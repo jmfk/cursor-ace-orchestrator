@@ -14,7 +14,7 @@ Each feature or module in a project has its own directory within the `.ace/specs
 | `constraints.md` | **Constraints** | Human + Agent | Security, performance, and technical boundaries. Semi-stable. |
 | `implementation.md` | **Implementation** | Agent | Technical approach, data models, and API contracts. Fluid/Disposable. |
 | `verification.md` | **Verification** | Agent + Human | Acceptance criteria and test cases (e.g., Gherkin). Executable. |
-| `meta.json` | **Metadata** | System | Tracks format used, outcome, and experiment IDs. |
+| `meta.json` | **Metadata** | System | Tracks format used, outcome, experiment IDs, and **Google Stitch canvas URLs**. |
 
 ---
 

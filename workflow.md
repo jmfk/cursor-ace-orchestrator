@@ -36,6 +36,7 @@ When a user runs `ace run "task"` or `ace loop "task"`, the orchestrator:
 - **Verify (TDD)**: If running via `ace loop`, the orchestrator executes the specified test command (e.g., `npm test`).
 - **Analyze**: If tests fail, a reflection prompt analyzes the failure to update the memory for the next iteration.
 - **Coordinate (SOP-driven)**: If multiple agents are involved, they follow the **Consensus SOP** via **Agent Mail**.
+- **UI/UX Mockup**: If the task involves UI, the agent uses **Google Stitch** to generate mockups and extract code before implementation.
 - **Review**: Other agents may perform a **PR Review SOP** on the changes if the Token Mode is set to Medium or High.
 
 ### Phase C: Reflection (Write-back)

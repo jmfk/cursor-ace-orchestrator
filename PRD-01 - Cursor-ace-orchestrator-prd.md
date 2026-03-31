@@ -36,6 +36,7 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 8. Implementera ett **Internal Messaging System (Agent Mail)** för asynkron kommunikation mellan agenter
 9. Använda **Standard Operating Procedures (SOPs)** för att styra agent-interaktioner och arbetsflöden
 10. Implementera **Token Consumption Modes** (Low, Medium, High) för att kontrollera driftskostnader
+11. Integrera **Google Stitch** för AI-driven UI/UX-design och mockup-generering
 
 ---
 
@@ -58,13 +59,15 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 │         │                  │                               │
 │         ▼                  ▼                               │
 │  ┌─────────────┐    ┌───────────────┐   ┌────────────────┐  │
-│  │ Agent Mail  │◀──▶│ cursor-agent  │◀──┤ Token Manager  │  │
-│  │ (Messaging) │    │  (executor)   │   │ (L / M / H)    │  │
+│  │ Agent Mail  │◀──▶│ cursor-agent  │◀──┤ Google Stitch  │  │
+│  │ (Messaging) │    │  (executor)   │   │ (UI/UX Mockups)│  │
 │  └─────────────┘    └───────────────┘   └────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Nyckelbegrepp
+
+**Google Stitch Integration** — Användning av Google Labs AI-native designverktyg för att generera UI-mockups och kod (Tailwind, Flutter, etc.) baserat på "Vibe Design"-prompts från ACE-agenter.
 
 **Agent Role / Agent Team** — En dedikerad agent-persona som agerar som en "one-agent team" för en specifik subsystem, bibliotek eller komponentgrupp. Agenter kan expandera sitt ägarskap till relaterade moduler över tid.
 
@@ -414,6 +417,22 @@ ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 3. **Consensus Check:** En neutral `arch-agent` (eller LLM-referee) utvärderar tråden för att se om båda parter är nöjda.
 4. **Human Escalation:** Om debatten går >3 rundor utan konsensus, skickas en notis till användaren: `ace consensus resolve <decision-id>`.
 
+### 6.7 UI/UX Orchestration (Google Stitch)
+
+**Ansvar:** Integrera Google Stitch för att generera mockups och UI-kod som en del av utvecklingsflödet.
+
+**Arbetsflöde:**
+1. **Vibe Prompting:** En `ui-agent` genererar en "Vibe Design"-beskrivning baserat på `intent.md` och `constraints.md`.
+2. **Mockup Generation:** ACE anropar Google Stitch API (eller instruerar användaren att öppna en genererad länk) för att skapa mockups.
+3. **Code Extraction:** Agenten extraherar Tailwind/Flutter-kod från Stitch och sparar den i `implementation.md` eller direkt i källkoden.
+4. **Visual Verification:** E2E-tester (Playwright) validerar att den implementerade koden matchar Stitch-mockupen.
+
+**CLI-interface:**
+```bash
+ace ui mockup "Skapa en dashboard för admin" --agent ui-expert-01
+ace ui sync <stitch-canvas-url>              # Importera kod från Stitch
+```
+
 ---
 
 ## 7. AGENTS.md som globalt minne
@@ -480,6 +499,10 @@ ace loop "<prompt>" --max 5                 # Begränsa iterationer
 ace mail inbox                              # Visa inbox för aktiv agent
 ace mail send --to <agent-id> --subject "API change" --body "..."
 ace mail reply <msg-id>
+
+# UI/UX (Google Stitch)
+ace ui mockup "<prompt>"                    # Generera mockup via Stitch
+ace ui sync <url>                           # Synka kod från Stitch canvas
 
 # SOP & QA
 ace agent onboard <agent-id>                # Kör onboarding-SOP
