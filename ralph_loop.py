@@ -8,20 +8,21 @@ from pathlib import Path
 
 # Configuration
 MODEL = "gemini-3-flash"
-MAX_ITERATIONS = 5
+MAX_ITERATIONS = 10
 PLAN_FILE = "plan.md"
 CHANGELOG_FILE = "changelog.md"
 LOG_FILE = "ralph_execution.log"
 STATS_FILE = "ralph_stats.json"
 
-# NOTE: This script is a temporary bootstrapping tool. 
-# Once the core ACE Orchestrator is built, this script should be 
+# NOTE: This script is a temporary bootstrapping tool.
+# Once the core ACE Orchestrator is built, this script should be
 # manually removed and replaced by the system's own 'ace loop' command.
 
 # Pricing for gemini-3-flash (approximate 2026 pricing)
 # $0.10 per 1M input tokens, $0.40 per 1M output tokens
 PRICE_INPUT_1M = 0.10
 PRICE_OUTPUT_1M = 0.40
+
 
 def log_message(message: str):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -30,55 +31,71 @@ def log_message(message: str):
     with open(LOG_FILE, "a") as f:
         f.write(formatted_msg + "\n")
 
+
 def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
-    stats = {"total_input_tokens": 0, "total_output_tokens": 0, "total_cost_usd": 0.0, "total_time_sec": 0.0, "iterations": 0}
+    stats = {
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_cost_usd": 0.0,
+        "total_time_sec": 0.0,
+        "iterations": 0,
+    }
     if os.path.exists(STATS_FILE):
         with open(STATS_FILE, "r") as f:
             stats = json.load(f)
-    
-    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M) + (output_tokens / 1_000_000 * PRICE_OUTPUT_1M)
-    
+
+    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M) + (
+        output_tokens / 1_000_000 * PRICE_OUTPUT_1M
+    )
+
     stats["total_input_tokens"] += input_tokens
     stats["total_output_tokens"] += output_tokens
     stats["total_cost_usd"] += cost
     stats["total_time_sec"] += elapsed_time
     stats["iterations"] += 1
-    
+
     with open(STATS_FILE, "w") as f:
         json.dump(stats, f, indent=2)
-    
-    log_message(f"Stats Update: +{input_tokens}in, +{output_tokens}out | Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s")
+
+    log_message(
+        f"Stats Update: +{input_tokens}in, +{output_tokens}out | Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s"
+    )
     log_message(f"Total Cost so far: ${stats['total_cost_usd']:.4f}")
+
 
 def run_cursor_agent(prompt: str):
     """Runs cursor-agent in headless mode and tracks usage."""
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
-    
+
     # Note: In a real scenario, cursor-agent headless would return usage stats in JSON.
     # We simulate token counts here for the purpose of the script logic.
     cmd = [
         "cursor-agent",
         "headless",
-        "--model", MODEL,
-        "--prompt", prompt,
-        "--output-format", "stream-json"
+        "--model",
+        MODEL,
+        "--prompt",
+        prompt,
+        "--output-format",
+        "stream-json",
     ]
-    
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         elapsed = time.time() - start_time
-        
+
         # Simulated token extraction (assuming the CLI returns this in production)
         # In a real implementation, we would parse result.stdout for usage data
         input_tokens = len(prompt.split()) * 1.3  # Rough estimate
-        output_tokens = len(result.stdout.split()) * 1.3 # Rough estimate
-        
+        output_tokens = len(result.stdout.split()) * 1.3  # Rough estimate
+
         update_stats(int(input_tokens), int(output_tokens), elapsed)
         return result.stdout
     except subprocess.CalledProcessError as e:
         log_message(f"Error running cursor-agent: {e.stderr}")
         return None
+
 
 def get_file_content(path: str):
     if os.path.exists(path):
@@ -86,9 +103,10 @@ def get_file_content(path: str):
             return f.read()
     return ""
 
+
 def main():
     log_message("🚀 Starting RALPH Loop for Cursor ACE Orchestrator...")
-    
+
     iteration = 0
     while iteration < MAX_ITERATIONS:
         iteration += 1
@@ -128,7 +146,7 @@ def main():
             "Do not proceed until all tests pass and the code is clean."
         )
         verification_result = run_cursor_agent(prompt)
-        
+
         # Step 4: Commit
         log_message("Step 4: Committing changes...")
         try:
@@ -150,7 +168,7 @@ def main():
         run_cursor_agent(prompt)
 
         log_message(f"Iteration {iteration} complete.")
-        
+
         # Check if plan is finished
         plan_content = get_file_content(PLAN_FILE)
         if "[ ]" not in plan_content and "todo" not in plan_content.lower():
@@ -159,6 +177,7 @@ def main():
 
     if iteration >= MAX_ITERATIONS:
         print(f"Reached maximum iterations ({MAX_ITERATIONS}). Stopping.")
+
 
 if __name__ == "__main__":
     main()
