@@ -90,9 +90,16 @@ When a task affects multiple subsystems:
 
 ---
 
-## 6. Implementation Stack
-- **Language**: Python 3.10+
-- **CLI Framework**: Typer
-- **API Framework**: FastAPI (planned)
-- **YAML Parsing**: ruamel.yaml (preserves comments)
-- **LLM Integration**: Anthropic Claude (Reflection) & Google Gemini (Execution)
+## 7. Development Lifecycle: From Bootstrap to Self-Hosting
+
+The development of ACE Orchestrator follows a two-phase evolution:
+
+### Phase 1: Bootstrapping (Temporary RALPH Loop)
+Initially, a standalone Python script (`ralph_loop.py`) is used to orchestrate `cursor-agent` in headless mode. This script implements a simplified RALPH cycle to build the core components of ACE (CLI, Registry, Context Builder).
+- **Status**: Active.
+- **Outcome**: A functional `ace` CLI that can run its own loops.
+
+### Phase 2: Self-Hosting (The ACE Loop)
+Once the core system is stable, `ralph_loop.py` will be manually removed. The system will then use its own `ace loop` command to implement further features, SOPs, and optimizations.
+- **Status**: Target.
+- **Mechanism**: ACE uses its own internal logic, Agent Mail, and Consensus protocols to evolve itself.

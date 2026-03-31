@@ -14,6 +14,10 @@ CHANGELOG_FILE = "changelog.md"
 LOG_FILE = "ralph_execution.log"
 STATS_FILE = "ralph_stats.json"
 
+# NOTE: This script is a temporary bootstrapping tool. 
+# Once the core ACE Orchestrator is built, this script should be 
+# manually removed and replaced by the system's own 'ace loop' command.
+
 # Pricing for gemini-3-flash (approximate 2026 pricing)
 # $0.10 per 1M input tokens, $0.40 per 1M output tokens
 PRICE_INPUT_1M = 0.10
