@@ -499,35 +499,47 @@ ace constraint approve <constraint-id>
 
 - [ ] Reflection-prompt, delta-updates, `helpful/harmful`-räknare.
 - [ ] **YAGNI/DRY Enforcement:** Lints och agent-instruktioner för att motverka överimplementering.
+- [ ] **Token Manager:** Implementera L/M/H modes för att styra kontext och debatt-djup.
 
 ### M3 — Living Specs (v0.2)
 
-- [ ] `ace spec create` — genererar de fyra lagrena
-- [ ] `specs/`-mapp i `.ace/`
-- [ ] Human-approval flow för constraints och verification
-- [ ] `ace spec feedback` — outcome-registrering
-- [ ] `meta.json` per spec
+- [ ] `ace spec create` — genererar de fyra lagrena.
+- [ ] `specs/`-mapp i `.ace/`.
+- [ ] Human-approval flow för constraints och verification.
+- [ ] `ace spec feedback` — outcome-registrering.
+- [ ] `meta.json` per spec.
+- [ ] **SOP-integration:** Definiera SOP:er för spec-generering och validering.
 
 ### M4 — Experiment Tracker (v0.2)
 
-- [ ] Format-bibliotek med 3 initiala format
-- [ ] Experiment-tracking per spec med outcome
-- [ ] Epsilon-greedy format-selektion (fallback: minimal-spec tills N≥5)
-- [ ] `ace meta experiment status`
+- [ ] Format-bibliotek med 3 initiala format.
+- [ ] Experiment-tracking per spec med outcome.
+- [ ] Epsilon-greedy format-selektion (fallback: minimal-spec tills N≥5).
+- [ ] `ace meta experiment status`.
 
 ### M5 — Dual-layer & Meta mode (v0.2)
 
-- [ ] `.ace-meta/`-struktur
-- [ ] `ace meta run` — explicit meta-mode, hårt separerat
-- [ ] `ace meta analyze` — self-improvement agent
-- [ ] Anonymisering av cross-project data
+- [ ] `.ace-meta/`-struktur.
+- [ ] `ace meta run` — explicit meta-mode, hårt separerat.
+- [ ] `ace meta analyze` — self-improvement agent.
+- [ ] Anonymisering av cross-project data.
 
 ### M6 — Self-improvement loop (v0.2)
 
-- [ ] Cross-project aggregering med confidence threshold
-- [ ] Global strategy extraction
-- [ ] `ace meta sync-templates` med human review-steg
-- [ ] Weekly scheduled analysis
+- [ ] Cross-project aggregering med confidence threshold.
+- [ ] Global strategy extraction.
+- [ ] `ace meta sync-templates` med human review-steg.
+- [ ] Weekly scheduled analysis.
+
+### M7 — Multi-agent, SOPs & Consensus (v0.5)
+
+- [ ] Parallell exekvering av oberoende roller.
+- [ ] **Agent Teams & SOPs**: Implementera onboarding, PR-review och audit-SOPs.
+- [ ] **Agent Mail & Subscriptions**: Implementera prenumerationslogik för subsystem-ändringar.
+- [ ] **Consensus & Debate**: Implementera debatt-logik med LLM-referee (Debate as Fact-Checking).
+- [ ] **Human-in-the-loop Escalation**: CLI-stöd för att lösa agent-konflikter.
+- [ ] **System-wide Integration Tests**: Verifiera multi-agent koordination och minnes-konsistens.
+- [ ] **Shared Learning**: Implementera `shared-learnings.mdc` för cross-pollination.
 
 ------
 

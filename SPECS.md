@@ -56,3 +56,19 @@ Role-specific knowledge bases that act as the agent's "long-term memory" for a s
 - **Architectural Decisions**: Module-specific ADR summaries.
 - **Strategies & Patterns**: `[str-XXX]` entries with helpful/harmful counters.
 - **Known Pitfalls**: `[mis-XXX]` entries to avoid repeating mistakes.
+
+---
+
+## 5. ACE Metadata & Registry (`.ace/`)
+
+Central location for project-specific orchestration data.
+
+| File/Directory | Description |
+|---|---|
+| `agents.yaml` | **Agent Registry**: Defines all agents (ID, Name, Role, Email, Responsibilities). |
+| `ownership.yaml` | **Ownership Registry**: Maps code modules to specific `agent_id`s. |
+| `mail/` | **Agent Mail Storage**: Contains `inbox/` and `sent/` directories for each agent. |
+| `shared-learnings.mdc` | **Cross-pollination**: Shared context for general architectural patterns and fixes. |
+| `sessions/` | **Session Logs**: History of agent tasks and write-back results. |
+| `decisions/` | **ADRs**: Architectural Decision Records for the project. |
+| `specs/` | **Living Specs**: Feature-specific specification layers. |
