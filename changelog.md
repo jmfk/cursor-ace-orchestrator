@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 6
+
+### Added
+- **Phase 5: API & Future Readiness**
+  - Documentation: Finalized `README.md` and CLI `--help` documentation for all commands.
+
 ## [2026-04-01] - RALPH Loop Iteration 5
 
 ### Added

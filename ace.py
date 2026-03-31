@@ -897,5 +897,151 @@ def memory_sync():
     Path("AGENTS.md").write_text("\n".join(content))
     console.print("Updated [green]AGENTS.md[/green]")
 
+# --- Mail & Interaction (Phase 3) ---
+
+@app.command()
+def mail_send(
+    to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
+    sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
+    subject: str = typer.Option(..., "--subject", "-s", help="Subject"),
+    body: str = typer.Option(..., "--body", "-b", help="Body"),
+):
+    """Send a message to another agent."""
+    mail_dir = Path(".ace/mail") / to
+    mail_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    msg_id = f"{timestamp}_{sender}"
+    mail_file = mail_dir / f"{msg_id}.yaml"
+    
+    msg_data = {
+        "id": msg_id,
+        "from": sender,
+        "to": to,
+        "subject": subject,
+        "body": body,
+        "timestamp": datetime.now().isoformat(),
+        "status": "unread"
+    }
+    
+    with open(mail_file, "w") as f:
+        yaml.dump(msg_data, f)
+        
+    console.print(f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]")
+
+@app.command()
+def mail_list(agent_id: str):
+    """List messages in an agent's inbox."""
+    mail_dir = Path(".ace/mail") / agent_id
+    if not mail_dir.exists():
+        console.print(f"No mail for agent [blue]{agent_id}[/blue]")
+        return
+        
+    mail_files = sorted(list(mail_dir.glob("*.yaml")), reverse=True)
+    if not mail_files:
+        console.print(f"Inbox for [blue]{agent_id}[/blue] is empty.")
+        return
+        
+    table = Table(title=f"Inbox: {agent_id}")
+    table.add_column("ID", style="cyan")
+    table.add_column("From", style="green")
+    table.add_column("Subject", style="yellow")
+    table.add_column("Status", style="magenta")
+    
+    for f in mail_files:
+        with open(f, "r") as m:
+            data = yaml.load(m)
+            table.add_row(data["id"], data["from"], data["subject"], data["status"])
+            
+    console.print(table)
+
+@app.command()
+def mail_read(agent_id: str, msg_id: str):
+    """Read a specific message."""
+    mail_file = Path(".ace/mail") / agent_id / f"{msg_id}.yaml"
+    if not mail_file.exists():
+        console.print(f"Message [red]{msg_id}[/red] not found.")
+        return
+        
+    with open(mail_file, "r") as f:
+        data = yaml.load(f)
+        
+    console.print(f"\n[bold]From:[/bold] {data['from']}")
+    console.print(f"[bold]Subject:[/bold] {data['subject']}")
+    console.print(f"[bold]Date:[/bold] {data['timestamp']}")
+    console.print("-" * 20)
+    console.print(data["body"])
+    console.print("-" * 20)
+    
+    # Mark as read
+    data["status"] = "read"
+    with open(mail_file, "w") as f:
+        yaml.dump(data, f)
+
+@app.command()
+def debate(
+    proposal: str = typer.Option(..., "--proposal", "-p", help="The proposal to debate"),
+    agents: List[str] = typer.Option(..., "--agent", "-a", help="Agents to participate"),
+):
+    """Initiate a debate between multiple agents."""
+    console.print(f"Initiating debate on proposal: [bold]{proposal}[/bold]")
+    
+    for agent_id in agents:
+        mail_send(
+            to=agent_id,
+            sender="orchestrator",
+            subject="DEBATE PROPOSAL",
+            body=f"Please review and debate the following proposal: {proposal}"
+        )
+        
+    console.print(f"Proposal sent to all participants: {', '.join(agents)}")
+
+# --- UI Integration (Phase 4) ---
+
+ui_app = typer.Typer(help="UI integration commands")
+app.add_typer(ui_app, name="ui")
+
+@app.command()
+def ui_mockup(description: str):
+    """Generate a UI mockup (Legacy)."""
+    console.print(f"Generating UI mockup for: [bold]{description}[/bold]")
+    canvas_url = f"https://stitch.google.com/canvas/{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    console.print(f"Stitch Canvas URL: [blue]{canvas_url}[/blue]")
+
+@app.command()
+def ui_sync(url: str):
+    """Sync UI code from Google Stitch (Legacy)."""
+    console.print(f"Syncing UI code from: [blue]{url}[/blue]")
+    # Mock implementation
+    tailwind_code = """
+<div class="bg-gray-100 p-8">
+    <h1 class="text-3xl font-bold text-blue-600">ACE Orchestrator Dashboard</h1>
+    <p class="mt-4 text-gray-600">This is a mock sync output.</p>
+</div>
+"""
+    console.print("Extracted Tailwind code:")
+    console.print(tailwind_code)
+    
+    output_file = Path("stitch_sync_output.html")
+    output_file.write_text(tailwind_code)
+    console.print(f"Saved to: [green]{output_file}[/green]")
+
+@ui_app.command("mockup")
+def ui_mockup_new(
+    description: str = typer.Argument(..., help="Description of the UI to mockup"),
+    agent_id: str = typer.Option(..., "--agent", "-a", help="Agent to handle the mockup")
+):
+    """Generate a UI mockup using a specific agent."""
+    console.print(f"Generating UI mockup for: [bold]{description}[/bold] using agent [green]{agent_id}[/green]")
+    # In a real implementation, this would trigger an agent call
+    console.print("Mockup generation initiated.")
+
+@ui_app.command("sync")
+def ui_sync_new(url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")):
+    """Sync UI code from Google Stitch."""
+    console.print(f"Syncing UI code from Google Stitch: [blue]{url}[/blue]")
+    # Mock implementation
+    console.print("Sync complete.")
+
 if __name__ == "__main__":
     app()
