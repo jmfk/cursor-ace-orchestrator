@@ -11,11 +11,12 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **0.6 TDD Infrastructure**: Set up `pytest` and create initial unit tests for Registry and Path matching logic.
 
 ## Phase 1: Context Builder & Executor (M1)
-- [ ] **1.1 Context Builder Logic**: Implement `ace build-context` to compose the context slice (global rules + role playbook + recent ADRs + task framing).
-- [ ] **1.2 Task Type Framing**: Define structured prompt prefixes for `implement`, `review`, `debug`, `refactor`, and `plan`.
-- [ ] **1.3 Executor Wrapper**: Implement `ace run` to wrap `cursor-agent` (or `claude-code`). Capture output and exit codes.
-- [ ] **1.4 Session Logging**: Implement automatic logging of every `ace run` execution to `.ace/sessions/` in Markdown format.
-- [ ] **1.5 Token Mode Configuration**: Implement `ace config tokens --mode [low|medium|high]` to control context depth.
+- [x] **1.1 Context Builder Logic**: Implement `ace build-context` to compose the context slice (global rules + role playbook + recent ADRs + task framing).
+- [x] **1.2 Task Type Framing**: Define structured prompt prefixes for `implement`, `review`, `debug`, `refactor`, and `plan`.
+- [x] **1.3 Executor Wrapper**: Implement `ace run` to wrap `cursor-agent` (or `claude-code`). Capture output and exit codes.
+- [x] **1.4 Session Logging**: Implement automatic logging of every `ace run` execution to `.ace/sessions/` in Markdown format.
+- [x] **1.5 Token Mode Configuration**: Implement `ace config tokens --mode [low|medium|high]` to control context depth.
+- [x] **1.6 Session Continuity**: Implement logic to inject the most recent relevant session log into the Context Builder.
 
 ## Phase 2: Write-back Pipeline (M2)
 - [ ] **2.1 Reflection Engine**: Implement the LLM reflection prompt (using Claude) to extract learnings from agent output.
@@ -26,8 +27,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 ## Phase 3: Memory & Decision Management (M3)
 - [ ] **3.1 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.
 - [ ] **3.2 Memory Pruning**: Implement `ace memory prune` to archive or remove "harmful" strategies (harmful > helpful).
-- [ ] **3.3 Session Continuity**: Implement logic to inject the most recent relevant session log into the Context Builder.
-- [ ] **3.4 Global Memory Sync**: Implement logic to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
+- [ ] **3.3 Global Memory Sync**: Implement logic to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
 
 ## Phase 4: RALPH Loop & Multi-Agent Coordination (M4)
 - [ ] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.

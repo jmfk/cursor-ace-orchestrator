@@ -8,6 +8,228 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.table import Table
 from ruamel.yaml import YAML
+import subprocess
+import tempfile
+import anthropic
+import re
+
+app = typer.Typer(no_args_is_help=True)
+console = Console()
+yaml = YAML()
+yaml.preserve_quotes = True
+
+# --- Reflection Engine (Phase 2.1) ---
+
+REFLECTION_PROMPT = """You are an ACE Reflection Engine. Your task is to analyze the output of a coding agent session and extract structured learnings.
+
+Look for:
+1. **Strategies [str-XXX]**: Successful patterns, helpful libraries, or effective approaches.
+2. **Pitfalls [mis-XXX]**: Bugs encountered, harmful patterns, or things to avoid.
+3. **Decisions [dec-XXX]**: Architectural choices made during the task.
+
+Format your output EXACTLY as follows:
+[str-NEW] helpful=1 harmful=0 :: <description of the strategy>
+[mis-NEW] helpful=0 harmful=1 :: <description of the pitfall>
+[dec-NEW] :: <description of the decision>
+
+Only include items that are clearly supported by the session output. If no new learnings are found, return "No new learnings."
+
+Session Output:
+{session_output}
+"""
+
+def get_anthropic_client():
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        console.print("[red]Error: ANTHROPIC_API_KEY environment variable not set.[/red]")
+        raise typer.Exit(code=1)
+    return anthropic.Anthropic(api_key=api_key)
+
+def reflect_on_session(session_output: str) -> str:
+    """Use Claude to extract learnings from session output."""
+    client = get_anthropic_client()
+    
+    prompt = REFLECTION_PROMPT.format(session_output=session_output)
+    
+    try:
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        # Extract text from the response
+        if isinstance(message.content, list):
+            return "".join([block.text for block in message.content if hasattr(block, 'text')])
+        return str(message.content)
+    except Exception as e:
+        console.print(f"[red]Error during reflection: {e}[/red]")
+        return "Error during reflection."
+
+@app.command()
+def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s", help="Session ID to reflect on")):
+    """Reflect on a session and extract learnings."""
+    sessions_dir = Path(".ace/sessions")
+    if not session_id:
+        # Get most recent session
+        session_files = sorted(list(sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
+        if not session_files:
+            console.print("[red]No sessions found to reflect on.[/red]")
+            return
+        session_file = session_files[0]
+    else:
+        session_file = sessions_dir / f"session_{session_id}.md"
+        if not session_file.exists():
+            console.print(f"[red]Session {session_id} not found.[/red]")
+            return
+
+    console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
+    session_content = session_file.read_text()
+    
+    # Extract the Output section from the session log
+    output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
+    if not output_match:
+        console.print("[red]Could not find output section in session log.[/red]")
+        return
+    
+    session_output = output_match.group(1)
+    reflection_text = reflect_on_session(session_output)
+    
+    console.print("\n[bold]Reflection Output:[/bold]")
+    console.print(reflection_text)
+    
+    # Parse and update playbooks
+    updates = parse_reflection_output(reflection_text)
+    if updates:
+        # For now, we update the agent associated with the session
+        # We can extract the path from the session log to find the agent
+        path_match = re.search(r"- \*\*Path\*\*: `(.*?)`", session_content)
+        path = path_match.group(1) if path_match else None
+        
+        if path and path != "None":
+            # Find agent for this path
+            ownership = load_ownership()
+            best_match_len = -1
+            resolved_agent_id = None
+            for module_path in ownership.modules:
+                if path.startswith(module_path):
+                    if len(module_path) > best_match_len:
+                        best_match_len = len(module_path)
+                        resolved_agent_id = ownership.modules[module_path].agent_id
+            
+            if resolved_agent_id:
+                agents_config = load_agents()
+                agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+                if agent:
+                    playbook_path = Path(agent.memory_file)
+                    update_playbook(playbook_path, updates)
+                else:
+                    console.print(f"[yellow]Agent {resolved_agent_id} not found for playbook update.[/yellow]")
+            else:
+                console.print("[yellow]No agent found for path. Skipping playbook update.[/yellow]")
+        else:
+            console.print("[yellow]No path found in session. Skipping playbook update.[/yellow]")
+    else:
+        console.print("[yellow]No new learnings extracted.[/yellow]")
+
+# --- Delta Update Parser (Phase 2.2) ---
+
+def parse_reflection_output(reflection_text: str) -> List[Dict]:
+    """Parse structured reflection output into a list of update dictionaries."""
+    updates = []
+    # Regex to match [type-ID] helpful=X harmful=Y :: description
+    pattern = r"\[(str|mis|dec)-([^\]]+)\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*)"
+    
+    for line in reflection_text.splitlines():
+        match = re.search(pattern, line)
+        if match:
+            update_type = match.group(1)
+            update_id = match.group(2)
+            helpful = int(match.group(3)) if match.group(3) else 0
+            harmful = int(match.group(4)) if match.group(4) else 0
+            description = match.group(5).strip()
+            
+            updates.append({
+                "type": update_type,
+                "id": update_id,
+                "helpful": helpful,
+                "harmful": harmful,
+                "description": description
+            })
+    return updates
+
+# --- Playbook Updater (Phase 2.3 & 2.4) ---
+
+def update_playbook(playbook_path: Path, updates: List[Dict]):
+    """Safely update an .mdc playbook with new learnings."""
+    if not playbook_path.exists():
+        console.print(f"[yellow]Warning: Playbook {playbook_path} not found. Skipping update.[/yellow]")
+        return
+
+    content = playbook_path.read_text()
+    
+    for update in updates:
+        update_id = update['id']
+        update_type = update['type']
+        
+        # Check if it's a new item or an update to an existing one
+        # Pattern for existing item: <!-- [type-ID] helpful=X harmful=Y :: description -->
+        # Or for decisions: <!-- [dec-ID] :: description -->
+        
+        existing_pattern = rf"<!-- \[{update_type}-{update_id}\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
+        match = re.search(existing_pattern, content)
+        
+        if match:
+            # Update existing item
+            old_helpful = int(match.group(1)) if match.group(1) else 0
+            old_harmful = int(match.group(2)) if match.group(2) else 0
+            
+            new_helpful = old_helpful + update['helpful']
+            new_harmful = old_harmful + update['harmful']
+            
+            new_line = f"<!-- [{update_type}-{update_id}]"
+            if update_type != 'dec':
+                new_line += f" helpful={new_helpful} harmful={new_harmful}"
+            new_line += f" :: {update['description']} -->"
+            
+            content = content.replace(match.group(0), new_line)
+            console.print(f"Updated existing {update_type} [blue]{update_id}[/blue]")
+        else:
+            # Add new item
+            # Generate a unique ID if it's "NEW"
+            if update_id == "NEW":
+                # Simple ID generation: count existing items of same type
+                existing_ids = re.findall(rf"\[{update_type}-(\d+)\]", content)
+                next_id = max([int(i) for i in existing_ids] + [0]) + 1
+                update_id = f"{next_id:03d}"
+            
+            update_str = f"[{update_type}-{update_id}]"
+            if update_type != 'dec':
+                update_str += f" helpful={update['helpful']} harmful={update['harmful']}"
+            update_str += f" :: {update['description']}"
+            
+            new_line = f"<!-- {update_str} -->"
+            
+            # Determine which section to add to
+            section_map = {
+                "str": "## Strategier & patterns",
+                "mis": "## Kända fallgropar",
+                "dec": "## Arkitekturella beslut"
+            }
+            
+            section_header = section_map.get(update_type)
+            if section_header and section_header in content:
+                parts = content.split(section_header)
+                content = parts[0] + section_header + "\n" + new_line + parts[1]
+                console.print(f"Added new {update_type} [green]{update_id}[/green]")
+            else:
+                # If section not found, append to end
+                content += f"\n\n{section_header}\n{new_line}"
+                console.print(f"Created section and added new {update_type} [green]{update_id}[/green]")
+            
+    playbook_path.write_text(content)
+    console.print(f"Updated playbook: [green]{playbook_path}[/green]")
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -349,7 +571,8 @@ def build_context(
     
     full_context = "\n\n".join(context_parts)
     console.print(full_context)
-    return full_context
+    # Return both context and resolved agent ID
+    return full_context, resolved_agent_id
 
 @app.command()
 def run(
@@ -360,13 +583,11 @@ def run(
 ):
     """Execute an agent command with ACE context."""
     # 1. Build context
-    context = build_context(path=path, task_type=task_type, agent_id=agent_id)
+    context, resolved_agent_id = build_context(path=path, task_type=task_type, agent_id=agent_id)
     
     # 2. Prepare the command
     # For now, we'll just print it. In a real implementation, we'd use subprocess.
     # We might want to inject the context as an environment variable or a temporary file.
-    import subprocess
-    import tempfile
     
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
         tmp.write(context)
@@ -418,6 +639,7 @@ def run(
     session_content = f"""# Session {session_id}
 - **Command**: `{command}`
 - **Path**: `{path}`
+- **Agent ID**: `{resolved_agent_id}`
 - **Task Type**: `{task_type.value}`
 - **Exit Code**: {exit_code}
 - **Timestamp**: {datetime.now().isoformat()}
@@ -433,8 +655,71 @@ def run(
     session_file.write_text(session_content)
     console.print(f"Session logged to: [green]{session_file}[/green]")
     
+    # 5. Trigger reflection
+    if exit_code == 0:
+        # Skip reflection in tests if ANTHROPIC_API_KEY is not set
+        if os.getenv("ANTHROPIC_API_KEY"):
+            _perform_reflection(session_file)
+        else:
+            console.print("[yellow]Skipping reflection: ANTHROPIC_API_KEY not set.[/yellow]")
+    
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
+
+def _perform_reflection(session_file: Path):
+    """Internal helper to perform reflection on a session file."""
+    session_content = session_file.read_text()
+    
+    # Extract the Output section from the session log
+    output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
+    if not output_match:
+        console.print("[red]Could not find output section in session log.[/red]")
+        return
+    
+    session_output = output_match.group(1)
+    reflection_text = reflect_on_session(session_output)
+    
+    console.print("\n[bold]Reflection Output:[/bold]")
+    console.print(reflection_text)
+    
+    # Parse and update playbooks
+    updates = parse_reflection_output(reflection_text)
+    if updates:
+        # Find the agent/playbook to update
+        agent_id_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", session_content)
+        if agent_id_match:
+            agent_id = agent_id_match.group(1)
+            if agent_id != "None":
+                agents_config = load_agents()
+                agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+                if agent:
+                    update_playbook(Path(agent.memory_file), updates)
+                    return
+        
+        # Fallback: update global rules
+        update_playbook(Path(".cursor/rules/_global.mdc"), updates)
+    else:
+        console.print("[yellow]No new learnings extracted.[/yellow]")
+
+@app.command()
+def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s", help="Session ID to reflect on")):
+    """Reflect on a session and extract learnings."""
+    sessions_dir = Path(".ace/sessions")
+    if not session_id:
+        # Get most recent session
+        session_files = sorted(list(sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
+        if not session_files:
+            console.print("[red]No sessions found to reflect on.[/red]")
+            return
+        session_file = session_files[0]
+    else:
+        session_file = sessions_dir / f"session_{session_id}.md"
+        if not session_file.exists():
+            console.print(f"[red]Session {session_id} not found.[/red]")
+            return
+
+    console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
+    _perform_reflection(session_file)
 
 if __name__ == "__main__":
     app()

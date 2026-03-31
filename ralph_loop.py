@@ -4,7 +4,6 @@ import sys
 import time
 import json
 from datetime import datetime
-from pathlib import Path
 
 # Configuration
 MODEL = "gemini-3-flash"

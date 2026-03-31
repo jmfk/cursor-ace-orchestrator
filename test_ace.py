@@ -1,8 +1,7 @@
 import pytest
 from pathlib import Path
-import shutil
 import os
-from ace import load_ownership, save_ownership, OwnershipConfig, OwnershipModule, load_agents, save_agents, AgentsConfig, Agent
+from ace import save_ownership, OwnershipConfig, OwnershipModule
 
 @pytest.fixture
 def temp_ace_dir(tmp_path):
@@ -153,3 +152,44 @@ def test_session_continuity(temp_ace_dir):
     result = runner.invoke(app, ["build-context"])
     assert "RECENT SESSIONS" in result.stdout
     assert "Session 1" in result.stdout
+
+def test_parse_reflection_output():
+    from ace import parse_reflection_output
+    text = """
+    [str-NEW] helpful=1 harmful=0 :: Use the Read tool before editing.
+    [mis-NEW] helpful=0 harmful=1 :: Don't skip tests.
+    [dec-NEW] :: Use FastAPI for the backend.
+    """
+    updates = parse_reflection_output(text)
+    assert len(updates) == 3
+    assert updates[0]["type"] == "str"
+    assert updates[0]["description"] == "Use the Read tool before editing."
+    assert updates[1]["type"] == "mis"
+    assert updates[2]["type"] == "dec"
+
+def test_update_playbook(tmp_path):
+    from ace import update_playbook
+    playbook = tmp_path / "test.mdc"
+    playbook.write_text("""
+## Strategier & patterns
+## Kända fallgropar
+## Arkitekturella beslut
+""")
+    
+    updates = [
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
+        {"type": "dec", "id": "001", "helpful": 0, "harmful": 0, "description": "Existing decision"}
+    ]
+    
+    # Add new
+    update_playbook(playbook, updates[:1])
+    content = playbook.read_text()
+    assert "[str-001] helpful=1 harmful=0 :: New strategy" in content
+    
+    # Update existing (simulated by adding it first then updating)
+    playbook.write_text(content + "\n<!-- [dec-001] :: Existing decision -->")
+    updates[1]["description"] = "Updated decision"
+    update_playbook(playbook, updates[1:])
+    content = playbook.read_text()
+    assert "Updated decision" in content
+    assert "Existing decision" not in content
