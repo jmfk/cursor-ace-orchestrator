@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 9
+
+### Added
+- **Phase 5: API & Future Readiness**
+  - FastAPI Architecture: Refactored core logic into a service layer to support a FastAPI backend.
+  - CLI-to-API Bridge: Ensured all CLI commands call the underlying service layer.
+
+## [2026-04-01] - RALPH Loop Iteration 9
+
+### Added
+- **Phase 5: API & Future Readiness**
+  - Documentation: Finalized `README.md` and CLI `--help` documentation for all commands.
+
 ## [2026-04-01] - RALPH Loop Iteration 8
 
 ### Added

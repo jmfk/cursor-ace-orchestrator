@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 """
@@ -80,7 +79,7 @@ def version(
         return None
     if isinstance(major, str):
         assert minor is None
-        parts = major.split('.')
+        parts = major.split(".")
         assert len(parts) == 2
         return Version(int(parts[0]), int(parts[1]))
     elif isinstance(major, tuple):
@@ -116,6 +115,7 @@ class DocInfo:
     doc_version: from %YAML directive
     tags: from %TAG directives in scanned order
     """
+
     # requested_version: Optional[Version] = None
     # doc_version: Optional[Version] = None
     # tags: list[Tag] = field(default_factory=list)

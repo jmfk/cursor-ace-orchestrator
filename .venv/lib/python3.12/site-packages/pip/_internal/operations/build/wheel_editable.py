@@ -23,9 +23,7 @@ def build_wheel_editable(
     try:
         logger.debug("Destination directory: %s", tempd)
 
-        runner = runner_with_spinner_message(
-            f"Building editable for {name} (pyproject.toml)"
-        )
+        runner = runner_with_spinner_message(f"Building editable for {name} (pyproject.toml)")
         with backend.subprocess_runner(runner):
             try:
                 wheel_name = backend.build_editable(
@@ -34,8 +32,7 @@ def build_wheel_editable(
                 )
             except HookMissing as e:
                 logger.error(
-                    "Cannot build editable %s because the build "
-                    "backend does not have the %s hook",
+                    "Cannot build editable %s because the build " "backend does not have the %s hook",
                     name,
                     e,
                 )

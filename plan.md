@@ -2,13 +2,28 @@
 
 This plan outlines the step-by-step implementation of the Cursor ACE Orchestrator, a Python-based CLI tool designed to provide long-term memory and coordination for coding agents.
 
-## Phase 0: Foundation & Project Setup (M0)
-- [x] **0.1 Environment Setup**: Initialize Python project with `poetry` or `pip` + `venv`. Install dependencies: `typer`, `ruamel.yaml`, `pydantic`, `rich`, `anthropic`.
-- [x] **0.2 Core Directory Structure**: Implement `ace init` to create `.ace/` (agents.yaml, ownership.yaml, mail/, sessions/, decisions/) and `.ace-local/`.
-- [x] **0.3 Ownership Registry**: Implement `ace own` and `ace who` logic using longest-prefix matching for file paths.
-- [x] **0.4 Agent Registry**: Implement `ace agent create` and `ace agent list` to manage `agents.yaml`.
-- [x] **0.5 MDC Templates**: Create base `.cursor/rules/*.mdc` templates with the required sections (Ownership, Decisions, Strategies, Pitfalls).
-- [x] **0.6 TDD Infrastructure**: Set up `pytest` and create initial unit tests for Registry and Path matching logic.
+## Phase 5: API & Future Readiness
+- [ ] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
+- [ ] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
+- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
+
+## Phase 4: RALPH Loop & Multi-Agent Coordination (M4)
+- [x] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.
+- [x] **4.2 Agent Mail System**: Implement the internal messaging system in `.ace/mail/` with `inbox/` and `sent/` per agent.
+- [x] **4.3 Consensus Protocol**: Implement the debate logic where agents exchange proposals via Mail, mediated by an LLM-referee.
+- [x] **4.4 SOP Engine**: Implement Standard Operating Procedures for `onboarding`, `audit`, and `pr-review`.
+- [x] **4.5 Google Stitch Integration**: Implement `ace ui mockup` and `ace ui sync` to interface with Google Labs design tools.
+
+## Phase 3: Memory & Decision Management (M3)
+- [x] **3.1 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.
+- [x] **3.2 Memory Pruning**: Implement `ace memory prune` to archive or remove "harmful" strategies (harmful > helpful).
+- [x] **3.3 Global Memory Sync**: Implement logic to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
+
+## Phase 2: Write-back Pipeline (M2)
+- [x] **2.1 Reflection Engine**: Implement the LLM reflection prompt (using Claude) to extract learnings from agent output.
+- [x] **2.2 Delta Update Parser**: Create logic to parse structured reflection output into `[str-XXX]`, `[mis-XXX]`, and `[dec-XXX]` updates.
+- [x] **2.3 Playbook Updater**: Implement safe, incremental updates to `.mdc` files that preserve existing structure and frontmatter.
+- [x] **2.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy counters based on task success/failure.
 
 ## Phase 1: Context Builder & Executor (M1)
 - [x] **1.1 Context Builder Logic**: Implement `ace build-context` to compose the context slice (global rules + role playbook + recent ADRs + task framing).
@@ -18,25 +33,10 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **1.5 Token Mode Configuration**: Implement `ace config tokens --mode [low|medium|high]` to control context depth.
 - [x] **1.6 Session Continuity**: Implement logic to inject the most recent relevant session log into the Context Builder.
 
-## Phase 2: Write-back Pipeline (M2)
-- [x] **2.1 Reflection Engine**: Implement the LLM reflection prompt (using Claude) to extract learnings from agent output.
-- [x] **2.2 Delta Update Parser**: Create logic to parse structured reflection output into `[str-XXX]`, `[mis-XXX]`, and `[dec-XXX]` updates.
-- [x] **2.3 Playbook Updater**: Implement safe, incremental updates to `.mdc` files that preserve existing structure and frontmatter.
-- [x] **2.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy counters based on task success/failure.
-
-## Phase 3: Memory & Decision Management (M3)
-- [x] **3.1 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.
-- [x] **3.2 Memory Pruning**: Implement `ace memory prune` to archive or remove "harmful" strategies (harmful > helpful).
-- [x] **3.3 Global Memory Sync**: Implement logic to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
-
-## Phase 4: RALPH Loop & Multi-Agent Coordination (M4)
-- [x] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.
-- [x] **4.2 Agent Mail System**: Implement the internal messaging system in `.ace/mail/` with `inbox/` and `sent/` per agent.
-- [x] **4.3 Consensus Protocol**: Implement the debate logic where agents exchange proposals via Mail, mediated by an LLM-referee.
-- [x] **4.4 SOP Engine**: Implement Standard Operating Procedures for `onboarding`, `audit`, and `pr-review`.
-- [x] **4.5 Google Stitch Integration**: Implement `ace ui mockup` and `ace ui sync` to interface with Google Labs design tools.
-
-## Phase 5: API & Future Readiness
-- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
-- [ ] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
-- [ ] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
+## Phase 0: Foundation & Project Setup (M0)
+- [x] **0.1 Environment Setup**: Initialize Python project with `poetry` or `pip` + `venv`. Install dependencies: `typer`, `ruamel.yaml`, `pydantic`, `rich`, `anthropic`.
+- [x] **0.2 Core Directory Structure**: Implement `ace init` to create `.ace/` (agents.yaml, ownership.yaml, mail/, sessions/, decisions/) and `.ace-local/`.
+- [x] **0.3 Ownership Registry**: Implement `ace own` and `ace who` logic using longest-prefix matching for file paths.
+- [x] **0.4 Agent Registry**: Implement `ace agent create` and `ace agent list` to manage `agents.yaml`.
+- [x] **0.5 MDC Templates**: Create base `.cursor/rules/*.mdc` templates with the required sections (Ownership, Decisions, Strategies, Pitfalls).
+- [x] **0.6 TDD Infrastructure**: Set up `pytest` and create initial unit tests for Registry and Path matching logic.

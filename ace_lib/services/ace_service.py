@@ -6,8 +6,15 @@ from typing import Optional, List, Dict, Tuple
 from ruamel.yaml import YAML
 import anthropic
 from ace_lib.models.schemas import (
-    Config, Decision, Agent, AgentsConfig,
-    OwnershipConfig, OwnershipModule, TokenMode, TaskType, MailMessage
+    Config,
+    Decision,
+    Agent,
+    AgentsConfig,
+    OwnershipConfig,
+    OwnershipModule,
+    TokenMode,
+    TaskType,
+    MailMessage,
 )
 
 yaml = YAML()
@@ -107,15 +114,32 @@ class ACEService:
 
     def get_task_framing(self, task_type: TaskType, module: str) -> str:
         framing = {
-            TaskType.IMPLEMENT: f"You are implementing new functionality in {module}. Follow the playbook strategies. Write back new learnings in the write-back section.",
-            TaskType.REVIEW: f"You are reviewing code in {module}. Identify deviations from playbook strategies. Add any new pitfalls to the write-back section.",
-            TaskType.DEBUG: f"You are debugging an issue in {module}. If the root cause reveals a new pattern, document it as [mis-XXX] in write-back.",
-            TaskType.REFACTOR: f"You are refactoring code in {module}. Ensure that the refactoring adheres to the architectural decisions and strategies in the playbook.",
-            TaskType.PLAN: f"You are planning a task in {module}. Outline the steps and consider the impact on existing strategies and decisions."
+            TaskType.IMPLEMENT: (
+                f"You are implementing new functionality in {module}. Follow the playbook strategies. "
+                "Write back new learnings in the write-back section."
+            ),
+            TaskType.REVIEW: (
+                f"You are reviewing code in {module}. Identify deviations from playbook strategies. "
+                "Add any new pitfalls to the write-back section."
+            ),
+            TaskType.DEBUG: (
+                f"You are debugging an issue in {module}. If the root cause reveals a new pattern, "
+                "document it as [mis-XXX] in write-back."
+            ),
+            TaskType.REFACTOR: (
+                f"You are refactoring code in {module}. Ensure that the refactoring adheres to the "
+                "architectural decisions and strategies in the playbook."
+            ),
+            TaskType.PLAN: (
+                f"You are planning a task in {module}. Outline the steps and consider the impact on "
+                "existing strategies and decisions."
+            ),
         }
         return framing.get(task_type, "")
 
-    def build_context(self, path: Optional[str] = None, task_type: TaskType = TaskType.IMPLEMENT, agent_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
+    def build_context(
+        self, path: Optional[str] = None, task_type: TaskType = TaskType.IMPLEMENT, agent_id: Optional[str] = None
+    ) -> Tuple[str, Optional[str]]:
         context_parts = []
 
         # 1. Global rules
@@ -175,31 +199,27 @@ class ACEService:
 
     def reflect_on_session(self, session_output: str) -> str:
         client = self.get_anthropic_client()
-        prompt = f"""You are an ACE Reflection Engine. Your task is to analyze the output of a coding agent session and extract structured learnings.
-
-Look for:
-1. **Strategies [str-XXX]**: Successful patterns, helpful libraries, or effective approaches.
-2. **Pitfalls [mis-XXX]**: Bugs encountered, harmful patterns, or things to avoid.
-3. **Decisions [dec-XXX]**: Architectural choices made during the task.
-
-Format your output EXACTLY as follows:
-[str-NEW] helpful=1 harmful=0 :: <description of the strategy>
-[mis-NEW] helpful=0 harmful=1 :: <description of the pitfall>
-[dec-NEW] :: <description of the decision>
-
-Only include items that are clearly supported by the session output. If no new learnings are found, return "No new learnings."
-
-Session Output:
-{session_output}
-"""
+        prompt = (
+            "You are an ACE Reflection Engine. Your task is to analyze the output of a coding agent session "
+            "and extract structured learnings.\n\n"
+            "Look for:\n"
+            "1. **Strategies [str-XXX]**: Successful patterns, helpful libraries, or effective approaches.\n"
+            "2. **Pitfalls [mis-XXX]**: Bugs encountered, harmful patterns, or things to avoid.\n"
+            "3. **Decisions [dec-XXX]**: Architectural choices made during the task.\n\n"
+            "Format your output EXACTLY as follows:\n"
+            "[str-NEW] helpful=1 harmful=0 :: <description of the strategy>\n"
+            "[mis-NEW] helpful=0 harmful=1 :: <description of the pitfall>\n"
+            "[dec-NEW] :: <description of the decision>\n\n"
+            "Only include items that are clearly supported by the session output. If no new learnings are found, "
+            'return "No new learnings."\n\n'
+            f"Session Output:\n{session_output}\n"
+        )
         try:
             message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}]
+                model="claude-3-5-sonnet-20241022", max_tokens=1024, messages=[{"role": "user", "content": prompt}]
             )
             if isinstance(message.content, list):
-                return "".join([block.text for block in message.content if hasattr(block, 'text')])
+                return "".join([block.text for block in message.content if hasattr(block, "text")])
             return str(message.content)
         except Exception as e:
             return f"Error during reflection: {e}"
@@ -210,13 +230,15 @@ Session Output:
         for line in reflection_text.splitlines():
             match = re.search(pattern, line)
             if match:
-                updates.append({
-                    "type": match.group(1),
-                    "id": match.group(2),
-                    "helpful": int(match.group(3)) if match.group(3) else 0,
-                    "harmful": int(match.group(4)) if match.group(4) else 0,
-                    "description": match.group(5).strip()
-                })
+                updates.append(
+                    {
+                        "type": match.group(1),
+                        "id": match.group(2),
+                        "helpful": int(match.group(3)) if match.group(3) else 0,
+                        "harmful": int(match.group(4)) if match.group(4) else 0,
+                        "description": match.group(5).strip(),
+                    }
+                )
         return updates
 
     def update_playbook(self, playbook_path: Path, updates: List[Dict]):
@@ -225,15 +247,17 @@ Session Output:
 
         content = playbook_path.read_text()
         for update in updates:
-            update_id, update_type = update['id'], update['type']
-            existing_pattern = rf"<!-- \[{update_type}-{update_id}\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
+            update_id, update_type = update["id"], update["type"]
+            existing_pattern = (
+                rf"<!-- \[{update_type}-{update_id}\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
+            )
             match = re.search(existing_pattern, content)
 
             if match:
                 old_h, old_m = int(match.group(1) or 0), int(match.group(2) or 0)
-                new_h, new_m = old_h + update['helpful'], old_m + update['harmful']
+                new_h, new_m = old_h + update["helpful"], old_m + update["harmful"]
                 new_line = f"<!-- [{update_type}-{update_id}]"
-                if update_type != 'dec':
+                if update_type != "dec":
                     new_line += f" helpful={new_h} harmful={new_m}"
                 new_line += f" :: {update['description']} -->"
                 content = content.replace(match.group(0), new_line)
@@ -244,12 +268,15 @@ Session Output:
                     update_id = f"{next_id:03d}"
 
                 update_str = f"[{update_type}-{update_id}]"
-                if update_type != 'dec':
+                if update_type != "dec":
                     update_str += f" helpful={update['helpful']} harmful={update['harmful']}"
                 new_line = f"<!-- {update_str} :: {update['description']} -->"
 
-                section_map = {"str": "## Strategier & patterns",
-                               "mis": "## Kända fallgropar", "dec": "## Arkitekturella beslut"}
+                section_map = {
+                    "str": "## Strategier & patterns",
+                    "mis": "## Kända fallgropar",
+                    "dec": "## Arkitekturella beslut",
+                }
                 header = section_map.get(update_type)
                 if header and header in content:
                     parts = content.split(header)
@@ -262,26 +289,77 @@ Session Output:
 
     # --- ADR Management ---
 
-    def add_decision(self, title: str, context: str, decision: str, consequences: str, status: str = "accepted", agent_id: Optional[str] = None) -> Decision:
+    def add_decision(
+        self,
+        title: str,
+        context: str,
+        decision: str,
+        consequences: str,
+        status: str = "accepted",
+        agent_id: Optional[str] = None,
+    ) -> Decision:
         self.decisions_dir.mkdir(parents=True, exist_ok=True)
         existing_adrs = list(self.decisions_dir.glob("ADR-*.md"))
         next_num = 1
         if existing_adrs:
-            nums = [int(re.search(r"ADR-(\d+)", f.name).group(1))
-                    for f in existing_adrs if re.search(r"ADR-(\d+)", f.name)]
+            nums = [
+                int(re.search(r"ADR-(\d+)", f.name).group(1)) for f in existing_adrs if re.search(r"ADR-(\d+)", f.name)
+            ]
             if nums:
                 next_num = max(nums) + 1
 
         adr_id = f"ADR-{next_num:03d}"
-        new_decision = Decision(id=adr_id, title=title, status=status, context=context,
-                                decision=decision, consequences=consequences, agent_id=agent_id)
+        new_decision = Decision(
+            id=adr_id,
+            title=title,
+            status=status,
+            context=context,
+            decision=decision,
+            consequences=consequences,
+            agent_id=agent_id,
+        )
 
         adr_file = self.decisions_dir / f"{adr_id}.md"
-        content = f"# {adr_id}: {title}\n- **Status**: {status}\n- **Date**: {new_decision.created_at}\n- **Agent**: {agent_id or 'User'}\n\n## Context\n{context}\n\n## Decision\n{decision}\n\n## Consequences\n{consequences}\n"
+        content = (
+            f"# {adr_id}: {title}\n"
+            f"- **Status**: {status}\n"
+            f"- **Date**: {new_decision.created_at}\n"
+            f"- **Agent**: {agent_id or 'User'}\n\n"
+            f"## Context\n{context}\n\n"
+            f"## Decision\n{decision}\n\n"
+            f"## Consequences\n{consequences}\n"
+        )
         adr_file.write_text(content)
         return new_decision
 
     # --- Mail System ---
+
+    def list_mail(self, agent_id: str) -> List[MailMessage]:
+        agent_mail_dir = self.mail_dir / agent_id
+        if not agent_mail_dir.exists():
+            return []
+        mail_files = sorted(list(agent_mail_dir.glob("*.yaml")), reverse=True)
+        messages = []
+        for f in mail_files:
+            with open(f, "r") as m:
+                data = yaml.load(m)
+                messages.append(MailMessage(**data))
+        return messages
+
+    def read_mail(self, agent_id: str, msg_id: str) -> Optional[MailMessage]:
+        mail_file = self.mail_dir / agent_id / f"{msg_id}.yaml"
+        if not mail_file.exists():
+            return None
+        with open(mail_file, "r") as f:
+            data = yaml.load(f)
+            msg = MailMessage(**data)
+        
+        # Mark as read
+        data["status"] = "read"
+        with open(mail_file, "w") as f:
+            yaml.dump(data, f)
+        
+        return MailMessage(**data)
 
     def send_mail(self, to_agent: str, from_agent: str, subject: str, body: str) -> MailMessage:
         agent_mail_dir = self.mail_dir / to_agent

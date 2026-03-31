@@ -53,6 +53,7 @@ def api_call(method: str, endpoint: str, **kwargs):
         pass
     return None
 
+
 # --- CLI Wrappers ---
 
 
@@ -206,8 +207,15 @@ def run(
     console.print(f"Context injected from: [dim]{context_file}[/dim]")
 
     try:
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+        )
         output_lines = []
         for line in process.stdout:
             console.print(line, end="")
@@ -306,10 +314,18 @@ def decision_add(
     agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent who made the decision"),
 ):
     """Add a new Architectural Decision Record (ADR)."""
-    res = api_call("POST", "/decisions", params={
-        "title": title, "context": context, "decision": decision,
-        "consequences": consequences, "status": status, "agent_id": agent_id
-    })
+    res = api_call(
+        "POST",
+        "/decisions",
+        params={
+            "title": title,
+            "context": context,
+            "decision": decision,
+            "consequences": consequences,
+            "status": status,
+            "agent_id": agent_id,
+        },
+    )
     if res:
         console.print(f"Created ADR: [green]{service.decisions_dir / f'{res['id']}.md'}[/green]")
     else:
@@ -340,8 +356,12 @@ def decision_list():
         title_match = re.search(r"# ADR-\d+: (.*)", content)
         status_match = re.search(r"- \*\*Status\*\*: (.*)", content)
         date_match = re.search(r"- \*\*Date\*\*: (.*)", content)
-        table.add_row(adr_path.stem, title_match.group(1) if title_match else adr_path.name, status_match.group(
-            1) if status_match else "unknown", date_match.group(1) if date_match else "unknown")
+        table.add_row(
+            adr_path.stem,
+            title_match.group(1) if title_match else adr_path.name,
+            status_match.group(1) if status_match else "unknown",
+            date_match.group(1) if date_match else "unknown",
+        )
     console.print(table)
 
 
@@ -373,7 +393,11 @@ def memory_sync():
     else:
         for agent in agents_config.agents:
             content.append(
-                f"### {agent.name} (`{agent.id}`)\n- **Role**: {agent.role}\n- **Email**: {agent.email}\n- **Memory**: `{agent.memory_file}`")
+                f"### {agent.name} (`{agent.id}`)\n"
+                f"- **Role**: {agent.role}\n"
+                f"- **Email**: {agent.email}\n"
+                f"- **Memory**: `{agent.memory_file}`"
+            )
             if agent.responsibilities:
                 content.append("- **Responsibilities**:")
                 for resp in agent.responsibilities:
@@ -390,14 +414,21 @@ def memory_sync():
             title_match = re.search(r"# (ADR-\d+: .*)", adr_content)
             status_match = re.search(r"- \*\*Status\*\*: (.*)", adr_content)
             content.append(
-                f"- **{title_match.group(1) if title_match else adr_path.name}** [{status_match.group(1) if status_match else 'unknown'}]")
+                f"- **{title_match.group(1) if title_match else adr_path.name}** "
+                f"[{status_match.group(1) if status_match else 'unknown'}]"
+            )
 
     Path("AGENTS.md").write_text("\n".join(content))
     console.print("Updated [green]AGENTS.md[/green]")
 
 
 @app.command()
-def mail_send(to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"), sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"), subject: str = typer.Option(..., "--subject", "-s", help="Subject"), body: str = typer.Option(..., "--body", "-b", help="Body")):
+def mail_send(
+    to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
+    sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
+    subject: str = typer.Option(..., "--subject", "-s", help="Subject"),
+    body: str = typer.Option(..., "--body", "-b", help="Body"),
+):
     """Send a message to another agent."""
     service.send_mail(to, sender, subject, body)
     console.print(f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]")
@@ -417,6 +448,7 @@ def mail_list(agent_id: str):
     table.add_column("Subject", style="yellow")
     table.add_column("Status", style="magenta")
     from ruamel.yaml import YAML
+
     y = YAML()
     for f in mail_files:
         with open(f, "r") as m:
@@ -433,22 +465,31 @@ def mail_read(agent_id: str, msg_id: str):
         console.print(f"Message [red]{msg_id}[/red] not found.")
         return
     from ruamel.yaml import YAML
+
     y = YAML()
     with open(mail_file, "r") as f:
         data = y.load(f)
     console.print(
-        f"\n[bold]From:[/bold] {data['from']}\n[bold]Subject:[/bold] {data['subject']}\n[bold]Date:[/bold] {data['timestamp']}\n{'-' * 20}\n{data['body']}\n{'-' * 20}")
+        f"\n[bold]From:[/bold] {data['from']}\n"
+        f"[bold]Subject:[/bold] {data['subject']}\n"
+        f"[bold]Date:[/bold] {data['timestamp']}\n"
+        f"{'-' * 20}\n{data['body']}\n{'-' * 20}"
+    )
     data["status"] = "read"
     with open(mail_file, "w") as f:
         y.dump(data, f)
 
 
 @app.command()
-def debate(proposal: str = typer.Option(..., "--proposal", "-p", help="The proposal to debate"), agents: List[str] = typer.Option(..., "--agent", "-a", help="Agents to participate")):
+def debate(
+    proposal: str = typer.Option(..., "--proposal", "-p", help="The proposal to debate"),
+    agents: List[str] = typer.Option(..., "--agent", "-a", help="Agents to participate"),
+):
     """Initiate a debate between multiple agents."""
     for agent_id in agents:
-        service.send_mail(agent_id, "orchestrator", "DEBATE PROPOSAL",
-                          f"Please review and debate the following proposal: {proposal}")
+        service.send_mail(
+            agent_id, "orchestrator", "DEBATE PROPOSAL", f"Please review and debate the following proposal: {proposal}"
+        )
     console.print(f"Proposal sent to participants: {', '.join(agents)}")
 
 
@@ -457,9 +498,14 @@ app.add_typer(ui_app, name="ui")
 
 
 @ui_app.command("mockup")
-def ui_mockup(description: str = typer.Argument(..., help="Description of the UI to mockup"), agent_id: str = typer.Option(..., "--agent", "-a", help="Agent to handle the mockup")):
+def ui_mockup(
+    description: str = typer.Argument(..., help="Description of the UI to mockup"),
+    agent_id: str = typer.Option(..., "--agent", "-a", help="Agent to handle the mockup"),
+):
     """Generate a UI mockup."""
-    console.print(f"Generating UI mockup for: [bold]{description}[/bold] using agent [green]{agent_id}[/green]")
+    console.print(
+        f"Generating UI mockup for: [bold]{description}[/bold] using agent [green]{agent_id}[/green]"
+    )
 
 
 @ui_app.command("sync")
