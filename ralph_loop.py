@@ -24,6 +24,7 @@ PRICE_OUTPUT_1M = 0.40
 
 
 def log_message(message: str):
+    """Log a message with timestamp to console and file."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted_msg = f"[{timestamp}] {message}"
     print(formatted_msg)
@@ -31,7 +32,12 @@ def log_message(message: str):
         f.write(formatted_msg + "\n")
 
 
-def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
+def update_stats(
+    input_tokens: int,
+    output_tokens: int,
+    elapsed_time: float
+):
+    """Update execution statistics and cost."""
     stats = {
         "total_input_tokens": 0,
         "total_output_tokens": 0,
@@ -57,7 +63,8 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
         json.dump(stats, f, indent=2)
 
     log_message(
-        f"Stats Update: +{input_tokens}in, +{output_tokens}out | Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s"
+        f"Stats Update: +{input_tokens}in, +{output_tokens}out | "
+        f"Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s"
     )
     log_message(f"Total Cost so far: ${stats['total_cost_usd']:.4f}")
 
@@ -105,6 +112,7 @@ def run_cursor_agent(prompt: str):
 
 
 def get_file_content(path: str):
+    """Read and return file content if it exists."""
     if os.path.exists(path):
         with open(path, "r") as f:
             return f.read()
@@ -112,6 +120,7 @@ def get_file_content(path: str):
 
 
 def main():
+    """Main execution loop for RALPH."""
     if "--help" in sys.argv or "-h" in sys.argv:
         print("RALPH Loop for Cursor ACE Orchestrator")
         print("Usage: python ralph_loop.py")
@@ -123,15 +132,17 @@ def main():
         iteration += 1
         log_message(f"=== Iteration {iteration}/{MAX_ITERATIONS} ===")
 
-        # Step 1: Planning (if plan.md doesn't exist or needs update)
+        # Step 1: Planning
         plan_content = get_file_content(PLAN_FILE)
         if not plan_content:
             log_message("Step 1: Planning...")
             prompt = (
-                "Based on PRD-01 - Cursor-ace-orchestrator-prd.md (primary), and SPECS.md, "
-                "create a detailed, sorted list of implementation steps for the Cursor ACE Orchestrator. "
-                "The system should be built in Python, supporting CLI first but architected for FastAPI later. "
-                "Save the plan as 'plan.md' as a sorted list of tasks."
+                "Based on PRD-01 - Cursor-ace-orchestrator-prd.md (primary), "
+                "and SPECS.md, create a detailed, sorted list of implementation "
+                "steps for the Cursor ACE Orchestrator. The system should be "
+                "built in Python, supporting CLI first but architected for "
+                "FastAPI later. Save the plan as 'plan.md' as a sorted list "
+                "of tasks."
             )
             run_cursor_agent(prompt)
             plan_content = get_file_content(PLAN_FILE)
@@ -144,8 +155,9 @@ def main():
         prompt = (
             f"Current plan:\n{plan_content}\n\n"
             "Implement the next (first uncompleted) task from the plan. "
-            "Include necessary tests. Ensure the software remains runnable and testable. "
-            "Use Python and follow the architecture described in PRD-01 and ARCHITECTURE.md."
+            "Include necessary tests. Ensure the software remains runnable "
+            "and testable. Use Python and follow the architecture described "
+            "in PRD-01 and ARCHITECTURE.md."
         )
         run_cursor_agent(prompt)
 
@@ -157,13 +169,18 @@ def main():
             "Do not proceed until all tests pass and the code is clean."
         )
         verification_result = run_cursor_agent(prompt)
+        if verification_result is None:
+            log_message("Verification failed. Retrying...")
+            continue
 
         # Step 4: Commit
         log_message("Step 4: Committing changes...")
         try:
             # Check if there are changes to commit
             status = subprocess.run(
-                ["git", "status", "--porcelain"], capture_output=True, text=True
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True
             )
             if status.stdout.strip():
                 subprocess.run(["git", "add", "."], check=True)
@@ -178,9 +195,10 @@ def main():
         # Step 5: Update Plan and Changelog
         log_message("Step 5: Updating plan and changelog...")
         prompt = (
-            f"Update '{PLAN_FILE}' by marking the completed task as done and keeping the list sorted. "
-            f"Write the completed task details to '{CHANGELOG_FILE}'. "
-            "Ensure the plan reflects what is left to do."
+            f"Update '{PLAN_FILE}' by marking the completed task as done "
+            f"and keeping the list sorted. Write the completed task details "
+            f"to '{CHANGELOG_FILE}'. Ensure the plan reflects what is left "
+            "to do."
         )
         run_cursor_agent(prompt)
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 2
+
+### Added
+- **Phase 2: Write-back Pipeline (M2)**
+  - Reflection Engine: Extracts learnings from agent output using structured patterns.
+  - Delta Update Parser: Parses `[str-XXX]`, `[mis-XXX]`, and `[dec-XXX]` updates from reflection output.
+  - Playbook Updater: Safely updates `.mdc` files with new learnings while preserving structure.
+  - Helpful/Harmful Counters: Logic to track and update strategy effectiveness.
+
 ## [2026-04-01] - RALPH Loop Iteration 1
 
 ### Added

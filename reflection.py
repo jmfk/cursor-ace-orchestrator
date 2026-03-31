@@ -26,8 +26,9 @@ class ReflectionEngine:
     DEC_PATTERN = r"\[dec-(\w+)\]\s+::\s+(.*)"
 
     def parse_output(self, text: str) -> ReflectionResult:
+        """Parse structured reflection output into a list of update dictionaries."""
         result = ReflectionResult()
-        
+
         # Find all matches for strategies
         for match in re.finditer(self.STR_PATTERN, text):
             result.entries.append(ReflectionEntry(
@@ -37,7 +38,7 @@ class ReflectionEngine:
                 harmful=int(match.group(3)),
                 content=match.group(4).strip()
             ))
-            
+
         # Find all matches for pitfalls
         for match in re.finditer(self.MIS_PATTERN, text):
             result.entries.append(ReflectionEntry(
@@ -47,7 +48,7 @@ class ReflectionEngine:
                 harmful=int(match.group(3)),
                 content=match.group(4).strip()
             ))
-            
+
         # Find all matches for decisions
         for match in re.finditer(self.DEC_PATTERN, text):
             result.entries.append(ReflectionEntry(
@@ -55,7 +56,7 @@ class ReflectionEngine:
                 type="dec",
                 content=match.group(2).strip()
             ))
-            
+
         return result
 
 class PlaybookUpdater:
@@ -67,6 +68,7 @@ class PlaybookUpdater:
         self.playbook_path = playbook_path
 
     def update(self, reflections: ReflectionResult):
+        """Updates .mdc files with new reflections while preserving structure."""
         if not reflections.entries:
             return
 
@@ -86,7 +88,13 @@ class PlaybookUpdater:
             with open(self.playbook_path, "w") as f:
                 f.write(new_content)
 
-    def _update_section(self, content: str, section_header: str, entry: ReflectionEntry) -> str:
+    def _update_section(
+        self,
+        content: str,
+        section_header: str,
+        entry: ReflectionEntry
+    ) -> str:
+        """Update a section with a new or existing entry."""
         # Find the section
         section_start = content.find(section_header)
         if section_start == -1:

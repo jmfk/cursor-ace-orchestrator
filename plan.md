@@ -19,15 +19,15 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **1.6 Session Continuity**: Implement logic to inject the most recent relevant session log into the Context Builder.
 
 ## Phase 2: Write-back Pipeline (M2)
-- [ ] **2.1 Reflection Engine**: Implement the LLM reflection prompt (using Claude) to extract learnings from agent output.
-- [ ] **2.2 Delta Update Parser**: Create logic to parse structured reflection output into `[str-XXX]`, `[mis-XXX]`, and `[dec-XXX]` updates.
-- [ ] **2.3 Playbook Updater**: Implement safe, incremental updates to `.mdc` files that preserve existing structure and frontmatter.
-- [ ] **2.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy counters based on task success/failure.
+- [x] **2.1 Reflection Engine**: Implement the LLM reflection prompt (using Claude) to extract learnings from agent output.
+- [x] **2.2 Delta Update Parser**: Create logic to parse structured reflection output into `[str-XXX]`, `[mis-XXX]`, and `[dec-XXX]` updates.
+- [x] **2.3 Playbook Updater**: Implement safe, incremental updates to `.mdc` files that preserve existing structure and frontmatter.
+- [x] **2.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy counters based on task success/failure.
 
 ## Phase 3: Memory & Decision Management (M3)
-- [ ] **3.1 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.
-- [ ] **3.2 Memory Pruning**: Implement `ace memory prune` to archive or remove "harmful" strategies (harmful > helpful).
-- [ ] **3.3 Global Memory Sync**: Implement logic to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
+- [x] **3.1 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.
+- [x] **3.2 Memory Pruning**: Implement `ace memory prune` to archive or remove "harmful" strategies (harmful > helpful).
+- [x] **3.3 Global Memory Sync**: Implement logic to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
 
 ## Phase 4: RALPH Loop & Multi-Agent Coordination (M4)
 - [ ] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.

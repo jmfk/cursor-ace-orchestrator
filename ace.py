@@ -39,6 +39,7 @@ Session Output:
 """
 
 def get_anthropic_client():
+    """Initialize and return the Anthropic client."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         console.print("[red]Error: ANTHROPIC_API_KEY environment variable not set.[/red]")
@@ -48,9 +49,9 @@ def get_anthropic_client():
 def reflect_on_session(session_output: str) -> str:
     """Use Claude to extract learnings from session output."""
     client = get_anthropic_client()
-    
+
     prompt = REFLECTION_PROMPT.format(session_output=session_output)
-    
+
     try:
         message = client.messages.create(
             model="claude-3-5-sonnet-20241022",
@@ -61,19 +62,33 @@ def reflect_on_session(session_output: str) -> str:
         )
         # Extract text from the response
         if isinstance(message.content, list):
-            return "".join([block.text for block in message.content if hasattr(block, 'text')])
+            return "".join([
+                block.text for block in message.content
+                if hasattr(block, 'text')
+            ])
         return str(message.content)
     except Exception as e:
         console.print(f"[red]Error during reflection: {e}[/red]")
         return "Error during reflection."
 
 @app.command()
-def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s", help="Session ID to reflect on")):
+def reflect(
+    session_id: Optional[str] = typer.Option(
+        None,
+        "--session-id",
+        "-s",
+        help="Session ID to reflect on"
+    )
+):
     """Reflect on a session and extract learnings."""
     sessions_dir = Path(".ace/sessions")
     if not session_id:
         # Get most recent session
-        session_files = sorted(list(sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
+        session_files = sorted(
+            list(sessions_dir.glob("*.md")),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
         if not session_files:
             console.print("[red]No sessions found to reflect on.[/red]")
             return
@@ -86,19 +101,23 @@ def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s",
 
     console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
     session_content = session_file.read_text()
-    
+
     # Extract the Output section from the session log
-    output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
+    output_match = re.search(
+        r"## Output\n```\n(.*?)\n```",
+        session_content,
+        re.DOTALL
+    )
     if not output_match:
         console.print("[red]Could not find output section in session log.[/red]")
         return
-    
+
     session_output = output_match.group(1)
     reflection_text = reflect_on_session(session_output)
-    
+
     console.print("\n[bold]Reflection Output:[/bold]")
     console.print(reflection_text)
-    
+
     # Parse and update playbooks
     updates = parse_reflection_output(reflection_text)
     if updates:
@@ -106,7 +125,7 @@ def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s",
         # We can extract the path from the session log to find the agent
         path_match = re.search(r"- \*\*Path\*\*: `(.*?)`", session_content)
         path = path_match.group(1) if path_match else None
-        
+
         if path and path != "None":
             # Find agent for this path
             ownership = load_ownership()
@@ -116,27 +135,38 @@ def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s",
                 if path.startswith(module_path):
                     if len(module_path) > best_match_len:
                         best_match_len = len(module_path)
-                        resolved_agent_id = ownership.modules[module_path].agent_id
-            
+                        resolved_agent_id = ownership.modules[
+                            module_path
+                        ].agent_id
+
             if resolved_agent_id:
                 agents_config = load_agents()
-                agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+                agent = next(
+                    (a for a in agents_config.agents if a.id == resolved_agent_id),
+                    None
+                )
                 if agent:
                     playbook_path = Path(agent.memory_file)
                     update_playbook(playbook_path, updates)
                 else:
-                    console.print(f"[yellow]Agent {resolved_agent_id} not found for playbook update.[/yellow]")
+                    console.print(
+                        f"[yellow]Agent {resolved_agent_id} not found.[/yellow]"
+                    )
             else:
-                console.print("[yellow]No agent found for path. Skipping playbook update.[/yellow]")
+                console.print(
+                    "[yellow]No agent found for path. Skipping update.[/yellow]"
+                )
         else:
-            console.print("[yellow]No path found in session. Skipping playbook update.[/yellow]")
+            console.print(
+                "[yellow]No path found. Skipping playbook update.[/yellow]"
+            )
     else:
         console.print("[yellow]No new learnings extracted.[/yellow]")
 
 # --- Delta Update Parser (Phase 2.2) ---
 
 def parse_reflection_output(reflection_text: str) -> List[Dict]:
-    """Parse structured reflection output into a list of update dictionaries."""
+    """Parse structured reflection output into a list of update dicts."""
     updates = []
     # Regex to match [type-ID] helpful=X harmful=Y :: description
     pattern = r"\[(str|mis|dec)-([^\]]+)\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*)"
@@ -172,29 +202,32 @@ def update_playbook(playbook_path: Path, updates: List[Dict]):
     for update in updates:
         update_id = update['id']
         update_type = update['type']
-        
+
         # Check if it's a new item or an update to an existing one
-        # Pattern for existing item: <!-- [type-ID] helpful=X harmful=Y :: description -->
+        # Pattern for existing item:
+        # <!-- [type-ID] helpful=X harmful=Y :: description -->
         # Or for decisions: <!-- [dec-ID] :: description -->
-        
+
         existing_pattern = rf"<!-- \[{update_type}-{update_id}\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
         match = re.search(existing_pattern, content)
-        
+
         if match:
             # Update existing item
             old_helpful = int(match.group(1)) if match.group(1) else 0
             old_harmful = int(match.group(2)) if match.group(2) else 0
-            
+
             new_helpful = old_helpful + update['helpful']
             new_harmful = old_harmful + update['harmful']
-            
+
             new_line = f"<!-- [{update_type}-{update_id}]"
             if update_type != 'dec':
                 new_line += f" helpful={new_helpful} harmful={new_harmful}"
             new_line += f" :: {update['description']} -->"
-            
+
             content = content.replace(match.group(0), new_line)
-            console.print(f"Updated existing {update_type} [blue]{update_id}[/blue]")
+            console.print(
+                f"Updated existing {update_type} [blue]{update_id}[/blue]"
+            )
         else:
             # Add new item
             # Generate a unique ID if it's "NEW"
@@ -203,30 +236,34 @@ def update_playbook(playbook_path: Path, updates: List[Dict]):
                 existing_ids = re.findall(rf"\[{update_type}-(\d+)\]", content)
                 next_id = max([int(i) for i in existing_ids] + [0]) + 1
                 update_id = f"{next_id:03d}"
-            
+
             update_str = f"[{update_type}-{update_id}]"
             if update_type != 'dec':
                 update_str += f" helpful={update['helpful']} harmful={update['harmful']}"
             update_str += f" :: {update['description']}"
-            
+
             new_line = f"<!-- {update_str} -->"
-            
+
             # Determine which section to add to
             section_map = {
                 "str": "## Strategier & patterns",
                 "mis": "## Kända fallgropar",
                 "dec": "## Arkitekturella beslut"
             }
-            
+
             section_header = section_map.get(update_type)
             if section_header and section_header in content:
                 parts = content.split(section_header)
-                content = parts[0] + section_header + "\n" + new_line + parts[1]
+                content = (
+                    parts[0] + section_header + "\n" + new_line + parts[1]
+                )
                 console.print(f"Added new {update_type} [green]{update_id}[/green]")
             else:
                 # If section not found, append to end
                 content += f"\n\n{section_header}\n{new_line}"
-                console.print(f"Created section and added new {update_type} [green]{update_id}[/green]")
+                console.print(
+                    f"Created section and added new {update_type} [green]{update_id}[/green]"
+                )
             
     playbook_path.write_text(content)
     console.print(f"Updated playbook: [green]{playbook_path}[/green]")
@@ -250,6 +287,16 @@ class TaskType(str, Enum):
 
 class Config(BaseModel):
     token_mode: TokenMode = TokenMode.LOW
+
+class Decision(BaseModel):
+    id: str
+    title: str
+    status: str = "proposed"
+    context: str
+    decision: str
+    consequences: str
+    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    agent_id: Optional[str] = None
 
 # Models
 class Agent(BaseModel):
@@ -279,6 +326,7 @@ class OwnershipConfig(BaseModel):
 
 # Helper to load/save configs
 def load_ownership() -> OwnershipConfig:
+    """Load ownership configuration from YAML."""
     ownership_file = Path(".ace/ownership.yaml")
     if not ownership_file.exists():
         return OwnershipConfig()
@@ -289,12 +337,14 @@ def load_ownership() -> OwnershipConfig:
         return OwnershipConfig(**data)
 
 def save_ownership(config: OwnershipConfig):
+    """Save ownership configuration to YAML."""
     ownership_file = Path(".ace/ownership.yaml")
     with open(ownership_file, "w") as f:
         # Pydantic model_dump() to dict, then yaml.dump
         yaml.dump(config.model_dump(), f)
 
 def load_agents() -> AgentsConfig:
+    """Load agents configuration from YAML."""
     agents_file = Path(".ace/agents.yaml")
     if not agents_file.exists():
         return AgentsConfig()
@@ -305,11 +355,13 @@ def load_agents() -> AgentsConfig:
         return AgentsConfig(**data)
 
 def save_agents(config: AgentsConfig):
+    """Save agents configuration to YAML."""
     agents_file = Path(".ace/agents.yaml")
     with open(agents_file, "w") as f:
         yaml.dump(config.model_dump(), f)
 
 def load_config() -> Config:
+    """Load general configuration from YAML."""
     config_file = Path(".ace/config.yaml")
     if not config_file.exists():
         return Config()
@@ -320,12 +372,14 @@ def load_config() -> Config:
         return Config(**data)
 
 def save_config(config: Config):
+    """Save general configuration to YAML."""
     config_file = Path(".ace/config.yaml")
     with open(config_file, "w") as f:
         # Use model_dump(mode="json") to ensure Enums are serialized as strings
         yaml.dump(config.model_dump(mode="json"), f)
 
 def get_task_framing(task_type: TaskType, module: str) -> str:
+    """Get the framing prompt for a specific task type and module."""
     framing = {
         TaskType.IMPLEMENT: f"You are implementing new functionality in {module}. Follow the playbook strategies. Write back new learnings in the write-back section.",
         TaskType.REVIEW: f"You are reviewing code in {module}. Identify deviations from playbook strategies. Add any new pitfalls to the write-back section.",
@@ -520,48 +574,66 @@ def build_context(
             if path.startswith(module_path):
                 if len(module_path) > best_match_len:
                     best_match_len = len(module_path)
-                    resolved_agent_id = ownership.modules[module_path].agent_id
-    
+                    resolved_agent_id = ownership.modules[
+                        module_path
+                    ].agent_id
+
     if resolved_agent_id:
         agents_config = load_agents()
-        agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+        agent = next(
+            (a for a in agents_config.agents if a.id == resolved_agent_id),
+            None
+        )
         if agent:
             playbook_path = Path(agent.memory_file)
             if playbook_path.exists():
-                context_parts.append(f"### AGENT PLAYBOOK ({agent.role})\n{playbook_path.read_text()}")
+                context_parts.append(
+                    f"### AGENT PLAYBOOK ({agent.role})\n"
+                    f"{playbook_path.read_text()}"
+                )
             else:
-                # Fallback to .cursor/rules/<role>.mdc if memory_file is not found
+                # Fallback to .cursor/rules/<role>.mdc
                 playbook_path = Path(f".cursor/rules/{agent.role}.mdc")
                 if playbook_path.exists():
-                    context_parts.append(f"### AGENT PLAYBOOK ({agent.role})\n{playbook_path.read_text()}")
-    
+                    context_parts.append(
+                        f"### AGENT PLAYBOOK ({agent.role})\n"
+                        f"{playbook_path.read_text()}"
+                    )
+
     # 3. Recent decisions (ADRs)
     decisions_dir = Path(".ace/decisions")
     if decisions_dir.exists():
-        decisions = sorted(list(decisions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)[:3]
+        decisions = sorted(
+            list(decisions_dir.glob("*.md")),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )[:3]
         if decisions:
             context_parts.append("### RECENT DECISIONS")
             for d in decisions:
                 context_parts.append(f"#### {d.name}\n{d.read_text()}")
-    
+
     # 4. Session continuity
     config = load_config()
     sessions_dir = Path(".ace/sessions")
     if sessions_dir.exists():
-        # Get most recent session logs based on token mode
-        session_files = sorted(list(sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
-        
+        # Get recent session logs based on token mode
+        session_files = sorted(
+            list(sessions_dir.glob("*.md")),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
+
         num_sessions = 1
         if config.token_mode == TokenMode.MEDIUM:
             num_sessions = 3
         elif config.token_mode == TokenMode.HIGH:
             num_sessions = 5
-            
+
         recent_sessions = session_files[:num_sessions]
         if recent_sessions:
             context_parts.append("### RECENT SESSIONS")
             for s in recent_sessions:
-                # Truncate session content if it's too long? For now just include it.
                 context_parts.append(f"#### Session: {s.name}\n{s.read_text()}")
     
     # 5. Task framing
@@ -576,36 +648,48 @@ def build_context(
 
 @app.command()
 def run(
-    command: str = typer.Argument(..., help="Command to run (e.g. 'cursor-agent' or 'claude-code')"),
-    path: Optional[str] = typer.Option(None, "--path", "-p", help="Path to the file or module"),
-    task_type: TaskType = typer.Option(TaskType.IMPLEMENT, "--task-type", "-t", help="Type of task"),
-    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Explicit agent ID"),
+    command: str = typer.Argument(..., help="Command to run"),
+    path: Optional[str] = typer.Option(
+        None,
+        "--path",
+        "-p",
+        help="Path to the file or module"
+    ),
+    task_type: TaskType = typer.Option(
+        TaskType.IMPLEMENT,
+        "--task-type",
+        "-t",
+        help="Type of task"
+    ),
+    agent_id: Optional[str] = typer.Option(
+        None,
+        "--agent",
+        "-a",
+        help="Explicit agent ID"
+    ),
 ):
     """Execute an agent command with ACE context."""
     # 1. Build context
-    context, resolved_agent_id = build_context(path=path, task_type=task_type, agent_id=agent_id)
-    
+    context, resolved_agent_id = build_context(
+        path=path,
+        task_type=task_type,
+        agent_id=agent_id
+    )
+
     # 2. Prepare the command
-    # For now, we'll just print it. In a real implementation, we'd use subprocess.
-    # We might want to inject the context as an environment variable or a temporary file.
-    
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".txt",
+        delete=False
+    ) as tmp:
         tmp.write(context)
         context_file = tmp.name
-        
+
     console.print(f"Running command: [bold blue]{command}[/bold blue]")
     console.print(f"Context injected from: [dim]{context_file}[/dim]")
-    
-    # In a real scenario, we'd pass the context file to the agent
-    # For example: cursor-agent --context-file context_file "the actual task"
-    # For this implementation, we'll just simulate the execution.
-    
+
     # 3. Execute and capture output
-    # This is a simplified version. We'd need to handle arguments properly.
-    # For now, let's just run the command and capture its output.
     try:
-        # We'll prepend the context to the agent's input or pass it via a flag if supported.
-        # Since we don't know the exact agent CLI, we'll just run the command as is for now.
         process = subprocess.Popen(
             command,
             shell=True,
@@ -615,27 +699,27 @@ def run(
             bufsize=1,
             universal_newlines=True
         )
-        
+
         output_lines = []
         for line in process.stdout:
             console.print(line, end="")
             output_lines.append(line)
-            
+
         process.wait()
         exit_code = process.returncode
         full_output = "".join(output_lines)
-        
+
     except Exception as e:
         console.print(f"[red]Error executing command: {e}[/red]")
         exit_code = 1
         full_output = str(e)
-    
+
     # 4. Log the session
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     sessions_dir = Path(".ace/sessions")
     sessions_dir.mkdir(parents=True, exist_ok=True)
     session_file = sessions_dir / f"session_{session_id}.md"
-    
+
     session_content = f"""# Session {session_id}
 - **Command**: `{command}`
 - **Path**: `{path}`
@@ -654,15 +738,17 @@ def run(
 """
     session_file.write_text(session_content)
     console.print(f"Session logged to: [green]{session_file}[/green]")
-    
+
     # 5. Trigger reflection
     if exit_code == 0:
         # Skip reflection in tests if ANTHROPIC_API_KEY is not set
         if os.getenv("ANTHROPIC_API_KEY"):
             _perform_reflection(session_file)
         else:
-            console.print("[yellow]Skipping reflection: ANTHROPIC_API_KEY not set.[/yellow]")
-    
+            console.print(
+                "[yellow]Skipping reflection: ANTHROPIC_API_KEY not set.[/yellow]"
+            )
+
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
@@ -702,12 +788,23 @@ def _perform_reflection(session_file: Path):
         console.print("[yellow]No new learnings extracted.[/yellow]")
 
 @app.command()
-def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s", help="Session ID to reflect on")):
+def reflect_cmd(
+    session_id: Optional[str] = typer.Option(
+        None,
+        "--session-id",
+        "-s",
+        help="Session ID to reflect on"
+    )
+):
     """Reflect on a session and extract learnings."""
     sessions_dir = Path(".ace/sessions")
     if not session_id:
         # Get most recent session
-        session_files = sorted(list(sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
+        session_files = sorted(
+            list(sessions_dir.glob("*.md")),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
         if not session_files:
             console.print("[red]No sessions found to reflect on.[/red]")
             return
@@ -720,6 +817,188 @@ def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s",
 
     console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
     _perform_reflection(session_file)
+
+
+@app.command()
+def decision_add(
+    title: str = typer.Option(..., "--title", "-t", help="Decision title"),
+    context: str = typer.Option(..., "--context", "-c", help="Context for the decision"),
+    decision: str = typer.Option(..., "--decision", "-d", help="The decision made"),
+    consequences: str = typer.Option(..., "--consequences", "-q", help="Consequences of the decision"),
+    status: str = typer.Option("accepted", "--status", "-s", help="Decision status (proposed/accepted/deprecated)"),
+    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent who made the decision"),
+):
+    """Add a new Architectural Decision Record (ADR)."""
+    decisions_dir = Path(".ace/decisions")
+    decisions_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate ID: ADR-001, ADR-002, etc.
+    existing_adrs = list(decisions_dir.glob("ADR-*.md"))
+    next_num = 1
+    if existing_adrs:
+        nums = [int(re.search(r"ADR-(\d+)", f.name).group(1)) for f in existing_adrs if re.search(r"ADR-(\d+)", f.name)]
+        if nums:
+            next_num = max(nums) + 1
+    
+    adr_id = f"ADR-{next_num:03d}"
+    
+    new_decision = Decision(
+        id=adr_id,
+        title=title,
+        status=status,
+        context=context,
+        decision=decision,
+        consequences=consequences,
+        agent_id=agent_id
+    )
+    
+    adr_file = decisions_dir / f"{adr_id}.md"
+    
+    content = f"""# {adr_id}: {title}
+- **Status**: {status}
+- **Date**: {new_decision.created_at}
+- **Agent**: {agent_id or "User"}
+
+## Context
+{context}
+
+## Decision
+{decision}
+
+## Consequences
+{consequences}
+"""
+    adr_file.write_text(content)
+    console.print(f"Created ADR: [green]{adr_file}[/green]")
+
+@app.command()
+def decision_list():
+    """List all Architectural Decision Records."""
+    decisions_dir = Path(".ace/decisions")
+    if not decisions_dir.exists():
+        console.print("No decisions found.")
+        return
+        
+    adrs = sorted(list(decisions_dir.glob("ADR-*.md")))
+    if not adrs:
+        console.print("No ADRs found.")
+        return
+        
+    table = Table(title="Architectural Decision Records")
+    table.add_column("ID", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Status", style="yellow")
+    table.add_column("Date", style="magenta")
+    
+    for adr_path in adrs:
+        content = adr_path.read_text()
+        title_match = re.search(r"# ADR-\d+: (.*)", content)
+        status_match = re.search(r"- \*\*Status\*\*: (.*)", content)
+        date_match = re.search(r"- \*\*Date\*\*: (.*)", content)
+        
+        title = title_match.group(1) if title_match else adr_path.name
+        status = status_match.group(1) if status_match else "unknown"
+        date = date_match.group(1) if date_match else "unknown"
+        
+        table.add_row(adr_path.stem, title, status, date)
+        
+    console.print(table)
+
+@app.command()
+def memory_prune(
+    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent ID to prune memory for"),
+    threshold: int = typer.Option(0, "--threshold", "-t", help="Prune if harmful - helpful > threshold"),
+):
+    """Archive or remove 'harmful' strategies (harmful > helpful)."""
+    agents_config = load_agents()
+    
+    if agent_id:
+        agents = [a for a in agents_config.agents if a.id == agent_id]
+        if not agents:
+            console.print(f"[red]Agent {agent_id} not found.[/red]")
+            return
+    else:
+        agents = agents_config.agents
+        
+    for agent in agents:
+        playbook_path = Path(agent.memory_file)
+        if not playbook_path.exists():
+            continue
+            
+        console.print(f"Pruning memory for agent: [blue]{agent.id}[/blue] ([dim]{playbook_path}[/dim])")
+        content = playbook_path.read_text()
+        
+        # Pattern for strategies and pitfalls: <!-- [type-ID] helpful=X harmful=Y :: description -->
+        pattern = r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s*::\s*(.*?) -->"
+        
+        pruned_count = 0
+        def prune_match(match):
+            nonlocal pruned_count
+            update_type = match.group(1)
+            update_id = match.group(2)
+            helpful = int(match.group(3))
+            harmful = int(match.group(4))
+            description = match.group(5)
+            
+            if harmful - helpful > threshold:
+                console.print(f"  [red]Pruning[/red] {update_type} [blue]{update_id}[/blue]: {description} (h={helpful}, m={harmful})")
+                pruned_count += 1
+                return f"<!-- [PRUNED] {match.group(0)} -->"
+            return match.group(0)
+            
+        new_content = re.sub(pattern, prune_match, content)
+        
+        if pruned_count > 0:
+            playbook_path.write_text(new_content)
+            console.print(f"  [green]Done.[/green] Pruned {pruned_count} items.")
+        else:
+            console.print("  [yellow]No items met the pruning threshold.[/yellow]")
+
+@app.command()
+def memory_sync():
+    """Keep AGENTS.md in sync with the Agent Registry and recent Decisions."""
+    agents_config = load_agents()
+    decisions_dir = Path(".ace/decisions")
+    
+    content = ["# ACE Agents Registry", ""]
+    
+    # Agents Section
+    content.append("## Active Agents")
+    if not agents_config.agents:
+        content.append("No agents registered.")
+    else:
+        for agent in agents_config.agents:
+            content.append(f"### {agent.name} (`{agent.id}`)")
+            content.append(f"- **Role**: {agent.role}")
+            content.append(f"- **Email**: {agent.email}")
+            content.append(f"- **Memory**: `{agent.memory_file}`")
+            if agent.responsibilities:
+                content.append("- **Responsibilities**:")
+                for resp in agent.responsibilities:
+                    content.append(f"  - {resp}")
+            content.append("")
+            
+    # Decisions Section
+    content.append("## Recent Architectural Decisions")
+    if not decisions_dir.exists():
+        content.append("No decisions found.")
+    else:
+        adrs = sorted(list(decisions_dir.glob("ADR-*.md")), reverse=True)[:5]
+        if not adrs:
+            content.append("No ADRs found.")
+        else:
+            for adr_path in adrs:
+                adr_content = adr_path.read_text()
+                title_match = re.search(r"# (ADR-\d+: .*)", adr_content)
+                status_match = re.search(r"- \*\*Status\*\*: (.*)", adr_content)
+                
+                title = title_match.group(1) if title_match else adr_path.name
+                status = status_match.group(1) if status_match else "unknown"
+                
+                content.append(f"- **{title}** [{status}]")
+    
+    Path("AGENTS.md").write_text("\n".join(content))
+    console.print("Updated [green]AGENTS.md[/green]")
 
 if __name__ == "__main__":
     app()

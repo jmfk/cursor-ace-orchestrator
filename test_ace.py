@@ -193,3 +193,100 @@ def test_update_playbook(tmp_path):
     content = playbook.read_text()
     assert "Updated decision" in content
     assert "Existing decision" not in content
+
+def test_decision_management(temp_ace_dir):
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Add decision
+    result = runner.invoke(app, [
+        "decision-add", 
+        "--title", "Use PostgreSQL", 
+        "--context", "We need a database", 
+        "--decision", "PostgreSQL", 
+        "--consequences", "Reliable data"
+    ])
+    assert result.exit_code == 0
+    assert "Created ADR: .ace/decisions/ADR-001.md" in result.stdout
+    
+    # List decisions
+    result = runner.invoke(app, ["decision-list"])
+    assert result.exit_code == 0
+    assert "ADR-001" in result.stdout
+    assert "Use PostgreSQL" in result.stdout
+    assert "accepted" in result.stdout
+    
+    # Add another decision
+    result = runner.invoke(app, [
+        "decision-add", 
+        "--title", "Use Redis", 
+        "--context", "We need caching", 
+        "--decision", "Redis", 
+        "--consequences", "Faster reads"
+    ])
+    assert result.exit_code == 0
+    assert "ADR-002" in result.stdout
+    
+    # Verify file content
+    adr_file = Path(".ace/decisions/ADR-001.md")
+    content = adr_file.read_text()
+    assert "# ADR-001: Use PostgreSQL" in content
+    assert "## Context\nWe need a database" in content
+    assert "## Decision\nPostgreSQL" in content
+    assert "## Consequences\nReliable data" in content
+
+def test_memory_prune(temp_ace_dir):
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Setup agent and playbook with harmful strategy
+    runner.invoke(app, ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    playbook_path = Path(".cursor/rules/tester.mdc")
+    playbook_path.parent.mkdir(parents=True, exist_ok=True)
+    playbook_path.write_text("""
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=5 :: Bad strategy -->
+<!-- [str-002] helpful=5 harmful=1 :: Good strategy -->
+""")
+    
+    # Prune
+    result = runner.invoke(app, ["memory-prune", "--agent", "test-01", "--threshold", "0"])
+    assert result.exit_code == 0
+    assert "Pruning str 001" in result.stdout
+    assert "No items met" not in result.stdout
+    
+    # Verify file content
+    content = playbook_path.read_text()
+    assert "<!-- [PRUNED] <!-- [str-001] helpful=1 harmful=5 :: Bad strategy --> -->" in content
+    assert "<!-- [str-002] helpful=5 harmful=1 :: Good strategy -->" in content
+
+def test_memory_sync(temp_ace_dir):
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Setup agents and decisions
+    runner.invoke(app, ["agent-create", "--name", "Auth Agent", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(app, [
+        "decision-add", 
+        "--title", "Use PostgreSQL", 
+        "--context", "We need a database", 
+        "--decision", "PostgreSQL", 
+        "--consequences", "Reliable data"
+    ])
+    
+    # Sync
+    result = runner.invoke(app, ["memory-sync"])
+    assert result.exit_code == 0
+    assert "Updated AGENTS.md" in result.stdout
+    
+    # Verify AGENTS.md content
+    agents_md = Path("AGENTS.md")
+    assert agents_md.exists()
+    content = agents_md.read_text()
+    assert "# ACE Agents Registry" in content
+    assert "### Auth Agent (`auth-01`)" in content
+    assert "## Recent Architectural Decisions" in content
+    assert "ADR-001: Use PostgreSQL" in content
