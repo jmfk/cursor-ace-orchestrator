@@ -2,6 +2,7 @@ import re
 from typing import List
 from pydantic import BaseModel, Field
 
+
 class ReflectionEntry(BaseModel):
     id: str
     type: str  # 'str', 'mis', or 'dec'
@@ -9,8 +10,10 @@ class ReflectionEntry(BaseModel):
     harmful: int = 0
     content: str
 
+
 class ReflectionResult(BaseModel):
     entries: List[ReflectionEntry] = Field(default_factory=list)
+
 
 class ReflectionEngine:
     """
@@ -19,7 +22,7 @@ class ReflectionEngine:
     [mis-XXX] helpful=X harmful=Y :: <pitfall>
     [dec-XXX] :: <decision>
     """
-    
+
     # Regex patterns for the three types of reflections
     STR_PATTERN = r"\[str-(\w+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s+::\s+(.*)"
     MIS_PATTERN = r"\[mis-(\w+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s+::\s+(.*)"
@@ -59,11 +62,12 @@ class ReflectionEngine:
 
         return result
 
+
 class PlaybookUpdater:
     """
     Updates .mdc files with new reflections while preserving structure.
     """
-    
+
     def __init__(self, playbook_path: str):
         self.playbook_path = playbook_path
 
@@ -122,7 +126,7 @@ class PlaybookUpdater:
             else:
                 new_entry_line = f"<!-- [{entry.type}-{entry.id}] helpful={entry.helpful} harmful={entry.harmful} :: {entry.content} -->"
                 old_entry_pattern = rf"<!-- \[{entry.type}-{entry.id}\] helpful=\d+ harmful=\d+ :: .*? -->"
-            
+
             # Use a more specific replacement that includes the comment markers
             # and avoid issues with re.sub and groups if needed.
             # We'll use a simple string replace if we can find the exact old line.
@@ -136,7 +140,7 @@ class PlaybookUpdater:
                 new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
             else:
                 new_entry_line = f"<!-- [{entry.type}-{entry.id}] helpful={entry.helpful} harmful={entry.harmful} :: {entry.content} -->"
-            
+
             # Append at the end of section_content
             if section_content.strip().endswith("-->"):
                 section_content = section_content.rstrip() + f"\n{new_entry_line}\n"

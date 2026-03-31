@@ -37,6 +37,6 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **4.5 Google Stitch Integration**: Implement `ace ui mockup` and `ace ui sync` to interface with Google Labs design tools.
 
 ## Phase 5: API & Future Readiness
+- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
 - [ ] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
 - [ ] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
-- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.

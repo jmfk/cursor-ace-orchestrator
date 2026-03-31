@@ -18,7 +18,7 @@ def test_reflection_engine_parse():
     result = engine.parse_output(text)
 
     assert len(result.entries) == 3
-    
+
     str_entry = next(e for e in result.entries if e.type == "str")
     assert str_entry.id == "001"
     assert str_entry.helpful == 1
@@ -51,7 +51,7 @@ description: "Test playbook"
 
 ## Kända fallgropar
 """)
-    
+
     updater = PlaybookUpdater(str(playbook_file))
 
     # 1. Add new strategy
@@ -82,7 +82,7 @@ def test_add_missing_sections(tmp_path):
     """Test adding missing sections to a playbook."""
     playbook_file = tmp_path / "test.mdc"
     playbook_file.write_text("# Empty Playbook")
-    
+
     updater = PlaybookUpdater(str(playbook_file))
     reflections = ReflectionResult(entries=[
         ReflectionEntry(
