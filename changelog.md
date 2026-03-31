@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 7
+
+### Added
+- **Phase 4: RALPH Loop & Multi-Agent Coordination (M4)**
+  - Google Stitch Integration: Implemented `ace ui mockup` and `ace ui sync` to interface with Google Labs design tools.
+
 ## [2026-04-01] - RALPH Loop Iteration 6
 
 ### Added

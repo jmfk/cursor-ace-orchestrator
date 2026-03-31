@@ -345,3 +345,78 @@ def test_memory_sync(temp_ace_dir):
     assert "### Auth Agent (`auth-01`)" in content
     assert "## Recent Architectural Decisions" in content
     assert "ADR-001: Use PostgreSQL" in content
+
+def test_mail_system(temp_ace_dir):
+    """Test the agent mail system."""
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Create agents
+    runner.invoke(app, ["agent-create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
+    runner.invoke(app, ["agent-create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    
+    # Send mail
+    result = runner.invoke(app, ["mail-send", "--to", "agent-b", "--from", "agent-a", "--subject", "Hello", "--body", "How are you?"])
+    assert result.exit_code == 0
+    assert "Message sent from agent-a to agent-b" in result.stdout
+    
+    # List mail
+    result = runner.invoke(app, ["mail-list", "agent-b"])
+    assert result.exit_code == 0
+    assert "agent-a" in result.stdout
+    assert "Hello" in result.stdout
+    
+    # Read mail
+    import re
+    msg_id_match = re.search(r"(\d+_\d+_\d+)", result.stdout)
+    if msg_id_match:
+        msg_id = msg_id_match.group(1)
+        result = runner.invoke(app, ["mail-read", "agent-b", msg_id])
+        assert result.exit_code == 0
+        assert "How are you?" in result.stdout
+        
+def test_debate(temp_ace_dir):
+    """Test the debate command."""
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Create agents
+    runner.invoke(app, ["agent-create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
+    runner.invoke(app, ["agent-create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    
+    # Initiate debate
+    result = runner.invoke(app, ["debate", "--proposal", "Use Python", "--agent", "agent-a", "--agent", "agent-b"])
+    assert result.exit_code == 0
+    assert "Initiating debate on proposal: Use Python" in result.stdout
+    assert "Proposal sent to all participants" in result.stdout
+    
+    # Verify mail in agent-a's inbox
+    result = runner.invoke(app, ["mail-list", "agent-a"])
+    assert "DEBATE PROPOSAL" in result.stdout
+
+def test_ui_mockup(temp_ace_dir):
+    """Test the UI mockup command."""
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    result = runner.invoke(app, ["ui-mockup", "Admin Dashboard"])
+    assert result.exit_code == 0
+    assert "Generating UI mockup for: Admin Dashboard" in result.stdout
+    assert "Stitch Canvas URL: https://stitch.google.com/canvas/" in result.stdout
+
+def test_ui_sync(temp_ace_dir):
+    """Test the UI sync command."""
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    url = "https://stitch.google.com/canvas/12345"
+    result = runner.invoke(app, ["ui-sync", url])
+    assert result.exit_code == 0
+    assert f"Syncing UI code from: {url}" in result.stdout
+    assert "Extracted Tailwind code:" in result.stdout
+    assert Path("stitch_sync_output.html").exists()
+    assert "ACE Orchestrator Dashboard" in Path("stitch_sync_output.html").read_text()
