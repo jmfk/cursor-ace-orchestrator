@@ -80,19 +80,26 @@ def run_cursor_agent(prompt: str):
     ]
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Execute the command and capture both stdout and stderr
+        result = subprocess.run(cmd, capture_output=True, text=True)
         elapsed = time.time() - start_time
         
-        # Simulated token extraction
+        if result.returncode != 0:
+            log_message(f"❌ Cursor Agent failed with Exit Code {result.returncode}")
+            log_message(f"--- STDOUT ---\n{result.stdout}")
+            log_message(f"--- STDERR ---\n{result.stderr}")
+            return None
+
+        # If successful, extract simulated stats
         input_tokens = len(prompt.split()) * 1.3
         output_tokens = len(result.stdout.split()) * 1.3
         
         update_stats(int(input_tokens), int(output_tokens), elapsed)
+        log_message("✅ Cursor Agent completed successfully.")
         return result.stdout
-    except subprocess.CalledProcessError as e:
-        log_message(f"Error running cursor-agent (Exit Code {e.returncode}):")
-        log_message(f"STDOUT: {e.stdout}")
-        log_message(f"STDERR: {e.stderr}")
+
+    except Exception as e:
+        log_message(f"🚨 Unexpected error during subprocess execution: {str(e)}")
         return None
 
 
