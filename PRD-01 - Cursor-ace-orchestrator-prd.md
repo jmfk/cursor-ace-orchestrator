@@ -1,8 +1,8 @@
 # PRD: Cursor ACE Orchestrator
 
-**Version:** 0.1  
+**Version:** 0.2  
 **Status:** Draft  
-**Datum:** 2026-03-31  
+**Datum:** 2026-04-01  
 **Författare:** Johan / The Rockit Lab
 
 ---
@@ -33,13 +33,9 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 5. Bygga en **context builder** som komponerar rätt kontext-slice per anrop
 6. Implementera en **iterativ loop-motor (`ace loop`)** som kör agenten tills tester passerar (RALPH-style)
 7. Möjliggöra **Multi-Agent Consensus** där agenter kan debattera arkitektoniska beslut innan de fastställs
-
-### Icke-mål (v0.1)
-
-- GUI eller visuellt dashboard
-- Multi-repo-stöd
-- Realtidskoordination mellan parallella agenter
-- Fine-tuning eller ML-träning (det är ace-agent/ace, inte detta)
+8. Implementera ett **Internal Messaging System (Agent Mail)** för asynkron kommunikation mellan agenter
+9. Använda **Standard Operating Procedures (SOPs)** för att styra agent-interaktioner och arbetsflöden
+10. Implementera **Token Consumption Modes** (Low, Medium, High) för att kontrollera driftskostnader
 
 ---
 
@@ -57,14 +53,14 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 │         ▼                  ▼                    ▼           │
 │  ┌─────────────┐    ┌───────────────┐   ┌────────────────┐  │
 │  │ Agent Teams │◀──▶│  Loop Engine  │◀──┤  .mdc / memory │  │
-│  │ (Consensus) │    │ (RALPH Cycle) │   │    (store)     │  │
-│  └─────────────┘    └───────┬───────┘   └────────────────┘  │
-│                            │                               │
-│                            ▼                               │
-│                    ┌───────────────┐                       │
-│                    │ cursor-agent  │                       │
-│                    │  (executor)   │                       │
-│                    └───────────────┘                       │
+│  │ (SOP-driven)│    │ (RALPH Cycle) │   │    (store)     │  │
+│  └──────┬──────┘    └───────┬───────┘   └────────────────┘  │
+│         │                  │                               │
+│         ▼                  ▼                               │
+│  ┌─────────────┐    ┌───────────────┐   ┌────────────────┐  │
+│  │ Agent Mail  │◀──▶│ cursor-agent  │◀──┤ Token Manager  │  │
+│  │ (Messaging) │    │  (executor)   │   │ (L / M / H)    │  │
+│  └─────────────┘    └───────────────┘   └────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,13 +68,31 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 
 **Agent Role / Agent Team** — En dedikerad agent-persona som agerar som en "one-agent team" för en specifik subsystem, bibliotek eller komponentgrupp. Agenter kan expandera sitt ägarskap till relaterade moduler över tid.
 
-**Consensus Protocol** — En process där två eller flera agenter (t.ex. `api-agent` och `db-agent`) debatterar en ändring som påverkar båda deras ansvarsområden. Om de inte når konsensus eskaleras beslutet till en människa.
+**SOP (Standard Operating Procedure)** — Formella instruktioner som styr hur agenter utför specifika uppgifter (t.ex. `onboarding`, `pr-review`, `consensus-debate`). SOPs håller kommunikationen fokuserad och minskar token-waste.
+
+**Token Consumption Mode** — En global inställning som styr agenternas beteende:
+- **Low (Default)**: Minimal kontext, ingen asynkron debatt, fokus på enskilda tasks.
+- **Medium**: Tillåter korta debatter, grundläggande QA-audits och prenumerationer.
+- **High**: Full multi-agent debatt, omfattande QA, djup kontext-analys och proaktiva refactoring-förslag.
+
+**Consensus Protocol** — En process där två eller flera agenter debatterar en ändring. Inspirerat av "Debate as Fact-Checking" för att minska hallucinationer och nå robusta beslut.
+
+**Contextual Specialization** — Genom att dela upp kodbasen i subsystem minskar vi den totala mängden tokens per anrop, då varje agent endast läser relevant kontext.
+
+**Agent Mail** — Ett internt meddelandesystem (likt e-post) där agenter kan skicka meddelanden, svara i trådar och bifoga filer/kontext till varandra. Detta möjliggör asynkron koordination och formell debatt.
 
 **Memory Slice** — Den kontext en specifik agent behöver för en specifik task. Komponeras dynamiskt från ownership registry + relevant `.mdc` + session memory.
 
 **Write-back** — Processen där agenten efter en avslutad task skriver lärdomar, beslut och uppdaterat ägarskap tillbaka till sin `.mdc`.
 
 **Playbook** — Agentens ackumulerade kunskaps-dokument. Lever i `.cursor/rules/<role>.mdc`. Uppdateras inkrementellt, aldrig skrivs om från scratch.
+
+**RALPH Loop (Reasoning, Action, Learning, Progress, Halt)** — En iterativ cykel där agenten:
+1. **Reason:** Analyserar task och befintlig kontext.
+2. **Action:** Utför kodändringar.
+3. **Learning:** Kör tester och fångar fel/lärdomar.
+4. **Progress:** Uppdaterar minnet (`.mdc`) med vad som fungerade/inte fungerade.
+5. **Halt:** Avbryter när målet (tester) är uppnått eller max-iterationer nåtts.
 
 ---
 
@@ -215,8 +229,7 @@ Formatet med `[id] helpful=X harmful=Y :: content` är inspirerat av ace-agent/a
 **CLI-interface:**
 
 ```bash
-ace own src/auth --role auth-agent          # Tilldela ägarskap
-ace own src/api --role api-agent
+ace own src/auth --agent auth-expert-01      # Tilldela ägarskap till specifik agent
 ace who src/auth/middleware.ts              # Fråga vem som äger en fil
 ace list-owners                             # Lista alla ägarskap
 ace unown src/utils                         # Ta bort ägarskap
@@ -320,6 +333,32 @@ Svara ENDAST med en JSON-array av delta-updates.
 ]
 ```
 
+### 6.4 Executor
+
+**Ansvar:** Köra cursor-agent med rätt kontext och fånga output.
+
+```bash
+# Intern exekveringslogik
+context=$(ace build-context --file $target_file --task-type $task_type)
+result=$(cursor-agent -p --force "$context\n\n$user_prompt" \
+  --output-format stream-json 2>&1)
+ace writeback --role $role --result "$result" --success $exit_code
+```
+
+**Wrapper CLI:**
+
+```bash
+# Användaren kör
+ace run "implementera refresh token rotation" --file src/auth/token.ts
+
+# Systemet gör:
+# 1. Löser roll: auth-agent (via ownership registry)
+# 2. Bygger context slice
+# 3. Köra cursor-agent med injicerad kontext
+# 4. Köra write-back pipeline
+# 5. Uppdaterar .ace/sessions/ och .cursor/rules/auth.mdc
+```
+
 ### 6.5 Loop Engine (RALPH Motor)
 
 **Ansvar:** Hantera den iterativa processen där agenten försöker lösa en task genom flera försök.
@@ -344,6 +383,19 @@ ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 - Agenter kan skapas **manuellt** av användaren (`ace agent create`) eller **autonomt** av systemet när en ny modul eller ett bibliotek identifieras.
 - Varje agent får ett unikt namn, en dedikerad e-postadress (för Agent Mail) och en egen långtidsminnes-fil (`.mdc`).
 - Alla agenter och deras metadata (id, namn, roll, ansvarsområden) dokumenteras centralt i `.ace/agents.yaml`.
+
+**SOP:er (Standard Operating Procedures):**
+- **Onboarding/Handover**: När en agent byts ut eller skapas, genereras en `onboarding.md` som sammanfattar subsystemets status och tekniska skulder.
+- **PR Review**: Agenter utför automatiskt reviews på varandras ändringar. En `ui-agent` kan granska en `api-agent`s ändringar om de påverkar frontend-kontraktet.
+- **Subsystem Health Monitoring**: Agenter kör periodiska "audits" för att hitta brott mot DRY/YAGNI eller prestandaproblem.
+- **Dependency Awareness**: Agenter prenumererar på ändringar i subsystem de beror på via Agent Mail.
+- **Shared "Coffee Break" Context**: Ett sätt för agenter att dela generella lärdomar (cross-pollination) via en delad `.ace/shared-learnings.mdc`.
+
+**Multi-Agent Debate & Consensus:**
+- Inspirerat av "Debate as Fact-Checking" för att minska hallucinationer.
+- Agenter utbyter formella förslag via Agent Mail.
+- En neutral `arch-agent` (eller LLM-referee) utvärderar tråden.
+- **Token Management**: Debatt-längd och djup styrs av det valda Token Consumption Mode (L/M/H).
 
 **Logik för Agent Teams:**
 - Varje subsystem (t.ex. `lib/ui-components`, `services/payment`) tilldelas en dedikerad agent.
@@ -408,6 +460,7 @@ din playbook.
 ace init                                    # Initiera .ace/ i projektet
 ace agent create --name Aegis --role auth   # Skapa en namngiven agent
 ace agent list                              # Visa alla agenter från agents.yaml
+ace config tokens --mode medium             # Sätt token consumption mode (low/medium/high)
 
 # Ägarskap
 ace own <path> --agent <agent-id>           # Tilldela modul till specifik agent
@@ -427,6 +480,11 @@ ace loop "<prompt>" --max 5                 # Begränsa iterationer
 ace mail inbox                              # Visa inbox för aktiv agent
 ace mail send --to <agent-id> --subject "API change" --body "..."
 ace mail reply <msg-id>
+
+# SOP & QA
+ace agent onboard <agent-id>                # Kör onboarding-SOP
+ace agent audit <agent-id>                  # Kör QA-audit på subsystem
+ace agent review <pr-id>                    # Kör cross-agent PR review
 
 # Minne
 ace memory show --agent <agent-id>          # Visa playbook
@@ -488,11 +546,14 @@ ace context show --file src/auth/token.ts  # Visa vad som skulle injiceras
 - [ ] `ace memory history`
 - [ ] **UI/UX Testing:** Om ACE introducerar UI-komponenter, applicera Playwright/Cypress för E2E-tester
 
-### M4 — Multi-agent (v0.5)
+### M4 — Multi-agent, SOPs & Consensus (v0.5)
 - [ ] Parallell exekvering av oberoende roller
-- [ ] Beroende-tracking (auth-agent läser db-agent-kod)
-- [ ] Cross-role context-sharing
-- [ ] **System-wide Integration Tests:** Verifiera multi-agent koordination och minnes-konsistens
+- [ ] **Agent Teams & SOPs**: Implementera onboarding, PR-review och audit-SOPs.
+- [ ] **Agent Mail & Subscriptions**: Implementera prenumerationslogik för subsystem-ändringar.
+- [ ] **Consensus & Debate**: Implementera debatt-logik med LLM-referee.
+- [ ] **Token Manager**: Implementera L/M/H modes för att styra kontext och debatt-djup.
+- [ ] **Human-in-the-loop Escalation**: CLI-stöd för att lösa agent-konflikter.
+- [ ] **System-wide Integration Tests**: Verifiera multi-agent koordination och minnes-konsistens.
 
 ---
 

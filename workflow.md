@@ -7,12 +7,13 @@ The workflow begins by preparing the repository for agent orchestration.
 - Creates the `.ace/` directory for tracked metadata.
 - Creates the `.ace-local/` directory for local session state (git-ignored).
 - Generates a default `AGENTS.md` in the root if it doesn't exist.
-- Sets up the `ownership.yaml` registry.
+- Sets up the `agents.yaml` registry and `ownership.yaml`.
 
-## 2. Defining Roles & Ownership (`ace own`)
-Before running tasks, code modules are mapped to specific agent roles.
-- **Assign Ownership**: `ace own src/auth --role auth-agent`
-- **Registry Update**: The orchestrator updates `.ace/ownership.yaml`.
+## 2. Defining Agents & Ownership (`ace agent create` / `ace own`)
+Before running tasks, agents are defined and code modules are mapped to them.
+- **Create Agent**: `ace agent create --name Aegis --role auth`
+- **Assign Ownership**: `ace own src/auth --agent <agent-id>`
+- **Registry Update**: The orchestrator updates `.ace/agents.yaml` and `.ace/ownership.yaml`.
 - **Playbook Creation**: A corresponding `.cursor/rules/<role>.mdc` is created using a template if it doesn't exist.
 
 ## 3. Execution Loop (`ace run` & `ace loop`)
@@ -20,19 +21,22 @@ The core loop consists of four distinct phases, with an optional iterative wrapp
 
 ### Phase A: Context Building
 When a user runs `ace run "task"` or `ace loop "task"`, the orchestrator:
-1. **Resolves Role**: Finds the owner of the target file(s) via longest-prefix match in `ownership.yaml`.
+1. **Resolves Agent**: Finds the owner of the target file(s) via longest-prefix match in `ownership.yaml`.
 2. **Gathers Memory**: 
    - Reads global rules (`_global.mdc`).
-   - Reads the role-specific playbook (`<role>.mdc`).
+   - Reads the agent-specific playbook (`<role>.mdc`).
    - Fetches recent decisions (ADRs) from `.ace/decisions/`.
    - Retrieves state from the last session in `.ace/sessions/`.
+   - Injects shared learnings from `.ace/shared-learnings.mdc`.
 3. **Composes Prompt**: Wraps the user task with a "Task Frame" (e.g., `implement`, `debug`, `review`) and the gathered context.
+4. **Token Management**: Applies context pruning based on the selected Token Mode (Low, Medium, High).
 
 ### Phase B: Execution (RALPH Cycle)
 - **Execute**: The orchestrator invokes the `cursor-agent` in headless mode.
 - **Verify (TDD)**: If running via `ace loop`, the orchestrator executes the specified test command (e.g., `npm test`).
 - **Analyze**: If tests fail, a reflection prompt analyzes the failure to update the memory for the next iteration.
-- **Coordinate**: If multiple agents are involved, they communicate via **Agent Mail** to reach consensus on cross-module changes.
+- **Coordinate (SOP-driven)**: If multiple agents are involved, they follow the **Consensus SOP** via **Agent Mail**.
+- **Review**: Other agents may perform a **PR Review SOP** on the changes if the Token Mode is set to Medium or High.
 
 ### Phase C: Reflection (Write-back)
 Once the task is completed (or max iterations reached):
@@ -42,6 +46,7 @@ Once the task is completed (or max iterations reached):
    - **Pitfalls** (`[mis-XXX]`) encountered.
    - **Decisions** (`[dec-XXX]`) for ADRs.
 3. **Delta Update**: A JSON delta is generated for the playbook.
+4. **Audit (Optional)**: If Token Mode is High, a **Subsystem Health SOP** is triggered to check for DRY/YAGNI violations.
 
 ### Phase D: Persistence & Best Practices
 - **Playbook Update**: The `.cursor/rules/<role>.mdc` is updated incrementally.
@@ -54,7 +59,7 @@ Once the task is completed (or max iterations reached):
 ## 4. Memory Management (`ace memory`)
 Over time, the orchestrator maintains the playbooks:
 - **Pruning**: `ace memory prune` removes strategies where `harmful` counts significantly outweigh `helpful` counts.
-- **History**: `ace memory history` allows the user to browse past session logs to understand how a playbook evolved.
+- **History**: `ace memory history` allows the user to browse past session logs.
 
 ---
 
@@ -62,13 +67,17 @@ Over time, the orchestrator maintains the playbooks:
 
 ```mermaid
 graph TD
-    A[User: ace run] --> B[Context Builder]
-    B --> C[Resolve Role & Memory]
+    A[User: ace run/loop] --> B[Context Builder]
+    B --> C[Resolve Agent & Memory]
     C --> D[Execute cursor-agent]
-    D --> E[Reflection Model]
-    E --> F[Extract Delta]
-    F --> G[Update .mdc Playbook]
-    F --> H[Log Session .md]
-    G --> I[End Task]
-    H --> I
+    D --> E{Tests Pass?}
+    E -- No (ace loop) --> F[Analyze Failure]
+    F --> G[Update Memory]
+    G --> D
+    E -- Yes --> H[Reflection Model]
+    H --> I[Extract Delta]
+    I --> J[Update .mdc Playbook]
+    I --> K[Log Session .md]
+    J --> L[End Task]
+    K --> L
 ```
