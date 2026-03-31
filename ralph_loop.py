@@ -64,36 +64,35 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
 
 
 def run_cursor_agent(prompt: str):
-    """Runs cursor-agent in headless mode and tracks usage."""
+    """Runs cursor-agent in non-interactive mode and tracks usage."""
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
-
-    # Note: In a real scenario, cursor-agent headless would return usage stats in JSON.
-    # We simulate token counts here for the purpose of the script logic.
+    
+    # Corrected command structure based on cursor-agent --help
     cmd = [
         "cursor-agent",
-        "headless",
-        "--model",
-        MODEL,
-        "--prompt",
-        prompt,
-        "--output-format",
-        "stream-json",
+        "--print",
+        "--model", MODEL,
+        "--output-format", "stream-json",
+        "--force",
+        "--trust",
+        prompt
     ]
-
+    
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         elapsed = time.time() - start_time
-
-        # Simulated token extraction (assuming the CLI returns this in production)
-        # In a real implementation, we would parse result.stdout for usage data
-        input_tokens = len(prompt.split()) * 1.3  # Rough estimate
-        output_tokens = len(result.stdout.split()) * 1.3  # Rough estimate
-
+        
+        # Simulated token extraction
+        input_tokens = len(prompt.split()) * 1.3
+        output_tokens = len(result.stdout.split()) * 1.3
+        
         update_stats(int(input_tokens), int(output_tokens), elapsed)
         return result.stdout
     except subprocess.CalledProcessError as e:
-        log_message(f"Error running cursor-agent: {e.stderr}")
+        log_message(f"Error running cursor-agent (Exit Code {e.returncode}):")
+        log_message(f"STDOUT: {e.stdout}")
+        log_message(f"STDERR: {e.stderr}")
         return None
 
 
@@ -150,11 +149,15 @@ def main():
         # Step 4: Commit
         log_message("Step 4: Committing changes...")
         try:
-            subprocess.run(["git", "add", "."], check=True)
-            # Try to get the task name for the commit message
-            commit_msg = f"RALPH Loop: Implementation iteration {iteration}"
-            subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-            subprocess.run(["git", "push"], check=True)
+            # Check if there are changes to commit
+            status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+            if status.stdout.strip():
+                subprocess.run(["git", "add", "."], check=True)
+                commit_msg = f"RALPH Loop: Implementation iteration {iteration}"
+                subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+                subprocess.run(["git", "push"], check=True)
+            else:
+                log_message("No changes to commit.")
         except subprocess.CalledProcessError as e:
             log_message(f"Git operation failed: {e}")
 
