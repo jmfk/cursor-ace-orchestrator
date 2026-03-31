@@ -29,8 +29,10 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 1. Använda `.cursor/rules/*.mdc` som agent-specifikt, modulärt minne
 2. Använda `AGENTS.md` som cross-tool projektminne
 3. Implementera en **write-back-loop** där agenten uppdaterar sin egen kontext efter varje task
-4. Tillhandahålla ett **ownership registry** som mappar kodmoduler till agentroller
+4. Tillhandahålla ett **ownership registry** som mappar kodmoduler till dedikerade **Agent Teams**
 5. Bygga en **context builder** som komponerar rätt kontext-slice per anrop
+6. Implementera en **iterativ loop-motor (`ace loop`)** som kör agenten tills tester passerar (RALPH-style)
+7. Möjliggöra **Multi-Agent Consensus** där agenter kan debattera arkitektoniska beslut innan de fastställs
 
 ### Icke-mål (v0.1)
 
@@ -50,19 +52,27 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 │  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐  │
 │  │  Ownership  │    │   Context    │    │   Write-back  │  │
 │  │  Registry   │───▶│   Builder    │───▶│   Pipeline    │  │
-│  └─────────────┘    └──────┬───────┘    └───────┬───────┘  │
-│                            │                    │           │
-│                            ▼                    ▼           │
-│                    ┌───────────────┐   ┌────────────────┐  │
-│                    │ cursor-agent  │   │  .mdc / memory │  │
-│                    │  (executor)   │   │    (store)     │  │
-│                    └───────────────┘   └────────────────┘  │
+│  └──────┬──────┘    └──────┬───────┘    └───────┬───────┘  │
+│         │                  │                    │           │
+│         ▼                  ▼                    ▼           │
+│  ┌─────────────┐    ┌───────────────┐   ┌────────────────┐  │
+│  │ Agent Teams │◀──▶│  Loop Engine  │◀──┤  .mdc / memory │  │
+│  │ (Consensus) │    │ (RALPH Cycle) │   │    (store)     │  │
+│  └─────────────┘    └───────┬───────┘   └────────────────┘  │
+│                            │                               │
+│                            ▼                               │
+│                    ┌───────────────┐                       │
+│                    │ cursor-agent  │                       │
+│                    │  (executor)   │                       │
+│                    └───────────────┘                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Nyckelbegrepp
 
-**Agent Role** — En namngiven roll med ansvar för en eller flera kodmoduler. Ex: `auth-agent`, `api-agent`, `db-agent`.
+**Agent Role / Agent Team** — En dedikerad agent-persona som agerar som en "one-agent team" för en specifik subsystem, bibliotek eller komponentgrupp. Agenter kan expandera sitt ägarskap till relaterade moduler över tid.
+
+**Consensus Protocol** — En process där två eller flera agenter (t.ex. `api-agent` och `db-agent`) debatterar en ändring som påverkar båda deras ansvarsområden. Om de inte når konsensus eskaleras beslutet till en människa.
 
 **Memory Slice** — Den kontext en specifik agent behöver för en specifik task. Komponeras dynamiskt från ownership registry + relevant `.mdc` + session memory.
 
@@ -86,7 +96,12 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 │       └── ui.mdc                     # glob: src/components/** — ui-agentens playbook
 │
 ├── .ace/                              # ACE Orchestrator metadata (gittracked)
-│   ├── ownership.yaml                 # Modul → agent-roll mappning (YAML)
+│   ├── agents.yaml                    # Centralt register över alla agenter (namn, roll, mail, etc)
+│   ├── ownership.yaml                 # Modul → agent-id mappning (YAML)
+│   ├── mail/                          # Agent Mail (inbox/sent per agent)
+│   │   └── <agent-id>/
+│   │       ├── inbox/
+│   │       └── sent/
 │   ├── sessions/                      # Session-loggar (Markdown)
 │   │   └── 2026-03-31T14-22.md
 │   └── decisions/                     # ADR-liknande beslutsdokumentation
@@ -98,19 +113,48 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
     └── agent-cache/
 ```
 
+### `.ace/agents.yaml` — Agent Registry
+
+Detta dokument definierar alla agenter i systemet, oavsett om de skapats manuellt av användaren eller autonomt av ACE.
+
+```yaml
+version: "1"
+agents:
+  - id: auth-expert-01
+    name: "Aegis"
+    role: auth-agent
+    email: aegis@ace.local
+    created_by: user
+    created_at: "2026-03-15"
+    responsibilities:
+      - src/auth
+      - src/middleware/auth.ts
+    memory_file: .cursor/rules/auth.mdc
+    status: active
+
+  - id: ui-styler-02
+    name: "Vogue"
+    role: ui-agent
+    email: vogue@ace.local
+    created_by: autonomous
+    created_at: "2026-04-01"
+    responsibilities:
+      - src/components/shared
+    memory_file: .cursor/rules/ui.mdc
+    status: active
+```
+
 ### `.ace/ownership.yaml` — format
 
 ```yaml
 version: "1"
 modules:
   src/auth:
-    role: auth-agent
-    rule_file: .cursor/rules/auth.mdc
+    agent_id: auth-expert-01
     owned_since: "2026-03-15"
     last_active: "2026-03-31"
   src/api/v2:
-    role: api-agent
-    rule_file: .cursor/rules/api.mdc
+    agent_id: api-master-01
     owned_since: "2026-03-20"
     last_active: "2026-03-30"
 unowned:
@@ -292,6 +336,32 @@ Svara ENDAST med en JSON-array av delta-updates.
 ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 ```
 
+### 6.6 Multi-Agent Consensus & Teams
+
+**Ansvar:** Hantera interaktioner mellan olika subsystem-agenter när ändringar korsar ägarskapsgränser.
+
+**Agent Creation & Registry:**
+- Agenter kan skapas **manuellt** av användaren (`ace agent create`) eller **autonomt** av systemet när en ny modul eller ett bibliotek identifieras.
+- Varje agent får ett unikt namn, en dedikerad e-postadress (för Agent Mail) och en egen långtidsminnes-fil (`.mdc`).
+- Alla agenter och deras metadata (id, namn, roll, ansvarsområden) dokumenteras centralt i `.ace/agents.yaml`.
+
+**Logik för Agent Teams:**
+- Varje subsystem (t.ex. `lib/ui-components`, `services/payment`) tilldelas en dedikerad agent.
+- En agent kan "lära sig" och ta ansvar för närliggande moduler om det finns en logisk koppling (t.ex. `auth-agent` tar även ansvar för `session-management`).
+- Ägarskapshistorik lagras i `.ace/ownership.yaml` för att bevara expertis.
+
+**Agent Mail (Internal Messaging):**
+- Agenter kommunicerar via ett trådat e-post-liknande system lagrat i `.ace/mail/`.
+- Varje agent har en `inbox/` och `sent/` mapp (Markdown-filer).
+- Stöd för **Attachments**: Agenter kan bifoga kodsnuttar, loggar eller spec-filer till sina meddelanden.
+- **Threading**: Meddelanden grupperas via `thread_id` för att bevara kontext i debatter.
+
+**Consensus-flöde:**
+1. **Conflict Detection:** Om en task i `src/api` kräver ändringar i `src/db`, flaggar systemet att både `api-agent` och `db-agent` är involverade.
+2. **Debate (Agent Mail):** Agenter skickar "Architectural Proposals" till varandras inboxar.
+3. **Consensus Check:** En neutral `arch-agent` (eller LLM-referee) utvärderar tråden för att se om båda parter är nöjda.
+4. **Human Escalation:** Om debatten går >3 rundor utan konsensus, skickas en notis till användaren: `ace consensus resolve <decision-id>`.
+
 ---
 
 ## 7. AGENTS.md som globalt minne
@@ -336,27 +406,32 @@ din playbook.
 ```bash
 # Setup
 ace init                                    # Initiera .ace/ i projektet
-ace role create auth-agent --glob "src/auth/**"
-ace role create api-agent --glob "src/api/**"
+ace agent create --name Aegis --role auth   # Skapa en namngiven agent
+ace agent list                              # Visa alla agenter från agents.yaml
 
 # Ägarskap
-ace own <path> --role <role>
+ace own <path> --agent <agent-id>           # Tilldela modul till specifik agent
 ace who <file>
 ace list-owners
 
 # Kör agent
-ace run "<prompt>" --file <target>          # Auto-resolve roll
-ace run "<prompt>" --role <role>            # Explicit roll
+ace run "<prompt>" --file <target>          # Auto-resolve agent
+ace run "<prompt>" --agent <agent-id>       # Explicit agent
 ace run "<prompt>" --task-type review       # Explicit task type
 
 # Iterativ loop (RALPH)
 ace loop "<prompt>" --test <test_cmd>       # Kör tills testet passerar
 ace loop "<prompt>" --max 5                 # Begränsa iterationer
 
+# Meddelanden (Agent Mail)
+ace mail inbox                              # Visa inbox för aktiv agent
+ace mail send --to <agent-id> --subject "API change" --body "..."
+ace mail reply <msg-id>
+
 # Minne
-ace memory show --role auth-agent           # Visa playbook
-ace memory history --role auth-agent        # Visa sessions
-ace memory prune --role auth-agent          # Ta bort inaktuellt (halvårsvis)
+ace memory show --agent <agent-id>          # Visa playbook
+ace memory history --agent <agent-id>       # Visa sessions
+ace memory prune --agent <agent-id>         # Ta bort inaktuellt (halvårsvis)
 
 # Beslut (ADR)
 ace decision add "Valde argon2id för password hashing"

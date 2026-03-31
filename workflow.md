@@ -32,6 +32,7 @@ When a user runs `ace run "task"` or `ace loop "task"`, the orchestrator:
 - **Execute**: The orchestrator invokes the `cursor-agent` in headless mode.
 - **Verify (TDD)**: If running via `ace loop`, the orchestrator executes the specified test command (e.g., `npm test`).
 - **Analyze**: If tests fail, a reflection prompt analyzes the failure to update the memory for the next iteration.
+- **Coordinate**: If multiple agents are involved, they communicate via **Agent Mail** to reach consensus on cross-module changes.
 
 ### Phase C: Reflection (Write-back)
 Once the task is completed (or max iterations reached):
