@@ -2,6 +2,8 @@ import os
 import subprocess
 import sys
 import time
+import json
+from datetime import datetime
 from pathlib import Path
 
 # Configuration
@@ -9,26 +11,69 @@ MODEL = "gemini-3-flash"
 MAX_ITERATIONS = 5
 PLAN_FILE = "plan.md"
 CHANGELOG_FILE = "changelog.md"
+LOG_FILE = "ralph_execution.log"
+STATS_FILE = "ralph_stats.json"
+
+# Pricing for gemini-3-flash (approximate 2026 pricing)
+# $0.10 per 1M input tokens, $0.40 per 1M output tokens
+PRICE_INPUT_1M = 0.10
+PRICE_OUTPUT_1M = 0.40
+
+def log_message(message: str):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted_msg = f"[{timestamp}] {message}"
+    print(formatted_msg)
+    with open(LOG_FILE, "a") as f:
+        f.write(formatted_msg + "\n")
+
+def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
+    stats = {"total_input_tokens": 0, "total_output_tokens": 0, "total_cost_usd": 0.0, "total_time_sec": 0.0, "iterations": 0}
+    if os.path.exists(STATS_FILE):
+        with open(STATS_FILE, "r") as f:
+            stats = json.load(f)
+    
+    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M) + (output_tokens / 1_000_000 * PRICE_OUTPUT_1M)
+    
+    stats["total_input_tokens"] += input_tokens
+    stats["total_output_tokens"] += output_tokens
+    stats["total_cost_usd"] += cost
+    stats["total_time_sec"] += elapsed_time
+    stats["iterations"] += 1
+    
+    with open(STATS_FILE, "w") as f:
+        json.dump(stats, f, indent=2)
+    
+    log_message(f"Stats Update: +{input_tokens}in, +{output_tokens}out | Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s")
+    log_message(f"Total Cost so far: ${stats['total_cost_usd']:.4f}")
 
 def run_cursor_agent(prompt: str):
-    """Runs cursor-agent in headless mode with the specified prompt."""
-    print(f"\n--- Running Cursor Agent ({MODEL}) ---")
-    print(f"Prompt: {prompt[:100]}...")
+    """Runs cursor-agent in headless mode and tracks usage."""
+    start_time = time.time()
+    log_message(f"Running Cursor Agent: {prompt[:100]}...")
     
-    # Construct the command for cursor-agent headless
-    # Note: Adjust the command based on actual cursor-agent CLI availability
+    # Note: In a real scenario, cursor-agent headless would return usage stats in JSON.
+    # We simulate token counts here for the purpose of the script logic.
     cmd = [
         "cursor-agent",
         "headless",
         "--model", MODEL,
-        "--prompt", prompt
+        "--prompt", prompt,
+        "--output-format", "stream-json"
     ]
     
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        elapsed = time.time() - start_time
+        
+        # Simulated token extraction (assuming the CLI returns this in production)
+        # In a real implementation, we would parse result.stdout for usage data
+        input_tokens = len(prompt.split()) * 1.3  # Rough estimate
+        output_tokens = len(result.stdout.split()) * 1.3 # Rough estimate
+        
+        update_stats(int(input_tokens), int(output_tokens), elapsed)
         return result.stdout
     except subprocess.CalledProcessError as e:
-        print(f"Error running cursor-agent: {e.stderr}")
+        log_message(f"Error running cursor-agent: {e.stderr}")
         return None
 
 def get_file_content(path: str):
@@ -38,40 +83,41 @@ def get_file_content(path: str):
     return ""
 
 def main():
-    print("🚀 Starting RALPH Loop for Cursor ACE Orchestrator...")
+    log_message("🚀 Starting RALPH Loop for Cursor ACE Orchestrator...")
     
     iteration = 0
     while iteration < MAX_ITERATIONS:
         iteration += 1
-        print(f"\n=== Iteration {iteration}/{MAX_ITERATIONS} ===")
+        log_message(f"=== Iteration {iteration}/{MAX_ITERATIONS} ===")
 
         # Step 1: Planning (if plan.md doesn't exist or needs update)
         plan_content = get_file_content(PLAN_FILE)
         if not plan_content:
-            print("Step 1: Planning...")
+            log_message("Step 1: Planning...")
             prompt = (
-                "Based on the PRDs (PRD-01, PRD-02) and SPECS.md, create a detailed, sorted list of implementation steps "
-                "for the Cursor ACE Orchestrator. The system should be built in Python, supporting CLI first but "
-                "architected for FastAPI later. Save the plan as 'plan.md' as a sorted list of tasks."
+                "Based on PRD-01 - Cursor-ace-orchestrator-prd.md (primary), PRD-02, and SPECS.md, "
+                "create a detailed, sorted list of implementation steps for the Cursor ACE Orchestrator. "
+                "The system should be built in Python, supporting CLI first but architected for FastAPI later. "
+                "Save the plan as 'plan.md' as a sorted list of tasks."
             )
             run_cursor_agent(prompt)
             plan_content = get_file_content(PLAN_FILE)
             if not plan_content:
-                print("Failed to create plan.md. Retrying...")
+                log_message("Failed to create plan.md. Retrying...")
                 continue
 
         # Step 2: Build next step
-        print("Step 2: Building next task...")
+        log_message("Step 2: Building next task...")
         prompt = (
             f"Current plan:\n{plan_content}\n\n"
             "Implement the next (first uncompleted) task from the plan. "
             "Include necessary tests. Ensure the software remains runnable and testable. "
-            "Use Python and follow the architecture described in the PRDs."
+            "Use Python and follow the architecture described in PRD-01 and ARCHITECTURE.md."
         )
         run_cursor_agent(prompt)
 
         # Step 3: Verify (Tests, Lint, Run)
-        print("Step 3: Verifying implementation...")
+        log_message("Step 3: Verifying implementation...")
         prompt = (
             "Run all tests, linter, and verify that the software is runnable. "
             "If there are any failures, fix them immediately. "
@@ -80,7 +126,7 @@ def main():
         verification_result = run_cursor_agent(prompt)
         
         # Step 4: Commit
-        print("Step 4: Committing changes...")
+        log_message("Step 4: Committing changes...")
         try:
             subprocess.run(["git", "add", "."], check=True)
             # Try to get the task name for the commit message
@@ -88,10 +134,10 @@ def main():
             subprocess.run(["git", "commit", "-m", commit_msg], check=True)
             subprocess.run(["git", "push"], check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Git operation failed: {e}")
+            log_message(f"Git operation failed: {e}")
 
         # Step 5: Update Plan and Changelog
-        print("Step 5: Updating plan and changelog...")
+        log_message("Step 5: Updating plan and changelog...")
         prompt = (
             f"Update '{PLAN_FILE}' by marking the completed task as done and keeping the list sorted. "
             f"Write the completed task details to '{CHANGELOG_FILE}'. "
@@ -99,7 +145,7 @@ def main():
         )
         run_cursor_agent(prompt)
 
-        print(f"Iteration {iteration} complete.")
+        log_message(f"Iteration {iteration} complete.")
         
         # Check if plan is finished
         plan_content = get_file_content(PLAN_FILE)
