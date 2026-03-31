@@ -67,23 +67,25 @@ def run_cursor_agent(prompt: str):
     """Runs cursor-agent in non-interactive mode and tracks usage."""
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
-    
+
     # Corrected command structure based on cursor-agent --help
     cmd = [
         "cursor-agent",
         "--print",
-        "--model", MODEL,
-        "--output-format", "stream-json",
+        "--model",
+        MODEL,
+        "--output-format",
+        "stream-json",
         "--force",
         "--trust",
-        prompt
+        prompt,
     ]
-    
+
     try:
         # Execute the command and capture both stdout and stderr
         result = subprocess.run(cmd, capture_output=True, text=True)
         elapsed = time.time() - start_time
-        
+
         if result.returncode != 0:
             log_message(f"❌ Cursor Agent failed with Exit Code {result.returncode}")
             log_message(f"--- STDOUT ---\n{result.stdout}")
@@ -93,7 +95,7 @@ def run_cursor_agent(prompt: str):
         # If successful, extract simulated stats
         input_tokens = len(prompt.split()) * 1.3
         output_tokens = len(result.stdout.split()) * 1.3
-        
+
         update_stats(int(input_tokens), int(output_tokens), elapsed)
         log_message("✅ Cursor Agent completed successfully.")
         return result.stdout
@@ -111,6 +113,10 @@ def get_file_content(path: str):
 
 
 def main():
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("RALPH Loop for Cursor ACE Orchestrator")
+        print("Usage: python ralph_loop.py")
+        return
     log_message("🚀 Starting RALPH Loop for Cursor ACE Orchestrator...")
 
     iteration = 0
@@ -123,7 +129,7 @@ def main():
         if not plan_content:
             log_message("Step 1: Planning...")
             prompt = (
-                "Based on PRD-01 - Cursor-ace-orchestrator-prd.md (primary), PRD-02, and SPECS.md, "
+                "Based on PRD-01 - Cursor-ace-orchestrator-prd.md (primary), and SPECS.md, "
                 "create a detailed, sorted list of implementation steps for the Cursor ACE Orchestrator. "
                 "The system should be built in Python, supporting CLI first but architected for FastAPI later. "
                 "Save the plan as 'plan.md' as a sorted list of tasks."
@@ -157,7 +163,9 @@ def main():
         log_message("Step 4: Committing changes...")
         try:
             # Check if there are changes to commit
-            status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+            status = subprocess.run(
+                ["git", "status", "--porcelain"], capture_output=True, text=True
+            )
             if status.stdout.strip():
                 subprocess.run(["git", "add", "."], check=True)
                 commit_msg = f"RALPH Loop: Implementation iteration {iteration}"

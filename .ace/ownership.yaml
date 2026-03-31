@@ -1,0 +1,7 @@
+version: '1'
+modules:
+  src/auth:
+    agent_id: auth-expert-01
+    owned_since: '2026-04-01'
+    last_active: '2026-04-01'
+unowned: []

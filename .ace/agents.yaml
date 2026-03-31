@@ -1,0 +1,11 @@
+version: '1'
+agents:
+- id: auth-expert-01
+  name: Aegis
+  role: auth
+  email: auth-expert-01@ace.local
+  created_by: user
+  created_at: '2026-04-01'
+  responsibilities: []
+  memory_file: .cursor/rules/auth.mdc
+  status: active
