@@ -299,6 +299,15 @@ class Decision(BaseModel):
     agent_id: Optional[str] = None
 
 # Models
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+    sender_id: str
+    recipient_id: str
+    subject: str
+    body: str
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    status: str = "unread"  # unread, read, archived
+
 class Agent(BaseModel):
     id: str
     name: str
@@ -999,6 +1008,163 @@ def memory_sync():
     
     Path("AGENTS.md").write_text("\n".join(content))
     console.print("Updated [green]AGENTS.md[/green]")
+
+# --- Mail System (Phase 4.2) ---
+
+@app.command()
+def mail_send(
+    to: str = typer.Option(..., "--to", "-t", help="Recipient Agent ID"),
+    from_id: str = typer.Option(..., "--from", "-f", help="Sender Agent ID"),
+    subject: str = typer.Option(..., "--subject", "-s", help="Message subject"),
+    body: str = typer.Option(..., "--body", "-b", help="Message body"),
+):
+    """Send a message from one agent to another."""
+    agents_config = load_agents()
+    
+    # Validate sender and recipient
+    sender = next((a for a in agents_config.agents if a.id == from_id), None)
+    recipient = next((a for a in agents_config.agents if a.id == to), None)
+    
+    if not sender and from_id != "user":
+        console.print(f"[red]Error: Sender agent {from_id} not found.[/red]")
+        raise typer.Exit(code=1)
+    if not recipient:
+        console.print(f"[red]Error: Recipient agent {to} not found.[/red]")
+        raise typer.Exit(code=1)
+        
+    msg_id = _send_mail(to=to, from_id=from_id, subject=subject, body=body)
+    console.print(f"Message sent from [blue]{from_id}[/blue] to [green]{to}[/green]. ID: {msg_id}")
+
+@app.command()
+def mail_list(
+    agent_id: str = typer.Argument(..., help="Agent ID to list mail for"),
+    folder: str = typer.Option("inbox", "--folder", "-f", help="Folder to list (inbox/sent)"),
+):
+    """List messages in an agent's inbox or sent folder."""
+    mail_dir = Path(".ace/mail") / agent_id / folder
+    if not mail_dir.exists():
+        console.print(f"No messages found in {agent_id}'s {folder}.")
+        return
+        
+    messages = []
+    for msg_file in mail_dir.glob("*.yaml"):
+        with open(msg_file, "r") as f:
+            data = yaml.load(f)
+            if data:
+                messages.append(Message(**data))
+                
+    if not messages:
+        console.print(f"No messages found in {agent_id}'s {folder}.")
+        return
+        
+    messages.sort(key=lambda x: x.timestamp, reverse=True)
+    
+    table = Table(title=f"{agent_id}'s {folder.capitalize()}")
+    table.add_column("ID", style="cyan")
+    table.add_column("From/To", style="green")
+    table.add_column("Subject", style="yellow")
+    table.add_column("Status", style="magenta")
+    table.add_column("Timestamp", style="blue")
+    
+    for msg in messages:
+        other_party = msg.sender_id if folder == "inbox" else msg.recipient_id
+        table.add_row(msg.id, other_party, msg.subject, msg.status, msg.timestamp)
+        
+    console.print(table)
+
+@app.command()
+def mail_read(
+    agent_id: str = typer.Argument(..., help="Agent ID reading the mail"),
+    message_id: str = typer.Argument(..., help="Message ID to read"),
+):
+    """Read a specific message from an agent's inbox."""
+    mail_dir = Path(".ace/mail") / agent_id / "inbox"
+    msg_file = mail_dir / f"{message_id}.yaml"
+    
+    if not msg_file.exists():
+        # Check sent folder too
+        mail_dir = Path(".ace/mail") / agent_id / "sent"
+        msg_file = mail_dir / f"{message_id}.yaml"
+        if not msg_file.exists():
+            console.print(f"[red]Error: Message {message_id} not found for agent {agent_id}.[/red]")
+            raise typer.Exit(code=1)
+            
+    with open(msg_file, "r") as f:
+        data = yaml.load(f)
+        msg = Message(**data)
+        
+    console.print(f"[bold]From:[/bold] {msg.sender_id}")
+    console.print(f"[bold]To:[/bold] {msg.recipient_id}")
+    console.print(f"[bold]Subject:[/bold] {msg.subject}")
+    console.print(f"[bold]Timestamp:[/bold] {msg.timestamp}")
+    console.print("-" * 20)
+    console.print(msg.body)
+    console.print("-" * 20)
+    
+    # Mark as read if it was unread and in inbox
+    if msg.status == "unread" and "inbox" in str(msg_file):
+        msg.status = "read"
+        with open(msg_file, "w") as f:
+            yaml.dump(msg.model_dump(), f)
+
+# --- Consensus Protocol (Phase 4.3) ---
+
+@app.command()
+def debate(
+    proposal: str = typer.Option(..., "--proposal", "-p", help="The proposal to debate"),
+    agents: List[str] = typer.Option(..., "--agent", "-a", help="Agent IDs to participate in the debate"),
+):
+    """Initiate a debate between agents on a proposal."""
+    console.print(f"[bold]Initiating debate on proposal:[/bold] {proposal}")
+    console.print(f"Participants: {', '.join(agents)}")
+    
+    agents_config = load_agents()
+    active_agents = [a for a in agents_config.agents if a.id in agents]
+    
+    if len(active_agents) < len(agents):
+        missing = set(agents) - set(a.id for a in active_agents)
+        console.print(f"[red]Error: Some agents not found: {', '.join(missing)}[/red]")
+        raise typer.Exit(code=1)
+        
+    # 1. Send proposal to all participants
+    for agent in active_agents:
+        # Use a helper function instead of re-invoking the CLI command
+        _send_mail(
+            to=agent.id,
+            from_id="user",
+            subject=f"DEBATE PROPOSAL: {proposal[:30]}...",
+            body=f"Please provide your feedback on the following proposal:\n\n{proposal}"
+        )
+        
+    console.print("[green]Proposal sent to all participants. Use 'ace mail list <agent_id>' to check for responses.[/green]")
+
+def _send_mail(to: str, from_id: str, subject: str, body: str):
+    """Internal helper to send a message from one agent to another."""
+    msg = Message(
+        sender_id=from_id,
+        recipient_id=to,
+        subject=subject,
+        body=body
+    )
+    
+    mail_dir = Path(".ace/mail")
+    recipient_inbox = mail_dir / to / "inbox"
+    sender_sent = mail_dir / from_id / "sent"
+    
+    recipient_inbox.mkdir(parents=True, exist_ok=True)
+    sender_sent.mkdir(parents=True, exist_ok=True)
+    
+    msg_filename = f"{msg.id}.yaml"
+    
+    # Save to recipient's inbox
+    with open(recipient_inbox / msg_filename, "w") as f:
+        yaml.dump(msg.model_dump(), f)
+        
+    # Save to sender's sent folder
+    with open(sender_sent / msg_filename, "w") as f:
+        yaml.dump(msg.model_dump(), f)
+    
+    return msg.id
 
 if __name__ == "__main__":
     app()

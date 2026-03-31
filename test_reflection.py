@@ -7,6 +7,7 @@ from reflection import (
 
 
 def test_reflection_engine_parse():
+    """Test parsing of structured reflection output."""
     engine = ReflectionEngine()
     text = """
     I have completed the task.
@@ -36,6 +37,7 @@ def test_reflection_engine_parse():
 
 
 def test_update_playbook(tmp_path):
+    """Test updating a playbook with new reflections."""
     playbook_file = tmp_path / "test.mdc"
     playbook_file.write_text("""---
 description: "Test playbook"
@@ -77,6 +79,7 @@ description: "Test playbook"
 
 
 def test_add_missing_sections(tmp_path):
+    """Test adding missing sections to a playbook."""
     playbook_file = tmp_path / "test.mdc"
     playbook_file.write_text("# Empty Playbook")
     

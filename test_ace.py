@@ -18,54 +18,65 @@ def temp_ace_dir(tmp_path):
     os.chdir(original_cwd)
 
 def test_ownership_longest_prefix_match(temp_ace_dir):
+    """Test that ownership is resolved using longest prefix match."""
     # Setup ownership
     config = OwnershipConfig()
     config.modules["src/auth"] = OwnershipModule(agent_id="auth-agent")
-    config.modules["src/auth/special"] = OwnershipModule(agent_id="special-agent")
+    config.modules["src/auth/special"] = OwnershipModule(
+        agent_id="special-agent"
+    )
     save_ownership(config)
-    
+
     # Test matching
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Exact match
     result = runner.invoke(app, ["who", "src/auth"])
     assert "owned by agent auth-agent" in result.stdout
-    
+
     # Prefix match
     result = runner.invoke(app, ["who", "src/auth/token.ts"])
     assert "owned by agent auth-agent" in result.stdout
-    
+
     # Longest prefix match
     result = runner.invoke(app, ["who", "src/auth/special/file.ts"])
     assert "owned by agent special-agent" in result.stdout
-    
+
     # Unowned
     result = runner.invoke(app, ["who", "src/other"])
     assert "currently unowned" in result.stdout
 
 def test_agent_registry(temp_ace_dir):
+    """Test agent creation and listing in the registry."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Create agent
-    result = runner.invoke(app, ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    result = runner.invoke(
+        app,
+        ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"]
+    )
     assert result.exit_code == 0
     assert "Created agent Test" in result.stdout
-    
+
     # List agents
     result = runner.invoke(app, ["agent-list"])
     assert "test-01" in result.stdout
     assert "tester" in result.stdout
-    
+
     # Duplicate ID
-    result = runner.invoke(app, ["agent-create", "--name", "Test2", "--role", "tester", "--id", "test-01"])
+    result = runner.invoke(
+        app,
+        ["agent-create", "--name", "Test2", "--role", "tester", "--id", "test-01"]
+    )
     assert result.exit_code == 1
     assert "already exists" in result.stdout
 
 def test_config_tokens(temp_ace_dir):
+    """Test setting and loading token consumption mode."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
@@ -81,26 +92,37 @@ def test_config_tokens(temp_ace_dir):
     assert config.token_mode == "high"
 
 def test_build_context(temp_ace_dir):
+    """Test composing the context slice for an agent call."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Setup global rules
     rules_dir = Path(".cursor/rules")
     rules_dir.mkdir(parents=True, exist_ok=True)
     global_rules = rules_dir / "_global.mdc"
     global_rules.write_text("Global rules content")
-    
+
     # Setup agent and playbook
-    runner.invoke(app, ["agent-create", "--name", "Auth", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(
+        app,
+        ["agent-create", "--name", "Auth", "--role", "auth", "--id", "auth-01"]
+    )
     playbook = rules_dir / "auth.mdc"
     playbook.write_text("Auth playbook content")
-    
+
     # Setup ownership
     runner.invoke(app, ["own", "src/auth", "auth-01"])
-    
+
     # Build context
-    result = runner.invoke(app, ["build-context", "--path", "src/auth/login.ts", "--task-type", "implement"])
+    result = runner.invoke(
+        app,
+        [
+            "build-context",
+            "--path", "src/auth/login.ts",
+            "--task-type", "implement"
+        ]
+    )
     assert result.exit_code == 0
     assert "GLOBAL RULES" in result.stdout
     assert "Global rules content" in result.stdout
@@ -110,21 +132,22 @@ def test_build_context(temp_ace_dir):
     assert "You are implementing new functionality in src/auth/login.ts" in result.stdout
 
 def test_run_session_logging(temp_ace_dir):
+    """Test that running a command logs the session correctly."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Setup global rules
     rules_dir = Path(".cursor/rules")
     rules_dir.mkdir(parents=True, exist_ok=True)
     global_rules = rules_dir / "_global.mdc"
     global_rules.write_text("Global rules content")
-    
+
     # Run a simple command
     result = runner.invoke(app, ["run", "echo 'Hello ACE'"])
     assert result.exit_code == 0
     assert "Hello ACE" in result.stdout
-    
+
     # Verify session log
     sessions_dir = Path(".ace/sessions")
     session_files = list(sessions_dir.glob("*.md"))
@@ -135,25 +158,27 @@ def test_run_session_logging(temp_ace_dir):
     assert "GLOBAL RULES" in session_log
 
 def test_session_continuity(temp_ace_dir):
+    """Test that recent sessions are included in the context."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Setup global rules
     rules_dir = Path(".cursor/rules")
     rules_dir.mkdir(parents=True, exist_ok=True)
     global_rules = rules_dir / "_global.mdc"
     global_rules.write_text("Global rules content")
-    
+
     # Run first command to create a session
     runner.invoke(app, ["run", "echo 'Session 1'"])
-    
+
     # Run second command and check context for session continuity
     result = runner.invoke(app, ["build-context"])
     assert "RECENT SESSIONS" in result.stdout
     assert "Session 1" in result.stdout
 
 def test_parse_reflection_output():
+    """Test parsing of structured reflection output."""
     from ace import parse_reflection_output
     text = """
     [str-NEW] helpful=1 harmful=0 :: Use the Read tool before editing.
@@ -168,6 +193,7 @@ def test_parse_reflection_output():
     assert updates[2]["type"] == "dec"
 
 def test_update_playbook(tmp_path):
+    """Test updating a playbook with new learnings."""
     from ace import update_playbook
     playbook = tmp_path / "test.mdc"
     playbook.write_text("""
@@ -175,17 +201,29 @@ def test_update_playbook(tmp_path):
 ## Kända fallgropar
 ## Arkitekturella beslut
 """)
-    
+
     updates = [
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
-        {"type": "dec", "id": "001", "helpful": 0, "harmful": 0, "description": "Existing decision"}
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "New strategy"
+        },
+        {
+            "type": "dec",
+            "id": "001",
+            "helpful": 0,
+            "harmful": 0,
+            "description": "Existing decision"
+        }
     ]
-    
+
     # Add new
     update_playbook(playbook, updates[:1])
     content = playbook.read_text()
     assert "[str-001] helpful=1 harmful=0 :: New strategy" in content
-    
+
     # Update existing (simulated by adding it first then updating)
     playbook.write_text(content + "\n<!-- [dec-001] :: Existing decision -->")
     updates[1]["description"] = "Updated decision"
@@ -195,39 +233,40 @@ def test_update_playbook(tmp_path):
     assert "Existing decision" not in content
 
 def test_decision_management(temp_ace_dir):
+    """Test adding and listing architectural decisions."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Add decision
     result = runner.invoke(app, [
-        "decision-add", 
-        "--title", "Use PostgreSQL", 
-        "--context", "We need a database", 
-        "--decision", "PostgreSQL", 
+        "decision-add",
+        "--title", "Use PostgreSQL",
+        "--context", "We need a database",
+        "--decision", "PostgreSQL",
         "--consequences", "Reliable data"
     ])
     assert result.exit_code == 0
     assert "Created ADR: .ace/decisions/ADR-001.md" in result.stdout
-    
+
     # List decisions
     result = runner.invoke(app, ["decision-list"])
     assert result.exit_code == 0
     assert "ADR-001" in result.stdout
     assert "Use PostgreSQL" in result.stdout
     assert "accepted" in result.stdout
-    
+
     # Add another decision
     result = runner.invoke(app, [
-        "decision-add", 
-        "--title", "Use Redis", 
-        "--context", "We need caching", 
-        "--decision", "Redis", 
+        "decision-add",
+        "--title", "Use Redis",
+        "--context", "We need caching",
+        "--decision", "Redis",
         "--consequences", "Faster reads"
     ])
     assert result.exit_code == 0
     assert "ADR-002" in result.stdout
-    
+
     # Verify file content
     adr_file = Path(".ace/decisions/ADR-001.md")
     content = adr_file.read_text()
@@ -237,12 +276,16 @@ def test_decision_management(temp_ace_dir):
     assert "## Consequences\nReliable data" in content
 
 def test_memory_prune(temp_ace_dir):
+    """Test pruning harmful strategies from an agent's memory."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Setup agent and playbook with harmful strategy
-    runner.invoke(app, ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    runner.invoke(
+        app,
+        ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"]
+    )
     playbook_path = Path(".cursor/rules/tester.mdc")
     playbook_path.parent.mkdir(parents=True, exist_ok=True)
     playbook_path.write_text("""
@@ -250,38 +293,50 @@ def test_memory_prune(temp_ace_dir):
 <!-- [str-001] helpful=1 harmful=5 :: Bad strategy -->
 <!-- [str-002] helpful=5 harmful=1 :: Good strategy -->
 """)
-    
+
     # Prune
-    result = runner.invoke(app, ["memory-prune", "--agent", "test-01", "--threshold", "0"])
+    result = runner.invoke(
+        app,
+        ["memory-prune", "--agent", "test-01", "--threshold", "0"]
+    )
     assert result.exit_code == 0
     assert "Pruning str 001" in result.stdout
     assert "No items met" not in result.stdout
-    
+
     # Verify file content
     content = playbook_path.read_text()
     assert "<!-- [PRUNED] <!-- [str-001] helpful=1 harmful=5 :: Bad strategy --> -->" in content
     assert "<!-- [str-002] helpful=5 harmful=1 :: Good strategy -->" in content
 
 def test_memory_sync(temp_ace_dir):
+    """Test syncing AGENTS.md with the registry and decisions."""
     from ace import app
     from typer.testing import CliRunner
     runner = CliRunner()
-    
+
     # Setup agents and decisions
-    runner.invoke(app, ["agent-create", "--name", "Auth Agent", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(
+        app,
+        [
+            "agent-create",
+            "--name", "Auth Agent",
+            "--role", "auth",
+            "--id", "auth-01"
+        ]
+    )
     runner.invoke(app, [
-        "decision-add", 
-        "--title", "Use PostgreSQL", 
-        "--context", "We need a database", 
-        "--decision", "PostgreSQL", 
+        "decision-add",
+        "--title", "Use PostgreSQL",
+        "--context", "We need a database",
+        "--decision", "PostgreSQL",
         "--consequences", "Reliable data"
     ])
-    
+
     # Sync
     result = runner.invoke(app, ["memory-sync"])
     assert result.exit_code == 0
     assert "Updated AGENTS.md" in result.stdout
-    
+
     # Verify AGENTS.md content
     agents_md = Path("AGENTS.md")
     assert agents_md.exists()
@@ -290,3 +345,57 @@ def test_memory_sync(temp_ace_dir):
     assert "### Auth Agent (`auth-01`)" in content
     assert "## Recent Architectural Decisions" in content
     assert "ADR-001: Use PostgreSQL" in content
+
+def test_mail_system(temp_ace_dir):
+    """Test the agent mail system."""
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Create agents
+    runner.invoke(app, ["agent-create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
+    runner.invoke(app, ["agent-create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    
+    # Send mail
+    result = runner.invoke(app, ["mail-send", "--to", "agent-b", "--from", "agent-a", "--subject", "Hello", "--body", "How are you?"])
+    assert result.exit_code == 0
+    assert "Message sent from agent-a to agent-b" in result.stdout
+    
+    # List mail
+    result = runner.invoke(app, ["mail-list", "agent-b"])
+    assert result.exit_code == 0
+    assert "agent-a" in result.stdout
+    assert "Hello" in result.stdout
+    
+    # Read mail
+    import re
+    msg_id_match = re.search(r"ID: (\d+_\d+_\d+)", result.stdout)
+    if not msg_id_match:
+        # Try to get ID from the list table
+        msg_id_match = re.search(r"(\d+_\d+_\d+)", result.stdout)
+        
+    if msg_id_match:
+        msg_id = msg_id_match.group(1)
+        result = runner.invoke(app, ["mail-read", "agent-b", msg_id])
+        assert result.exit_code == 0
+        assert "How are you?" in result.stdout
+        
+def test_debate(temp_ace_dir):
+    """Test the debate command."""
+    from ace import app
+    from typer.testing import CliRunner
+    runner = CliRunner()
+    
+    # Create agents
+    runner.invoke(app, ["agent-create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
+    runner.invoke(app, ["agent-create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    
+    # Initiate debate
+    result = runner.invoke(app, ["debate", "--proposal", "Use Python", "--agent", "agent-a", "--agent", "agent-b"])
+    assert result.exit_code == 0
+    assert "Initiating debate on proposal: Use Python" in result.stdout
+    assert "Proposal sent to all participants" in result.stdout
+    
+    # Verify mail in agent-a's inbox
+    result = runner.invoke(app, ["mail-list", "agent-a"])
+    assert "DEBATE PROPOSAL" in result.stdout
