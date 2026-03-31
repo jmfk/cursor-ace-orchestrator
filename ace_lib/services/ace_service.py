@@ -191,6 +191,30 @@ class ACEService:
 
     # --- Reflection Engine ---
 
+    def list_sessions(self) -> List[Dict]:
+        if not self.sessions_dir.exists():
+            return []
+        session_files = sorted(list(self.sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
+        sessions = []
+        for s in session_files:
+            content = s.read_text()
+            # Extract basic metadata from markdown
+            command_match = re.search(r"- \*\*Command\*\*: `(.*?)`", content)
+            agent_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", content)
+            sessions.append({
+                "id": s.stem.replace("session_", ""),
+                "command": command_match.group(1) if command_match else "unknown",
+                "agent_id": agent_match.group(1) if agent_match else "unknown",
+                "timestamp": datetime.fromtimestamp(s.stat().st_mtime).isoformat()
+            })
+        return sessions
+
+    def get_session(self, session_id: str) -> Optional[str]:
+        session_file = self.sessions_dir / f"session_{session_id}.md"
+        if not session_file.exists():
+            return None
+        return session_file.read_text()
+
     def get_anthropic_client(self):
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
@@ -289,6 +313,35 @@ class ACEService:
 
     # --- ADR Management ---
 
+    def list_decisions(self) -> List[Decision]:
+        if not self.decisions_dir.exists():
+            return []
+        adrs = sorted(list(self.decisions_dir.glob("ADR-*.md")))
+        decisions = []
+        for adr_path in adrs:
+            content = adr_path.read_text()
+            title_match = re.search(r"# ADR-\d+: (.*)", content)
+            status_match = re.search(r"- \*\*Status\*\*: (.*)", content)
+            date_match = re.search(r"- \*\*Date\*\*: (.*)", content)
+            agent_match = re.search(r"- \*\*Agent\*\*: (.*)", content)
+            
+            # Extract sections
+            context_match = re.search(r"## Context\n(.*?)\n\n## Decision", content, re.DOTALL)
+            decision_match = re.search(r"## Decision\n(.*?)\n\n## Consequences", content, re.DOTALL)
+            consequences_match = re.search(r"## Consequences\n(.*)", content, re.DOTALL)
+
+            decisions.append(Decision(
+                id=adr_path.stem,
+                title=title_match.group(1) if title_match else adr_path.name,
+                status=status_match.group(1) if status_match else "unknown",
+                created_at=date_match.group(1) if date_match else datetime.now().isoformat(),
+                agent_id=agent_match.group(1) if agent_match else None,
+                context=context_match.group(1).strip() if context_match else "",
+                decision=decision_match.group(1).strip() if decision_match else "",
+                consequences=consequences_match.group(1).strip() if consequences_match else ""
+            ))
+        return decisions
+
     def add_decision(
         self,
         title: str,
@@ -352,13 +405,12 @@ class ACEService:
             return None
         with open(mail_file, "r") as f:
             data = yaml.load(f)
-            msg = MailMessage(**data)
-        
+
         # Mark as read
         data["status"] = "read"
         with open(mail_file, "w") as f:
             yaml.dump(data, f)
-        
+
         return MailMessage(**data)
 
     def send_mail(self, to_agent: str, from_agent: str, subject: str, body: str) -> MailMessage:
@@ -372,6 +424,15 @@ class ACEService:
         with open(agent_mail_dir / f"{msg_id}.yaml", "w") as f:
             yaml.dump(msg.model_dump(by_alias=True), f)
         return msg
+
+    # --- Memory Pruning ---
+
+    def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return 0
+        return self.prune_memory(agent, threshold)
 
     def prune_memory(self, agent: Agent, threshold: int = 0) -> int:
         playbook_path = self.base_path / agent.memory_file

@@ -34,31 +34,31 @@ class ReflectionEngine:
 
         # Find all matches for strategies
         for match in re.finditer(self.STR_PATTERN, text):
-            result.entries.append(ReflectionEntry(
-                id=match.group(1),
-                type="str",
-                helpful=int(match.group(2)),
-                harmful=int(match.group(3)),
-                content=match.group(4).strip()
-            ))
+            result.entries.append(
+                ReflectionEntry(
+                    id=match.group(1),
+                    type="str",
+                    helpful=int(match.group(2)),
+                    harmful=int(match.group(3)),
+                    content=match.group(4).strip(),
+                )
+            )
 
         # Find all matches for pitfalls
         for match in re.finditer(self.MIS_PATTERN, text):
-            result.entries.append(ReflectionEntry(
-                id=match.group(1),
-                type="mis",
-                helpful=int(match.group(2)),
-                harmful=int(match.group(3)),
-                content=match.group(4).strip()
-            ))
+            result.entries.append(
+                ReflectionEntry(
+                    id=match.group(1),
+                    type="mis",
+                    helpful=int(match.group(2)),
+                    harmful=int(match.group(3)),
+                    content=match.group(4).strip(),
+                )
+            )
 
         # Find all matches for decisions
         for match in re.finditer(self.DEC_PATTERN, text):
-            result.entries.append(ReflectionEntry(
-                id=match.group(1),
-                type="dec",
-                content=match.group(2).strip()
-            ))
+            result.entries.append(ReflectionEntry(id=match.group(1), type="dec", content=match.group(2).strip()))
 
         return result
 
@@ -92,12 +92,7 @@ class PlaybookUpdater:
             with open(self.playbook_path, "w") as f:
                 f.write(new_content)
 
-    def _update_section(
-        self,
-        content: str,
-        section_header: str,
-        entry: ReflectionEntry
-    ) -> str:
+    def _update_section(self, content: str, section_header: str, entry: ReflectionEntry) -> str:
         """Update a section with a new or existing entry."""
         # Find the section
         section_start = content.find(section_header)
@@ -133,7 +128,7 @@ class PlaybookUpdater:
             match = re.search(old_entry_pattern, section_content)
             if match:
                 # Replace only the first occurrence within the section_content
-                section_content = section_content[:match.start()] + new_entry_line + section_content[match.end():]
+                section_content = section_content[: match.start()] + new_entry_line + section_content[match.end() :]
         else:
             # Add new entry
             if entry.type == "dec":

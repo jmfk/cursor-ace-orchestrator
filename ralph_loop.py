@@ -32,11 +32,7 @@ def log_message(message: str):
         f.write(formatted_msg + "\n")
 
 
-def update_stats(
-    input_tokens: int,
-    output_tokens: int,
-    elapsed_time: float
-):
+def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     """Update execution statistics and cost."""
     stats = {
         "total_input_tokens": 0,
@@ -49,9 +45,7 @@ def update_stats(
         with open(STATS_FILE, "r") as f:
             stats = json.load(f)
 
-    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M) + (
-        output_tokens / 1_000_000 * PRICE_OUTPUT_1M
-    )
+    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M) + (output_tokens / 1_000_000 * PRICE_OUTPUT_1M)
 
     stats["total_input_tokens"] += input_tokens
     stats["total_output_tokens"] += output_tokens
@@ -63,8 +57,7 @@ def update_stats(
         json.dump(stats, f, indent=2)
 
     log_message(
-        f"Stats Update: +{input_tokens}in, +{output_tokens}out | "
-        f"Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s"
+        f"Stats Update: +{input_tokens}in, +{output_tokens}out | " f"Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s"
     )
     log_message(f"Total Cost so far: ${stats['total_cost_usd']:.4f}")
 
@@ -177,11 +170,7 @@ def main():
         log_message("Step 4: Committing changes...")
         try:
             # Check if there are changes to commit
-            status = subprocess.run(
-                ["git", "status", "--porcelain"],
-                capture_output=True,
-                text=True
-            )
+            status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
             if status.stdout.strip():
                 subprocess.run(["git", "add", "."], check=True)
                 commit_msg = f"RALPH Loop: Implementation iteration {iteration}"

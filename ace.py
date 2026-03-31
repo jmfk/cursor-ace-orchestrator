@@ -289,19 +289,27 @@ def _perform_reflection(session_file: Path):
 def reflect(session_id: Optional[str] = typer.Option(None, "--session-id", "-s", help="Session ID to reflect on")):
     """Reflect on a session and extract learnings."""
     if not session_id:
-        session_files = sorted(list(service.sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
-        if not session_files:
+        res = api_call("GET", "/sessions")
+        sessions = res if res else service.list_sessions()
+        if not sessions:
             console.print("[red]No sessions found to reflect on.[/red]")
             return
-        session_file = session_files[0]
+        session_id = sessions[0]["id"]
+
+    console.print(f"Reflecting on session: [blue]{session_id}[/blue]")
+    
+    res = api_call("POST", f"/sessions/{session_id}/reflect")
+    if res:
+        console.print("\n[bold]Reflection Output:[/bold]")
+        console.print(res["reflection"])
+        if not res["updates"]:
+            console.print("[yellow]No new learnings extracted.[/yellow]")
     else:
         session_file = service.sessions_dir / f"session_{session_id}.md"
         if not session_file.exists():
             console.print(f"[red]Session {session_id} not found.[/red]")
             return
-
-    console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
-    _perform_reflection(session_file)
+        _perform_reflection(session_file)
 
 
 @app.command()
@@ -336,11 +344,9 @@ def decision_add(
 @app.command()
 def decision_list():
     """List all Architectural Decision Records."""
-    if not service.decisions_dir.exists():
-        console.print("No decisions found.")
-        return
-
-    adrs = sorted(list(service.decisions_dir.glob("ADR-*.md")))
+    res = api_call("GET", "/decisions")
+    adrs = res if res else service.list_decisions()
+    
     if not adrs:
         console.print("No ADRs found.")
         return
@@ -351,17 +357,21 @@ def decision_list():
     table.add_column("Status", style="yellow")
     table.add_column("Date", style="magenta")
 
-    for adr_path in adrs:
-        content = adr_path.read_text()
-        title_match = re.search(r"# ADR-\d+: (.*)", content)
-        status_match = re.search(r"- \*\*Status\*\*: (.*)", content)
-        date_match = re.search(r"- \*\*Date\*\*: (.*)", content)
-        table.add_row(
-            adr_path.stem,
-            title_match.group(1) if title_match else adr_path.name,
-            status_match.group(1) if status_match else "unknown",
-            date_match.group(1) if date_match else "unknown",
-        )
+    for adr in adrs:
+        if isinstance(adr, dict):
+            table.add_row(
+                adr["id"],
+                adr["title"],
+                adr["status"],
+                adr["created_at"],
+            )
+        else:
+            table.add_row(
+                adr.id,
+                adr.title,
+                adr.status,
+                adr.created_at,
+            )
     console.print(table)
 
 
@@ -371,16 +381,25 @@ def memory_prune(
     threshold: int = typer.Option(0, "--threshold", "-t", help="Prune if harmful - helpful > threshold"),
 ):
     """Archive or remove 'harmful' strategies."""
-    agents_config = service.load_agents()
-    agents = [a for a in agents_config.agents if a.id == agent_id] if agent_id else agents_config.agents
+    res = api_call("POST", "/memory/prune", params={"agent_id": agent_id, "threshold": threshold})
+    if res:
+        for aid, count in res.items():
+            console.print(f"Pruning memory for agent: [blue]{aid}[/blue]")
+            if count > 0:
+                console.print(f"  [green]Done.[/green] Pruned {count} items.")
+            else:
+                console.print("  [yellow]No items met the pruning threshold.[/yellow]")
+    else:
+        agents_config = service.load_agents()
+        agents = [a for a in agents_config.agents if a.id == agent_id] if agent_id else agents_config.agents
 
-    for agent in agents:
-        console.print(f"Pruning memory for agent: [blue]{agent.id}[/blue]")
-        pruned_count = service.prune_memory(agent, threshold)
-        if pruned_count > 0:
-            console.print(f"  [green]Done.[/green] Pruned {pruned_count} items.")
-        else:
-            console.print("  [yellow]No items met the pruning threshold.[/yellow]")
+        for agent in agents:
+            console.print(f"Pruning memory for agent: [blue]{agent.id}[/blue]")
+            pruned_count = service.prune_memory(agent, threshold)
+            if pruned_count > 0:
+                console.print(f"  [green]Done.[/green] Pruned {pruned_count} items.")
+            else:
+                console.print("  [yellow]No items met the pruning threshold.[/yellow]")
 
 
 @app.command()
@@ -430,54 +449,63 @@ def mail_send(
     body: str = typer.Option(..., "--body", "-b", help="Body"),
 ):
     """Send a message to another agent."""
-    service.send_mail(to, sender, subject, body)
+    res = api_call("POST", "/mail", params={"to_agent": to, "from_agent": sender, "subject": subject, "body": body})
+    if not res:
+        service.send_mail(to, sender, subject, body)
     console.print(f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]")
 
 
 @app.command()
 def mail_list(agent_id: str):
     """List messages in an agent's inbox."""
-    mail_dir = service.mail_dir / agent_id
-    if not mail_dir.exists():
+    res = api_call("GET", f"/mail/{agent_id}")
+    messages = res if res else service.list_mail(agent_id)
+    
+    if not messages:
         console.print(f"No mail for agent [blue]{agent_id}[/blue]")
         return
-    mail_files = sorted(list(mail_dir.glob("*.yaml")), reverse=True)
+        
     table = Table(title=f"Inbox: {agent_id}")
     table.add_column("ID", style="cyan")
     table.add_column("From", style="green")
     table.add_column("Subject", style="yellow")
     table.add_column("Status", style="magenta")
-    from ruamel.yaml import YAML
 
-    y = YAML()
-    for f in mail_files:
-        with open(f, "r") as m:
-            data = y.load(m)
-            table.add_row(data["id"], data["from"], data["subject"], data["status"])
+    for msg in messages:
+        if isinstance(msg, dict):
+            table.add_row(msg["id"], msg["from"], msg["subject"], msg["status"])
+        else:
+            table.add_row(msg.id, msg.from_agent, msg.subject, msg.status)
     console.print(table)
 
 
 @app.command()
 def mail_read(agent_id: str, msg_id: str):
     """Read a specific message."""
-    mail_file = service.mail_dir / agent_id / f"{msg_id}.yaml"
-    if not mail_file.exists():
+    res = api_call("GET", f"/mail/{agent_id}/{msg_id}")
+    data = res if res else service.read_mail(agent_id, msg_id)
+    
+    if not data:
         console.print(f"Message [red]{msg_id}[/red] not found.")
         return
-    from ruamel.yaml import YAML
 
-    y = YAML()
-    with open(mail_file, "r") as f:
-        data = y.load(f)
+    if isinstance(data, dict):
+        from_val = data["from"]
+        subject_val = data["subject"]
+        timestamp_val = data["timestamp"]
+        body_val = data["body"]
+    else:
+        from_val = data.from_agent
+        subject_val = data.subject
+        timestamp_val = data.timestamp
+        body_val = data.body
+
     console.print(
-        f"\n[bold]From:[/bold] {data['from']}\n"
-        f"[bold]Subject:[/bold] {data['subject']}\n"
-        f"[bold]Date:[/bold] {data['timestamp']}\n"
-        f"{'-' * 20}\n{data['body']}\n{'-' * 20}"
+        f"\n[bold]From:[/bold] {from_val}\n"
+        f"[bold]Subject:[/bold] {subject_val}\n"
+        f"[bold]Date:[/bold] {timestamp_val}\n"
+        f"{'-' * 20}\n{body_val}\n{'-' * 20}"
     )
-    data["status"] = "read"
-    with open(mail_file, "w") as f:
-        y.dump(data, f)
 
 
 @app.command()
@@ -503,9 +531,7 @@ def ui_mockup(
     agent_id: str = typer.Option(..., "--agent", "-a", help="Agent to handle the mockup"),
 ):
     """Generate a UI mockup."""
-    console.print(
-        f"Generating UI mockup for: [bold]{description}[/bold] using agent [green]{agent_id}[/green]"
-    )
+    console.print(f"Generating UI mockup for: [bold]{description}[/bold] using agent [green]{agent_id}[/green]")
 
 
 @ui_app.command("sync")

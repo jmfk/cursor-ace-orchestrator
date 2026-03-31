@@ -48,3 +48,35 @@ def test_context_building(ace_service):
     assert "Global Rules Content" in context
     assert "Auth Playbook Content" in context
     assert "implementing new functionality in src/auth/login.py" in context
+
+
+def test_mail_system(ace_service):
+    ace_service.send_mail("agent-b", "agent-a", "Hello", "Test body")
+    messages = ace_service.list_mail("agent-b")
+    assert len(messages) == 1
+    assert messages[0].subject == "Hello"
+    assert messages[0].status == "unread"
+
+    msg = ace_service.read_mail("agent-b", messages[0].id)
+    assert msg.body == "Test body"
+    assert msg.status == "read"
+
+
+def test_decision_listing(ace_service):
+    ace_service.add_decision("Title 1", "Context 1", "Decision 1", "Consequences 1")
+    ace_service.add_decision("Title 2", "Context 2", "Decision 2", "Consequences 2")
+    
+    decisions = ace_service.list_decisions()
+    assert len(decisions) == 2
+    assert decisions[0].title == "Title 1"
+    assert decisions[1].title == "Title 2"
+
+
+def test_session_listing(ace_service):
+    (ace_service.ace_dir / "sessions").mkdir(parents=True, exist_ok=True)
+    session_file = ace_service.sessions_dir / "session_20240101_120000.md"
+    session_file.write_text("# Session 20240101_120000\n- **Command**: `test`")
+    
+    sessions = ace_service.list_sessions()
+    assert len(sessions) == 1
+    assert sessions[0]["command"] == "test"

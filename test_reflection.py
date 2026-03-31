@@ -1,9 +1,4 @@
-from reflection import (
-    ReflectionEngine,
-    ReflectionEntry,
-    ReflectionResult,
-    PlaybookUpdater
-)
+from reflection import ReflectionEngine, ReflectionEntry, ReflectionResult, PlaybookUpdater
 
 
 def test_reflection_engine_parse():
@@ -55,23 +50,21 @@ description: "Test playbook"
     updater = PlaybookUpdater(str(playbook_file))
 
     # 1. Add new strategy
-    reflections = ReflectionResult(entries=[
-        ReflectionEntry(
-            id="001",
-            type="str",
-            helpful=1,
-            harmful=0,
-            content="Use TDD."
-        ),
-    ])
+    reflections = ReflectionResult(
+        entries=[
+            ReflectionEntry(id="001", type="str", helpful=1, harmful=0, content="Use TDD."),
+        ]
+    )
     updater.update(reflections)
     content = playbook_file.read_text()
     assert "<!-- [str-001] helpful=1 harmful=0 :: Use TDD. -->" in content
 
     # 2. Update existing decision
-    reflections = ReflectionResult(entries=[
-        ReflectionEntry(id="001", type="dec", content="Use PostgreSQL."),
-    ])
+    reflections = ReflectionResult(
+        entries=[
+            ReflectionEntry(id="001", type="dec", content="Use PostgreSQL."),
+        ]
+    )
     updater.update(reflections)
     content = playbook_file.read_text()
     assert "<!-- [dec-001] :: Use PostgreSQL. -->" in content
@@ -84,23 +77,13 @@ def test_add_missing_sections(tmp_path):
     playbook_file.write_text("# Empty Playbook")
 
     updater = PlaybookUpdater(str(playbook_file))
-    reflections = ReflectionResult(entries=[
-        ReflectionEntry(
-            id="001",
-            type="str",
-            helpful=1,
-            harmful=0,
-            content="Strategy 1"
-        ),
-        ReflectionEntry(id="001", type="dec", content="Decision 1"),
-        ReflectionEntry(
-            id="001",
-            type="mis",
-            helpful=0,
-            harmful=1,
-            content="Pitfall 1"
-        ),
-    ])
+    reflections = ReflectionResult(
+        entries=[
+            ReflectionEntry(id="001", type="str", helpful=1, harmful=0, content="Strategy 1"),
+            ReflectionEntry(id="001", type="dec", content="Decision 1"),
+            ReflectionEntry(id="001", type="mis", helpful=0, harmful=1, content="Pitfall 1"),
+        ]
+    )
 
     updater.update(reflections)
     content = playbook_file.read_text()

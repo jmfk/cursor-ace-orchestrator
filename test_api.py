@@ -16,6 +16,7 @@ def client():
 
     # Patch the service to use the test directory
     import ace_api.main
+
     old_service = ace_api.main.service
     ace_api.main.service = ACEService(base_path=test_ace_dir)
 
@@ -34,12 +35,9 @@ def test_list_agents_empty(client):
 
 
 def test_create_agent(client):
-    response = client.post("/agents", params={
-        "id": "test-agent",
-        "name": "Test Agent",
-        "role": "tester",
-        "email": "test@example.com"
-    })
+    response = client.post(
+        "/agents", params={"id": "test-agent", "name": "Test Agent", "role": "tester", "email": "test@example.com"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "test-agent"
@@ -47,10 +45,7 @@ def test_create_agent(client):
 
 
 def test_assign_ownership(client):
-    response = client.post("/ownership", params={
-        "path": "src/test",
-        "agent_id": "test-agent"
-    })
+    response = client.post("/ownership", params={"path": "src/test", "agent_id": "test-agent"})
     assert response.status_code == 200
 
     response = client.get("/ownership")
