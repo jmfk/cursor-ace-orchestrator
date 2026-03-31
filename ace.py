@@ -71,6 +71,41 @@ def reflect_on_session(session_output: str) -> str:
         console.print(f"[red]Error during reflection: {e}[/red]")
         return "Error during reflection."
 
+def _perform_reflection(session_file: Path):
+    """Internal helper to perform reflection on a session file."""
+    session_content = session_file.read_text()
+    
+    # Extract the Output section from the session log
+    output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
+    if not output_match:
+        console.print("[red]Could not find output section in session log.[/red]")
+        return
+    
+    session_output = output_match.group(1)
+    reflection_text = reflect_on_session(session_output)
+    
+    console.print("\n[bold]Reflection Output:[/bold]")
+    console.print(reflection_text)
+    
+    # Parse and update playbooks
+    updates = parse_reflection_output(reflection_text)
+    if updates:
+        # Find the agent/playbook to update
+        agent_id_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", session_content)
+        if agent_id_match:
+            agent_id = agent_id_match.group(1)
+            if agent_id != "None":
+                agents_config = load_agents()
+                agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+                if agent:
+                    update_playbook(Path(agent.memory_file), updates)
+                    return
+        
+        # Fallback: update global rules
+        update_playbook(Path(".cursor/rules/_global.mdc"), updates)
+    else:
+        console.print("[yellow]No new learnings extracted.[/yellow]")
+
 @app.command()
 def reflect(
     session_id: Optional[str] = typer.Option(
@@ -100,68 +135,7 @@ def reflect(
             return
 
     console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
-    session_content = session_file.read_text()
-
-    # Extract the Output section from the session log
-    output_match = re.search(
-        r"## Output\n```\n(.*?)\n```",
-        session_content,
-        re.DOTALL
-    )
-    if not output_match:
-        console.print("[red]Could not find output section in session log.[/red]")
-        return
-
-    session_output = output_match.group(1)
-    reflection_text = reflect_on_session(session_output)
-
-    console.print("\n[bold]Reflection Output:[/bold]")
-    console.print(reflection_text)
-
-    # Parse and update playbooks
-    updates = parse_reflection_output(reflection_text)
-    if updates:
-        # For now, we update the agent associated with the session
-        # We can extract the path from the session log to find the agent
-        path_match = re.search(r"- \*\*Path\*\*: `(.*?)`", session_content)
-        path = path_match.group(1) if path_match else None
-
-        if path and path != "None":
-            # Find agent for this path
-            ownership = load_ownership()
-            best_match_len = -1
-            resolved_agent_id = None
-            for module_path in ownership.modules:
-                if path.startswith(module_path):
-                    if len(module_path) > best_match_len:
-                        best_match_len = len(module_path)
-                        resolved_agent_id = ownership.modules[
-                            module_path
-                        ].agent_id
-
-            if resolved_agent_id:
-                agents_config = load_agents()
-                agent = next(
-                    (a for a in agents_config.agents if a.id == resolved_agent_id),
-                    None
-                )
-                if agent:
-                    playbook_path = Path(agent.memory_file)
-                    update_playbook(playbook_path, updates)
-                else:
-                    console.print(
-                        f"[yellow]Agent {resolved_agent_id} not found.[/yellow]"
-                    )
-            else:
-                console.print(
-                    "[yellow]No agent found for path. Skipping update.[/yellow]"
-                )
-        else:
-            console.print(
-                "[yellow]No path found. Skipping playbook update.[/yellow]"
-            )
-    else:
-        console.print("[yellow]No new learnings extracted.[/yellow]")
+    _perform_reflection(session_file)
 
 # --- Delta Update Parser (Phase 2.2) ---
 
@@ -268,11 +242,6 @@ def update_playbook(playbook_path: Path, updates: List[Dict]):
     playbook_path.write_text(content)
     console.print(f"Updated playbook: [green]{playbook_path}[/green]")
 
-app = typer.Typer(no_args_is_help=True)
-console = Console()
-yaml = YAML()
-yaml.preserve_quotes = True
-
 class TokenMode(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -299,15 +268,6 @@ class Decision(BaseModel):
     agent_id: Optional[str] = None
 
 # Models
-class Message(BaseModel):
-    id: str = Field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
-    sender_id: str
-    recipient_id: str
-    subject: str
-    body: str
-    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
-    status: str = "unread"  # unread, read, archived
-
 class Agent(BaseModel):
     id: str
     name: str
@@ -353,7 +313,6 @@ def save_ownership(config: OwnershipConfig):
         yaml.dump(config.model_dump(), f)
 
 def load_agents() -> AgentsConfig:
-    """Load agents configuration from YAML."""
     agents_file = Path(".ace/agents.yaml")
     if not agents_file.exists():
         return AgentsConfig()
@@ -364,13 +323,11 @@ def load_agents() -> AgentsConfig:
         return AgentsConfig(**data)
 
 def save_agents(config: AgentsConfig):
-    """Save agents configuration to YAML."""
     agents_file = Path(".ace/agents.yaml")
     with open(agents_file, "w") as f:
         yaml.dump(config.model_dump(), f)
 
 def load_config() -> Config:
-    """Load general configuration from YAML."""
     config_file = Path(".ace/config.yaml")
     if not config_file.exists():
         return Config()
@@ -381,14 +338,12 @@ def load_config() -> Config:
         return Config(**data)
 
 def save_config(config: Config):
-    """Save general configuration to YAML."""
     config_file = Path(".ace/config.yaml")
     with open(config_file, "w") as f:
         # Use model_dump(mode="json") to ensure Enums are serialized as strings
         yaml.dump(config.model_dump(mode="json"), f)
 
 def get_task_framing(task_type: TaskType, module: str) -> str:
-    """Get the framing prompt for a specific task type and module."""
     framing = {
         TaskType.IMPLEMENT: f"You are implementing new functionality in {module}. Follow the playbook strategies. Write back new learnings in the write-back section.",
         TaskType.REVIEW: f"You are reviewing code in {module}. Identify deviations from playbook strategies. Add any new pitfalls to the write-back section.",
@@ -761,73 +716,6 @@ def run(
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
-def _perform_reflection(session_file: Path):
-    """Internal helper to perform reflection on a session file."""
-    session_content = session_file.read_text()
-    
-    # Extract the Output section from the session log
-    output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
-    if not output_match:
-        console.print("[red]Could not find output section in session log.[/red]")
-        return
-    
-    session_output = output_match.group(1)
-    reflection_text = reflect_on_session(session_output)
-    
-    console.print("\n[bold]Reflection Output:[/bold]")
-    console.print(reflection_text)
-    
-    # Parse and update playbooks
-    updates = parse_reflection_output(reflection_text)
-    if updates:
-        # Find the agent/playbook to update
-        agent_id_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", session_content)
-        if agent_id_match:
-            agent_id = agent_id_match.group(1)
-            if agent_id != "None":
-                agents_config = load_agents()
-                agent = next((a for a in agents_config.agents if a.id == agent_id), None)
-                if agent:
-                    update_playbook(Path(agent.memory_file), updates)
-                    return
-        
-        # Fallback: update global rules
-        update_playbook(Path(".cursor/rules/_global.mdc"), updates)
-    else:
-        console.print("[yellow]No new learnings extracted.[/yellow]")
-
-@app.command()
-def reflect_cmd(
-    session_id: Optional[str] = typer.Option(
-        None,
-        "--session-id",
-        "-s",
-        help="Session ID to reflect on"
-    )
-):
-    """Reflect on a session and extract learnings."""
-    sessions_dir = Path(".ace/sessions")
-    if not session_id:
-        # Get most recent session
-        session_files = sorted(
-            list(sessions_dir.glob("*.md")),
-            key=lambda x: x.stat().st_mtime,
-            reverse=True
-        )
-        if not session_files:
-            console.print("[red]No sessions found to reflect on.[/red]")
-            return
-        session_file = session_files[0]
-    else:
-        session_file = sessions_dir / f"session_{session_id}.md"
-        if not session_file.exists():
-            console.print(f"[red]Session {session_id} not found.[/red]")
-            return
-
-    console.print(f"Reflecting on session: [blue]{session_file.name}[/blue]")
-    _perform_reflection(session_file)
-
-
 @app.command()
 def decision_add(
     title: str = typer.Option(..., "--title", "-t", help="Decision title"),
@@ -887,7 +775,7 @@ def decision_list():
     if not decisions_dir.exists():
         console.print("No decisions found.")
         return
-        
+    
     adrs = sorted(list(decisions_dir.glob("ADR-*.md")))
     if not adrs:
         console.print("No ADRs found.")
@@ -1008,163 +896,6 @@ def memory_sync():
     
     Path("AGENTS.md").write_text("\n".join(content))
     console.print("Updated [green]AGENTS.md[/green]")
-
-# --- Mail System (Phase 4.2) ---
-
-@app.command()
-def mail_send(
-    to: str = typer.Option(..., "--to", "-t", help="Recipient Agent ID"),
-    from_id: str = typer.Option(..., "--from", "-f", help="Sender Agent ID"),
-    subject: str = typer.Option(..., "--subject", "-s", help="Message subject"),
-    body: str = typer.Option(..., "--body", "-b", help="Message body"),
-):
-    """Send a message from one agent to another."""
-    agents_config = load_agents()
-    
-    # Validate sender and recipient
-    sender = next((a for a in agents_config.agents if a.id == from_id), None)
-    recipient = next((a for a in agents_config.agents if a.id == to), None)
-    
-    if not sender and from_id != "user":
-        console.print(f"[red]Error: Sender agent {from_id} not found.[/red]")
-        raise typer.Exit(code=1)
-    if not recipient:
-        console.print(f"[red]Error: Recipient agent {to} not found.[/red]")
-        raise typer.Exit(code=1)
-        
-    msg_id = _send_mail(to=to, from_id=from_id, subject=subject, body=body)
-    console.print(f"Message sent from [blue]{from_id}[/blue] to [green]{to}[/green]. ID: {msg_id}")
-
-@app.command()
-def mail_list(
-    agent_id: str = typer.Argument(..., help="Agent ID to list mail for"),
-    folder: str = typer.Option("inbox", "--folder", "-f", help="Folder to list (inbox/sent)"),
-):
-    """List messages in an agent's inbox or sent folder."""
-    mail_dir = Path(".ace/mail") / agent_id / folder
-    if not mail_dir.exists():
-        console.print(f"No messages found in {agent_id}'s {folder}.")
-        return
-        
-    messages = []
-    for msg_file in mail_dir.glob("*.yaml"):
-        with open(msg_file, "r") as f:
-            data = yaml.load(f)
-            if data:
-                messages.append(Message(**data))
-                
-    if not messages:
-        console.print(f"No messages found in {agent_id}'s {folder}.")
-        return
-        
-    messages.sort(key=lambda x: x.timestamp, reverse=True)
-    
-    table = Table(title=f"{agent_id}'s {folder.capitalize()}")
-    table.add_column("ID", style="cyan")
-    table.add_column("From/To", style="green")
-    table.add_column("Subject", style="yellow")
-    table.add_column("Status", style="magenta")
-    table.add_column("Timestamp", style="blue")
-    
-    for msg in messages:
-        other_party = msg.sender_id if folder == "inbox" else msg.recipient_id
-        table.add_row(msg.id, other_party, msg.subject, msg.status, msg.timestamp)
-        
-    console.print(table)
-
-@app.command()
-def mail_read(
-    agent_id: str = typer.Argument(..., help="Agent ID reading the mail"),
-    message_id: str = typer.Argument(..., help="Message ID to read"),
-):
-    """Read a specific message from an agent's inbox."""
-    mail_dir = Path(".ace/mail") / agent_id / "inbox"
-    msg_file = mail_dir / f"{message_id}.yaml"
-    
-    if not msg_file.exists():
-        # Check sent folder too
-        mail_dir = Path(".ace/mail") / agent_id / "sent"
-        msg_file = mail_dir / f"{message_id}.yaml"
-        if not msg_file.exists():
-            console.print(f"[red]Error: Message {message_id} not found for agent {agent_id}.[/red]")
-            raise typer.Exit(code=1)
-            
-    with open(msg_file, "r") as f:
-        data = yaml.load(f)
-        msg = Message(**data)
-        
-    console.print(f"[bold]From:[/bold] {msg.sender_id}")
-    console.print(f"[bold]To:[/bold] {msg.recipient_id}")
-    console.print(f"[bold]Subject:[/bold] {msg.subject}")
-    console.print(f"[bold]Timestamp:[/bold] {msg.timestamp}")
-    console.print("-" * 20)
-    console.print(msg.body)
-    console.print("-" * 20)
-    
-    # Mark as read if it was unread and in inbox
-    if msg.status == "unread" and "inbox" in str(msg_file):
-        msg.status = "read"
-        with open(msg_file, "w") as f:
-            yaml.dump(msg.model_dump(), f)
-
-# --- Consensus Protocol (Phase 4.3) ---
-
-@app.command()
-def debate(
-    proposal: str = typer.Option(..., "--proposal", "-p", help="The proposal to debate"),
-    agents: List[str] = typer.Option(..., "--agent", "-a", help="Agent IDs to participate in the debate"),
-):
-    """Initiate a debate between agents on a proposal."""
-    console.print(f"[bold]Initiating debate on proposal:[/bold] {proposal}")
-    console.print(f"Participants: {', '.join(agents)}")
-    
-    agents_config = load_agents()
-    active_agents = [a for a in agents_config.agents if a.id in agents]
-    
-    if len(active_agents) < len(agents):
-        missing = set(agents) - set(a.id for a in active_agents)
-        console.print(f"[red]Error: Some agents not found: {', '.join(missing)}[/red]")
-        raise typer.Exit(code=1)
-        
-    # 1. Send proposal to all participants
-    for agent in active_agents:
-        # Use a helper function instead of re-invoking the CLI command
-        _send_mail(
-            to=agent.id,
-            from_id="user",
-            subject=f"DEBATE PROPOSAL: {proposal[:30]}...",
-            body=f"Please provide your feedback on the following proposal:\n\n{proposal}"
-        )
-        
-    console.print("[green]Proposal sent to all participants. Use 'ace mail list <agent_id>' to check for responses.[/green]")
-
-def _send_mail(to: str, from_id: str, subject: str, body: str):
-    """Internal helper to send a message from one agent to another."""
-    msg = Message(
-        sender_id=from_id,
-        recipient_id=to,
-        subject=subject,
-        body=body
-    )
-    
-    mail_dir = Path(".ace/mail")
-    recipient_inbox = mail_dir / to / "inbox"
-    sender_sent = mail_dir / from_id / "sent"
-    
-    recipient_inbox.mkdir(parents=True, exist_ok=True)
-    sender_sent.mkdir(parents=True, exist_ok=True)
-    
-    msg_filename = f"{msg.id}.yaml"
-    
-    # Save to recipient's inbox
-    with open(recipient_inbox / msg_filename, "w") as f:
-        yaml.dump(msg.model_dump(), f)
-        
-    # Save to sender's sent folder
-    with open(sender_sent / msg_filename, "w") as f:
-        yaml.dump(msg.model_dump(), f)
-    
-    return msg.id
 
 if __name__ == "__main__":
     app()

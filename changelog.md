@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 5
+
+### Added
+- **Phase 4: RALPH Loop & Multi-Agent Coordination (M4)**
+  - SOP Engine: Implemented Standard Operating Procedures for `onboarding`, `audit`, and `pr-review`.
+
+## [2026-04-01] - RALPH Loop Iteration 4
+
+### Added
+- **Phase 4: RALPH Loop & Multi-Agent Coordination (M4)**
+  - Agent Mail System: Implemented the internal messaging system in `.ace/mail/` with `inbox/` and `sent/` per agent.
+  - Consensus Protocol: Implemented the debate logic where agents exchange proposals via Mail, mediated by an LLM-referee.
+
 ## [2026-04-01] - RALPH Loop Iteration 3
 
 ### Added
