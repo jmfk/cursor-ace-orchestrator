@@ -386,7 +386,8 @@ def main():
             prompt = f"Update '{plan_file}' based on {prd_path} and SPECS.md."
             run_cursor_agent(prompt)
             plan_content = get_file_content(plan_file)
-            if not plan_content: continue
+            if not plan_content:
+                continue
 
         # Step 2: Build
         log_message("Step 2: Building...")

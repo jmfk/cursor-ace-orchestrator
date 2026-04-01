@@ -916,16 +916,35 @@ class ACEService:
         path: Optional[str] = None,
         agent_id: Optional[str] = None,
         git_commit: bool = False,
+        prd_path: Optional[str] = None,
+        plan_file: Optional[str] = None,
     ):
         """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 9.5)."""
         iteration = 0
         success = False
         state_history = []
+        
+        # Use provided PRD and plan file or defaults
+        prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
+        plan_file = plan_file or "plan.md"
 
         # Initial state hash for stagnation detection
         while iteration < max_iterations:
             iteration += 1
             print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
+
+            # 0. Initial State Analysis (if it's the first iteration and we have a plan file)
+            if iteration == 1 and os.path.exists(prd_path) and os.path.exists(plan_file):
+                print(f"[RALPH] Step 0: Analyzing current project state against {prd_path}...")
+                plan_content = Path(plan_file).read_text()
+                analysis_prompt = (
+                    f"Analyze the current codebase and project structure relative to {prd_path}. "
+                    f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
+                    f"1. Identify implemented features. 2. Identify missing parts. 3. Update '{plan_file}'."
+                )
+                # We use the prompt for the first iteration if it was just "analyze"
+                if "analyze" in prompt.lower() and len(prompt) < 50:
+                    prompt = analysis_prompt
 
             # 1. Context Refresh & Build
             os.environ["ACE_LOOP_PROMPT"] = prompt

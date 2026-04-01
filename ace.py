@@ -942,6 +942,12 @@ def loop(
     git_commit: bool = typer.Option(
         False, "--git-commit", "-g", help="Automatically commit on success"
     ),
+    prd: Optional[str] = typer.Option(
+        None, "--prd", help="Path to the PRD file"
+    ),
+    plan_file: Optional[str] = typer.Option(
+        None, "--plan", help="Path to the plan file"
+    ),
 ):
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
@@ -981,7 +987,7 @@ def loop(
 
     # Use the service to run the loop
     success, iterations = svc.run_loop(
-        prompt, test_cmd, max_iterations, path, agent_id, git_commit
+        prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file
     )
 
     if success:
