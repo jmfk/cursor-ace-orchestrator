@@ -1,4 +1,6 @@
-from reflection import ReflectionEngine, ReflectionEntry, ReflectionResult, PlaybookUpdater
+from reflection import (
+    ReflectionEngine, ReflectionEntry, ReflectionResult, PlaybookUpdater
+)
 
 
 def test_reflection_engine_parse():

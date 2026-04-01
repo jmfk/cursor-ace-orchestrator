@@ -149,7 +149,8 @@ def test_build_context(temp_ace_dir, monkeypatch):
     # Setup agent and playbook
     runner.invoke(
         app,
-        ["agent", "create", "--name", "Auth", "--role", "auth", "--id", "auth-01"]
+        ["agent", "create", "--name", "Auth", "--role", "auth",
+         "--id", "auth-01"]
     )
     playbook = rules_dir / "auth.mdc"
     playbook.write_text("Auth playbook content")

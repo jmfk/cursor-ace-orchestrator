@@ -22,7 +22,7 @@ async def create_agent(
     name: str = Body(...),
     role: str = Body(...),
     email: Optional[str] = Body(None),
-    responsibilities: List[str] = Body(default_factory=list)
+    responsibilities: List[str] = Body([])
 ):
     try:
         return service.create_agent(id, name, role, email, responsibilities)

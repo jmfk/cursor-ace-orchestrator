@@ -79,5 +79,6 @@ class MailMessage(BaseModel):
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
     status: str = "unread"
 
-    class Config:
-        populate_by_name = True
+    model_config = {
+        "populate_by_name": True
+    }

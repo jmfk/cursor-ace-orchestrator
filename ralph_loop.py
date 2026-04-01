@@ -103,7 +103,6 @@ def run_cursor_agent(prompt: str):
         # If successful, extract simulated stats
         input_tokens = len(prompt.split()) * 1.3
         output_tokens = len(result.stdout.split()) * 1.3
-
         update_stats(int(input_tokens), int(output_tokens), elapsed)
         log_message("✅ Cursor Agent completed successfully.")
         return result.stdout
@@ -124,13 +123,15 @@ def generate_commit_message(task_name: str):
         try:
             from dotenv import load_dotenv
             load_dotenv()
-            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            api_key = (os.getenv("GEMINI_API_KEY") or
+                       os.getenv("GOOGLE_API_KEY"))
         except ImportError:
             # If dotenv is not installed, we can try a simple manual parse of .env
             if os.path.exists(".env"):
                 with open(".env", "r") as f:
                     for line in f:
-                        if line.startswith("GOOGLE_API_KEY=") or line.startswith("GEMINI_API_KEY="):
+                        if (line.startswith("GOOGLE_API_KEY=") or
+                                line.startswith("GEMINI_API_KEY=")):
                             api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
                             break
 
@@ -150,21 +151,27 @@ def generate_commit_message(task_name: str):
 
     if api_key:
         log_message("Generating commit message via direct Gemini API...")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+               f"gemini-1.5-flash:generateContent?key={api_key}")
         headers = {'Content-Type': 'application/json'}
         data = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=10)
+            response = requests.post(url, headers=headers, json=data,
+                                     timeout=10)
             if response.status_code == 200:
                 result = response.json()
-                msg = result['candidates'][0]['content']['parts'][0]['text'].strip()
+                msg = (result['candidates'][0]['content']['parts'][0]['text']
+                       .strip())
                 return msg
             else:
-                log_message(f"⚠️ Direct Gemini API failed (Status {response.status_code}). Falling back to cursor-agent.")
+                log_message(f"⚠️ Direct Gemini API failed (Status "
+                            f"{response.status_code}). Falling back to "
+                            f"cursor-agent.")
         except Exception as e:
-            log_message(f"⚠️ Error calling Gemini API: {e}. Falling back to cursor-agent.")
+            log_message(f"⚠️ Error calling Gemini API: {e}. Falling back to "
+                        f"cursor-agent.")
 
     # Fallback to cursor-agent
     log_message("Generating commit message via cursor-agent...")
@@ -225,7 +232,7 @@ def get_project_state_hash():
         status = subprocess.run(
             ["git", "status", "--porcelain"], capture_output=True, text=True
         )
-        # Also include a hash of the plan.md file to detect if the agent is
+        # Include a hash of the plan.md file to detect if the agent is
         # stuck on the same task
         plan_content = get_file_content(PLAN_FILE)
         state_str = status.stdout + plan_content
@@ -276,7 +283,8 @@ def main():
         return
 
     log_message(
-        f"🚀 Starting RALPH Loop for Cursor ACE Orchestrator using {prd_path}...")
+        f"🚀 Starting RALPH Loop for Cursor ACE Orchestrator using "
+        f"{prd_path}...")
 
     # Step 0: Initial State Analysis & Resumption Logic
     log_message("Step 0: Analyzing current project state...")
@@ -389,16 +397,19 @@ def main():
         try:
             # Check if there are changes to commit
             status = subprocess.run(
-                ["git", "status", "--porcelain"], capture_output=True, text=True)
+                ["git", "status", "--porcelain"], capture_output=True,
+                text=True)
             if status.stdout.strip():
                 commit_msg = generate_commit_message(current_task)
 
                 # Final fallback if cleaning resulted in empty string
                 if not commit_msg or len(commit_msg.strip()) < 5:
-                    commit_msg = f"RALPH Loop: Implementation iteration {iteration} - {current_task[:50]}"
+                    commit_msg = (f"RALPH Loop: Implementation iteration "
+                                  f"{iteration} - {current_task[:50]}")
 
                 subprocess.run(["git", "add", "."], check=True)
-                subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+                subprocess.run(["git", "commit", "-m", commit_msg],
+                               check=True)
                 subprocess.run(["git", "push"], check=True)
                 log_message(f"Committed with message: {commit_msg}")
             else:
