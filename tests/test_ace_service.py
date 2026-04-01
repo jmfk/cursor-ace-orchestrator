@@ -547,3 +547,39 @@ def test_onboarding_sop_with_parent(service):
     assert onboarding_file.exists()
     content = onboarding_file.read_text(encoding="utf-8")
     assert "- **Parent Agent**: parent" in content
+
+
+def test_adaptive_context_pruning(service, temp_workspace):
+    """Test adaptive context pruning."""
+    # Setup global rules
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    global_rules = service.cursor_rules_dir / "_global.mdc"
+    global_rules.write_text("Global project rules " * 100)
+
+    # Setup agent and playbook
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    playbook = service.cursor_rules_dir / "developer.mdc"
+    playbook.write_text("Developer playbook " * 100)
+
+    # Add many sessions to bloat context
+    service.sessions_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(5):
+        session_file = service.sessions_dir / f"session_{i}.md"
+        session_file.write_text(f"Session {i} content " * 500)
+
+    # Set token mode to HIGH to include more sessions
+    config = service.load_config()
+    from ace_lib.models.schemas import TokenMode
+    config.token_mode = TokenMode.HIGH
+    service.save_config(config)
+
+    # Build context with a short description (low complexity -> tight limit)
+    context, agent_id = service.build_context(
+        path="src/main.py", agent_id="dev-1", task_description="short"
+    )
+
+    # Check if context was pruned (limit for complexity 1 is 10000 + 5000 = 15000 chars)
+    assert len(context) <= 15000
+    assert "GLOBAL RULES" in context
+    assert "AGENT PLAYBOOK" in context
+    assert "[TRUNCATED]" in context or len(context) < 15000
