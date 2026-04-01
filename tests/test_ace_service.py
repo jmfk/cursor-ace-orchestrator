@@ -240,7 +240,7 @@ def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch)
     import subprocess
     from unittest.mock import MagicMock
 
-    def mock_run(cmd, shell=True, capture_output=True, text=True):
+    def mock_run(cmd, shell=True, capture_output=True, text=True, env=None):
         mock_res = MagicMock()
         if "cursor-agent" in cmd:
             mock_res.returncode = 0

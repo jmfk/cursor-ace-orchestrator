@@ -1,5 +1,3 @@
-import os
-import sys
 from ralph_loop import generate_commit_message, run_cursor_agent
 
 def test_direct_gemini_api():

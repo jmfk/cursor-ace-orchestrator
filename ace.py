@@ -91,7 +91,7 @@ def init():
             # Simple append/update logic
             lines = []
             if cred_file.exists():
-                lines = [l for l in cred_file.read_text().splitlines() if not l.startswith("GOOGLE_API_KEY=")]
+                lines = [line for line in cred_file.read_text().splitlines() if not line.startswith("GOOGLE_API_KEY=")]
             lines.append(f"GOOGLE_API_KEY={google_key}")
             cred_file.write_text("\n".join(lines) + "\n")
             os.chmod(cred_file, 0o600)
@@ -112,7 +112,7 @@ def init():
             cred_file.parent.mkdir(parents=True, exist_ok=True)
             lines = []
             if cred_file.exists():
-                lines = [l for l in cred_file.read_text().splitlines() if not l.startswith("CURSOR_API_KEY=")]
+                lines = [line for line in cred_file.read_text().splitlines() if not line.startswith("CURSOR_API_KEY=")]
             lines.append(f"CURSOR_API_KEY={cursor_key}")
             cred_file.write_text("\n".join(lines) + "\n")
             os.chmod(cred_file, 0o600)

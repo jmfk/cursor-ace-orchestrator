@@ -785,61 +785,61 @@ class ACEService:
             )
             session_file.write_text(session_content)
 
-        # 4. Reflection (Intermediate or Final)
-        if self.get_anthropic_client():
-            print(
-                f"[RALPH] Performing reflection for "
-                f"iteration {iteration}..."
-            )
-            # Reflect on current iteration output
-            reflection_text = self.reflect_on_session(
-                agent_proc.stdout + "\n" + result.stdout
-            )
-            updates = self.parse_reflection_output(reflection_text)
-            if updates:
-                playbook_path = self.cursor_rules_dir / "_global.mdc"
-                if resolved_agent_id:
-                    agents_config = self.load_agents()
-                    agent = next(
-                        (
-                            a
-                            for a in agents_config.agents
-                            if a.id == resolved_agent_id
-                        ),
-                        None
-                    )
-                    if agent:
-                        playbook_path = (
-                            self.base_path / agent.memory_file
-                        )
-                self.update_playbook(playbook_path, updates)
-                print(f"[RALPH] Updated playbook: {playbook_path.name}")
-
-            # Update prompt with reflection insights if it failed
-            if result.returncode != 0 and reflection_text != "No new learnings.":
-                prompt = (
-                    f"Previous attempt failed. Reflection insights:\n"
-                    f"{reflection_text}\n\n"
-                    f"Original task: {prompt}"
-                )
-            elif result.returncode != 0:
-                prompt = (
-                    f"Previous attempt failed. Test output:\n"
-                    f"{result.stdout}\n{result.stderr}\n\n"
-                    f"Original task: {prompt}"
-                )
-        else:
-            if result.returncode != 0:
+            # 4. Reflection (Intermediate or Final)
+            if self.get_anthropic_client():
                 print(
-                    f"[RALPH] ❌ Verification failed "
-                    f"(Exit code: {result.returncode})"
+                    f"[RALPH] Performing reflection for "
+                    f"iteration {iteration}..."
                 )
-                # Update prompt for next iteration with failure info
-                prompt = (
-                    f"Previous attempt failed. Test output:\n"
-                    f"{result.stdout}\n{result.stderr}\n\n"
-                    f"Original task: {prompt}"
+                # Reflect on current iteration output
+                reflection_text = self.reflect_on_session(
+                    agent_proc.stdout + "\n" + result.stdout
                 )
+                updates = self.parse_reflection_output(reflection_text)
+                if updates:
+                    playbook_path = self.cursor_rules_dir / "_global.mdc"
+                    if resolved_agent_id:
+                        agents_config = self.load_agents()
+                        agent = next(
+                            (
+                                a
+                                for a in agents_config.agents
+                                if a.id == resolved_agent_id
+                            ),
+                            None
+                        )
+                        if agent:
+                            playbook_path = (
+                                self.base_path / agent.memory_file
+                            )
+                    self.update_playbook(playbook_path, updates)
+                    print(f"[RALPH] Updated playbook: {playbook_path.name}")
+
+                # Update prompt with reflection insights if it failed
+                if result.returncode != 0 and reflection_text != "No new learnings.":
+                    prompt = (
+                        f"Previous attempt failed. Reflection insights:\n"
+                        f"{reflection_text}\n\n"
+                        f"Original task: {prompt}"
+                    )
+                elif result.returncode != 0:
+                    prompt = (
+                        f"Previous attempt failed. Test output:\n"
+                        f"{result.stdout}\n{result.stderr}\n\n"
+                        f"Original task: {prompt}"
+                    )
+            else:
+                if result.returncode != 0:
+                    print(
+                        f"[RALPH] ❌ Verification failed "
+                        f"(Exit code: {result.returncode})"
+                    )
+                    # Update prompt for next iteration with failure info
+                    prompt = (
+                        f"Previous attempt failed. Test output:\n"
+                        f"{result.stdout}\n{result.stderr}\n\n"
+                        f"Original task: {prompt}"
+                    )
 
             if result.returncode == 0:
                 print("[RALPH] ✅ Verification successful!")
