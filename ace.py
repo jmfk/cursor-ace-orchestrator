@@ -950,7 +950,7 @@ def loop(
     ),
 ):
     """
-    Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
+    Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
     """
     console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
     console.print(f"Prompt: [italic]{prompt}[/italic]")

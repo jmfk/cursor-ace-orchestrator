@@ -919,7 +919,7 @@ class ACEService:
         prd_path: Optional[str] = None,
         plan_file: Optional[str] = None,
     ):
-        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 9.5)."""
+        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 4.1)."""
         iteration = 0
         success = False
         state_history = []
@@ -946,13 +946,13 @@ class ACEService:
                 if "analyze" in prompt.lower() and len(prompt) < 50:
                     prompt = analysis_prompt
 
-            # 1. Context Refresh & Build
+            # 1. Context Refresh & Build (Phase 4.1)
             os.environ["ACE_LOOP_PROMPT"] = prompt
             context, resolved_agent_id = self.build_context(
                 path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id
             )
 
-            # 2. Execute (using cursor-agent)
+            # 2. Execute (Phase 4.1)
             print(f"[RALPH] Executing task: {prompt[:50]}...")
 
             # Inject GOOGLE_API_KEY and CURSOR_API_KEY from credentials if needed
@@ -995,13 +995,13 @@ class ACEService:
                 cost=(input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40)
             ))
 
-            # 3. Verify (Run tests)
+            # 3. Verify (Phase 4.1)
             print(f"[RALPH] Verifying with: {test_cmd}")
             result = subprocess.run(
                 test_cmd, shell=True, capture_output=True, text=True
             )
 
-            # --- Agentic Feedback Loop (8.2) ---
+            # --- Agentic Feedback Loop (Phase 6.7) ---
             # Automatically flag success/failure based on test-output
             test_passed = (result.returncode == 0)
             feedback_status = "SUCCESS" if test_passed else "FAILURE"
@@ -1034,7 +1034,7 @@ class ACEService:
             )
             session_file.write_text(session_content)
 
-            # 4. Reflection (Intermediate or Final)
+            # 4. Reflection (Phase 4.1)
             reflection_text = ""
             if self.get_anthropic_client():
                 print(
@@ -1051,7 +1051,7 @@ class ACEService:
                 updates = self.parse_reflection_output(reflection_text)
                 
                 # If test failed, ensure we increment harmful for the strategy used
-                # and if it passed, increment helpful.
+                # and if it passed, increment helpful (Phase 3.4).
                 if updates:
                     for update in updates:
                         if test_passed:
@@ -1207,7 +1207,7 @@ class ACEService:
     # --- SOP Engine ---
 
     def onboard_agent(self, agent_id: str):
-        """Run onboarding SOP for an agent."""
+        """Run onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
         agents_config = self.load_agents()
         agent = next(
             (a for a in agents_config.agents if a.id == agent_id), None
@@ -1275,48 +1275,8 @@ class ACEService:
 
         return onboarding_file
 
-    def audit_agent(self, agent_id: str):
-        """Run audit SOP for an agent."""
-        agents_config = self.load_agents()
-        agent = next(
-            (a for a in agents_config.agents if a.id == agent_id), None
-        )
-        if not agent:
-            raise ValueError(f"Agent {agent_id} not found.")
-
-        sop_dir = self.ace_dir / "sops"
-        sop_dir.mkdir(exist_ok=True)
-        
-        audit_file = (
-            sop_dir /
-            f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
-        )
-        content = f"""# SOP: Agent Audit - {agent.name} ({agent.id})
-- **Auditor**: Orchestrator
-- **Date**: {datetime.now().isoformat()}
-
-## 1. Memory Health
-- [ ] Check `{agent.memory_file}` for structure and content.
-- [ ] Verify that strategies have helpful/harmful counters.
-- [ ] Identify stale or conflicting strategies.
-
-## 2. Decision Alignment
-- [ ] Review agent's recent contributions against `.ace/decisions/`.
-- [ ] Ensure agent is not repeating previously rejected patterns.
-
-## 3. Performance Review
-- [ ] Analyze session logs for success/failure ratio.
-- [ ] Identify recurring pitfalls [mis-XXX].
-
-## 4. Recommendations
-- [ ] **Action**: [KEEP/PRUNE/RE-ONBOARD]
-- [ ] **Notes**:
-"""
-        audit_file.write_text(content)
-        return audit_file
-
     def review_pr(self, pr_id: str, agent_id: str):
-        """Run PR review SOP for an agent."""
+        """Run PR review SOP for an agent (PRD-01 / Phase 9.5)."""
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sop_dir = self.ace_dir / "sops"
         sop_dir.mkdir(exist_ok=True)
@@ -1361,6 +1321,59 @@ class ACEService:
         )
 
         return review_file
+
+    def audit_agent(self, agent_id: str):
+        """Run audit SOP for an agent (PRD-01 / Phase 9.5)."""
+        agents_config = self.load_agents()
+        agent = next(
+            (a for a in agents_config.agents if a.id == agent_id), None
+        )
+        if not agent:
+            raise ValueError(f"Agent {agent_id} not found.")
+
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
+        sop_dir = self.ace_dir / "sops"
+        sop_dir.mkdir(exist_ok=True)
+        
+        audit_file = sop_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+        
+        # Formal SOP for Agent Audits (PRD-01 / Phase 9.5)
+        content = f"""# SOP: Agent Audit - {agent.name} ({agent.id})
+- **Auditor**: Orchestrator
+- **Date**: {datetime.now().isoformat()}
+
+## 1. Playbook Quality
+- [ ] **Completeness**: Does the playbook have all required sections?
+- [ ] **Utility**: Are the strategies actionable and relevant?
+- [ ] **Pruning**: Has the playbook been pruned of stale or harmful entries?
+
+## 2. Performance & Alignment
+- [ ] **Success Rate**: Review recent session logs for success/failure ratio.
+- [ ] **Decision Alignment**: Does the agent's work align with recent ADRs?
+- [ ] **Communication**: Is the agent using the mail system and MACP correctly?
+
+## 3. Knowledge Extraction
+- [ ] **New Learnings**: Are new strategies being identified and documented?
+- [ ] **Shared Knowledge**: Is the agent contributing to shared-learnings?
+
+## 4. Conclusion
+- [ ] **Status**: [PASSED/REQUIRES_IMPROVEMENT/RE-ONBOARDING]
+- [ ] **Notes**:
+"""
+        audit_file.write_text(content)
+
+        # Notify agent of audit
+        self.send_mail(
+            to_agent=agent_id,
+            from_agent="orchestrator",
+            subject="AGENT AUDIT INITIATED",
+            body=(
+                f"An audit of your activities and playbook has been initiated. "
+                f"SOP: {audit_file.relative_to(self.base_path)}"
+            )
+        )
+
+        return audit_file
 
     def security_audit(self, agent_id: str):
         """Run security audit SOP for an agent."""
@@ -1470,7 +1483,7 @@ class ACEService:
     # --- Google Stitch Integration ---
 
     def ui_mockup(self, description: str, agent_id: str):
-        """Generate a UI mockup using Google Stitch."""
+        """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
         mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
 
@@ -1494,7 +1507,7 @@ class ACEService:
         if api_key:
             print(f"[STITCH] Calling Google Stitch API for: {description}")
             try:
-                # Actual Google Stitch API call
+                # Actual Google Stitch API call (PRD-01 / Phase 4.5)
                 response = requests.post(
                     "https://api.stitch.google.com/v1/mockup",
                     headers={"Authorization": f"Bearer {api_key}"},
@@ -1541,13 +1554,13 @@ class ACEService:
         if ui_code and "export const" in ui_code:
             self._extract_stitch_components(mockup_id, ui_code)
 
-        # Run visual verification if Playwright is available
+        # Run visual verification if Playwright is available (PRD-01 / Phase 7.2)
         self._verify_stitch_mockup(mockup_id, ui_code)
 
         return mockup_url
 
     def _verify_stitch_mockup(self, mockup_id: str, code: str):
-        """Perform visual verification of the mockup using Playwright."""
+        """Perform visual verification of the mockup using Playwright (PRD-01 / Phase 7.2)."""
         try:
             # We check if playwright is installed by trying to import it
             from playwright.sync_api import sync_playwright
@@ -1623,7 +1636,7 @@ class ACEService:
         return code_match.group(1) if code_match else result.stdout
 
     def _extract_stitch_components(self, mockup_id: str, code: str):
-        """Extract individual components from Stitch code."""
+        """Extract individual components from Stitch code (PRD-01 / Phase 8.3)."""
         components_dir = self.ace_dir / "ui_mockups" / "components" / mockup_id
         components_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1638,7 +1651,7 @@ class ACEService:
             (components_dir / f"{name}.tsx").write_text(content)
 
     def ui_sync(self, url: str):
-        """Sync UI code from Google Stitch with visual diffing (PRD-01 / Phase 9.6)."""
+        """Sync UI code from Google Stitch with visual diffing (PRD-01 / Phase 8.3)."""
         mockup_id = url.split("/")[-1]
         
         api_key = os.getenv("STITCH_API_KEY")
@@ -1653,7 +1666,7 @@ class ACEService:
 
         if api_key:
             try:
-                # Actual Google Stitch API call
+                # Actual Google Stitch API call (PRD-01 / Phase 4.5)
                 response = requests.get(
                     f"https://api.stitch.google.com/v1/mockup/{mockup_id}",
                     headers={"Authorization": f"Bearer {api_key}"},
@@ -1662,7 +1675,7 @@ class ACEService:
                 if response.status_code == 200:
                     ui_code = response.json().get("code")
                     if ui_code:
-                        # Perform visual diffing if we have an existing mockup
+                        # Perform visual diffing if we have an existing mockup (PRD-01 / Phase 8.3)
                         mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
                         if mockup_file.exists():
                             old_content = mockup_file.read_text()

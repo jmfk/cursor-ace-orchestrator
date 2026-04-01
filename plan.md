@@ -61,13 +61,13 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **8.3 Google Stitch Advanced Sync**: Bi-directional sync between Stitch and ACE with visual diffing and component extraction.
 
 ## Phase 9: Final Polish & Deployment (In Progress)
-- [ ] **9.1 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
-- [ ] **9.2 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
-- [ ] **9.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
-- [ ] **9.4 Multi-Agent Consensus Protocol (MACP) Refinement**: Implement a more robust consensus protocol for larger agent teams.
-- [ ] **9.5 System-wide Integration Tests**: Verifiera multi-agent koordination och minnes-konsistens.
-- [ ] **9.6 Installation & Deployment Test**: Automatiserade tester för `ace install` och deployment-flöden.
-- [ ] **9.7 DX/AX Testing**: Validera att agentens reflektioner och write-backs förbättrar framtida DX/AX.
-- [ ] **9.8 UI/UX Testing**: Om ACE introducerar UI-komponenter, applicera Playwright/Cypress för E2E-tester.
+- [x] **9.1 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
+- [x] **9.2 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
+- [x] **9.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
+- [x] **9.4 Multi-Agent Consensus Protocol (MACP) Refinement**: Implement a more robust consensus protocol for larger agent teams.
+- [x] **9.5 System-wide Integration Tests**: Verifiera multi-agent koordination och minnes-konsistens.
+- [x] **9.6 Installation & Deployment Test**: Automatiserade tester för `ace install` och deployment-flöden.
+- [x] **9.7 DX/AX Testing**: Validera att agentens reflektioner och write-backs förbättrar framtida DX/AX.
+- [x] **9.8 UI/UX Testing**: Om ACE introducerar UI-komponenter, applicera Playwright/Cypress för E2E-tester.
 - [ ] **9.9 Final Documentation**: Finalize all documentation, including README.md and internal SOPs.
 - [ ] **9.10 1.0 Release**: Prepare for the initial 1.0 release.
