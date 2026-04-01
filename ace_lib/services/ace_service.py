@@ -2095,6 +2095,114 @@ type: role
             
         return delegations
 
+    def synthesize_memories(self, agent_id: str) -> List[Dict]:
+        """Synthesize shared memories from individual experiences (Phase 10.8)."""
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return []
+
+        playbook_path = self.base_path / agent.memory_file
+        if not playbook_path.exists():
+            return []
+
+        content = playbook_path.read_text(encoding="utf-8")
+        
+        # Extract strategies and pitfalls
+        pattern = r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s*::\s*(.*?) -->"
+        learnings = []
+        for match in re.finditer(pattern, content):
+            l_type, l_id, helpful, harmful, desc = match.groups()
+            # Only synthesize highly helpful strategies or common pitfalls
+            if int(helpful) > 5 or int(harmful) > 2:
+                learnings.append({
+                    "type": l_type,
+                    "id": l_id,
+                    "helpful": int(helpful),
+                    "harmful": int(harmful),
+                    "description": desc,
+                    "agent_id": agent_id
+                })
+
+        if not learnings:
+            return []
+
+        # Use LLM to synthesize these into higher-level patterns
+        client = self.get_anthropic_client()
+        if not client:
+            return learnings
+
+        learnings_str = "\n".join(
+            [f"- [{item['type']}-{item['id']}] {item['description']} "
+             f"(H:{item['helpful']}, M:{item['harmful']})" for item in learnings]
+        )
+        prompt = (
+            f"You are the ACE Memory Synthesizer. Analyze the following learnings from agent {agent_id} "
+            "and synthesize them into 1-3 high-level architectural patterns or critical pitfalls.\n\n"
+            f"Learnings:\n{learnings_str}\n\n"
+            "Format your output as a JSON list of objects with 'type' (str/mis), 'description', and 'justification'.\n"
+            "Example: [{\"type\": \"str\", \"description\": \"Use centralized error handling for all API calls\", "
+            "\"justification\": \"Multiple instances of [str-001] and [str-005] show this reduces boilerplate.\"}]"
+        )
+
+        try:
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            import json
+            content = "".join([b.text for b in message.content if hasattr(b, "text")])
+            json_match = re.search(r"\[.*\]", content, re.DOTALL)
+            if json_match:
+                synthesized = json.loads(json_match.group(0))
+                # Add these to shared learnings
+                self._add_to_shared_learnings(synthesized, agent_id)
+                return synthesized
+        except Exception as e:
+            print(f"Error synthesizing memories: {e}")
+            
+        return learnings
+
+    def _add_to_shared_learnings(self, synthesized: List[Dict], agent_id: str):
+        """Add synthesized learnings to shared-learnings.mdc."""
+        shared_file = self.ace_dir / "shared-learnings.mdc"
+        if not shared_file.exists():
+            header = (
+                "---\nname: shared-learnings\ntype: global\n---\n"
+                "# Shared ACE Learnings\n\n## Strategier & patterns\n"
+            )
+            shared_file.write_text(header, encoding="utf-8")
+        
+        content = shared_file.read_text(encoding="utf-8")
+        for s in synthesized:
+            l_type = s.get("type", "str")
+            desc = s.get("description")
+            just = s.get("justification", "")
+            
+            # Avoid duplicates
+            if desc in content:
+                continue
+                
+            ts = datetime.now().strftime('%H%M%S')
+            entry = (
+                f"<!-- [syn-{l_type}-{agent_id}-{ts}] helpful=1 harmful=0 :: "
+                f"{desc} (Justification: {just}) -->\n"
+            )
+            
+            section_map = {
+                "str": "## Strategier & patterns",
+                "mis": "## Kända fallgropar",
+            }
+            header = section_map.get(l_type, "## Strategier & patterns")
+            if header in content:
+                parts = content.split(header, 1)
+                content = parts[0] + header + "\n" + entry + parts[1]
+            else:
+                content += f"\n{header}\n{entry}"
+        
+        shared_file.write_text(content, encoding="utf-8")
+
     # --- Token Monitoring ---
 
     def log_token_usage(self, usage: TokenUsage):

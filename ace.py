@@ -828,6 +828,34 @@ def memory_search(
     console.print(table)
 
 
+@memory_app.command("synthesize")
+def memory_synthesize(
+    agent_id: str = typer.Argument(..., help="Agent ID to synthesize memories for")
+):
+    """Synthesize shared memories from individual experiences (Phase 10.8)."""
+    svc = get_service()
+    with console.status(f"[bold green]Synthesizing memories for {agent_id}..."):
+        synthesized = svc.synthesize_memories(agent_id)
+    
+    if not synthesized:
+        console.print(f"No significant memories found to synthesize for [blue]{agent_id}[/blue].")
+        return
+
+    table = Table(title=f"Synthesized Memories: {agent_id}")
+    table.add_column("Type", style="yellow")
+    table.add_column("Description", style="green")
+    table.add_column("Justification", style="dim")
+    
+    for s in synthesized:
+        table.add_row(
+            s.get("type", "unknown"),
+            s.get("description", "N/A"),
+            s.get("justification", "N/A")
+        )
+    console.print(table)
+    console.print("\n[bold green]Synthesized learnings added to shared-learnings.mdc.[/bold green]")
+
+
 @app.command()
 def memory_prune(
     agent_id: Optional[str] = typer.Option(
