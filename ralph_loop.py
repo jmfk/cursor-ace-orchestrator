@@ -78,6 +78,8 @@ def run_cursor_agent(prompt: str):
     # Corrected command structure based on cursor-agent --help
     cmd = [
         "cursor-agent",
+        "--api-key",
+        os.getenv("CURSOR_API_KEY", ""),
         "--print",
         "--model",
         MODEL,
@@ -276,6 +278,18 @@ def get_total_cost():
 
 def main():
     """Main execution loop for RALPH."""
+    # Load .env if it exists
+    if os.path.exists(".env"):
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            with open(".env", "r") as f:
+                for line in f:
+                    if "=" in line and not line.startswith("#"):
+                        key, value = line.split("=", 1)
+                        os.environ[key.strip()] = value.strip().strip('"').strip("'")
+
     # Simple argument parsing
     prd_path = DEFAULT_PRD
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
