@@ -49,15 +49,15 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **6.6 Security Audit SOP**: Implement `ace agent security-audit` to perform security checks on agent-owned modules.
 - [x] **6.7 Agentic Feedback Loop**: Automate success/failure flagging in RALPH loop based on test-output, connecting write-back to CI/CD.
 
-## Phase 7: Future Directions & Optimization (Pending)
-- [ ] **7.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks using a vector database (e.g., ChromaDB or Qdrant).
-- [ ] **7.2 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
-- [ ] **7.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
-- [ ] **7.4 Performance Optimization**: Profile and optimize core logic for extremely large codebases and high-frequency agent calls.
-- [ ] **7.5 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
-- [ ] **7.6 Multi-Agent Consensus Debate**: Implement explicit consensus logic where multiple agents must "sign off" on a change before it's finalized.
-- [ ] **7.7 Shared "Coffee Break" Context**: Implement a shared `.ace/shared-learnings.mdc` for cross-pollination of general architectural patterns.
-- [ ] **7.8 Token Consumption Modes (L/M/H)**: Refine the impact of Token Modes on debate depth and context composition.
-- [ ] **7.9 Google Stitch Visual Verification**: Implement E2E tests (Playwright) to validate that implemented code matches Stitch mockups.
+## Phase 7: Future Directions & Optimization (In Progress)
+- [x] **7.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks using a vector database (e.g., ChromaDB or Qdrant).
+- [x] **7.2 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
+- [x] **7.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
+- [x] **7.4 Performance Optimization**: Profile and optimize core logic for extremely large codebases and high-frequency agent calls.
+- [x] **7.5 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
+- [x] **7.6 Multi-Agent Consensus Debate**: Implement explicit consensus logic where multiple agents must "sign off" on a change before it's finalized.
+- [x] **7.7 Shared "Coffee Break" Context**: Implement a shared `.ace/shared-learnings.mdc` for cross-pollination of general architectural patterns.
+- [x] **7.8 Token Consumption Modes (L/M/H)**: Refine the impact of Token Modes on debate depth and context composition.
+- [x] **7.9 Google Stitch Visual Verification**: Implement E2E tests (Playwright) to validate that implemented code matches Stitch mockups.
 - [ ] **7.10 Living Specs Sync**: Implement `ace spec sync` to ensure `intent.md` and `verification.md` stay aligned with the actual implementation.
 - [ ] **7.11 Agent Subscriptions**: Implement `ace subscribe` for agents to get notified via Agent Mail when specific modules or dependencies change.

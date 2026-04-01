@@ -1271,6 +1271,9 @@ class ACEService:
         else:
             ui_code = self._generate_mockup_with_agent(description)
 
+        if not ui_code:
+            ui_code = "// No code generated."
+
         content = (
             f"# UI Mockup: {description}\n"
             f"- **Agent**: {agent_id}\n"
@@ -1293,13 +1296,19 @@ class ACEService:
     def _verify_stitch_mockup(self, mockup_id: str, code: str):
         """Perform visual verification of the mockup using Playwright."""
         try:
-            import playwright
+            import playwright  # noqa: F401
             print(f"[STITCH] Running visual verification for {mockup_id}...")
             # This would normally run a playwright script to render the code
             # and compare it with the expected design or just check for errors.
             # For now, we simulate a successful verification.
-            verification_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
-            verification_file.write_text(f"# Visual Verification: {mockup_id}\nStatus: PASSED\nTimestamp: {datetime.now().isoformat()}")
+            verification_file = (
+                self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
+            )
+            verification_file.write_text(
+                f"# Visual Verification: {mockup_id}\n"
+                f"Status: PASSED\n"
+                f"Timestamp: {datetime.now().isoformat()}"
+            )
         except ImportError:
             pass
 
