@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 57
+
+### Added
+- **Phase 9: Future Directions**
+  - Multi-Agent Consensus Protocol (MACP) Refinement: Implemented a more robust consensus protocol for larger agent teams.
+  - Updated `plan.md` to mark task 9.4 as completed and reset 9.1-9.3, 9.5, 9.6 to pending as they appear to be mis-marked or require further work in the current iteration.
+
 ## [2026-04-01] - RALPH Loop Iteration 56
 
 ### Added
