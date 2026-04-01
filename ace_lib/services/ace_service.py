@@ -1041,10 +1041,7 @@ class ACEService:
         if api_key:
             print(f"[STITCH] Calling Google Stitch API for: {description}")
             try:
-                # Actual Google Stitch API call (simulated with requests to a placeholder)
-                # In a real scenario, this would be:
-                # response = requests.post("https://api.stitch.google.com/v1/mockup", ...)
-                # ui_code = response.json()["code"]
+                # Actual Google Stitch API call (simulated)
                 response = requests.post(
                     "https://api.stitch.google.com/v1/mockup",
                     headers={"Authorization": f"Bearer {api_key}"},
