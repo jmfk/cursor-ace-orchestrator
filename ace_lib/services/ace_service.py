@@ -710,32 +710,34 @@ class ACEService:
             )
             session_file.write_text(session_content)
 
+            # 4. Reflection (Intermediate or Final)
+            if os.getenv("ANTHROPIC_API_KEY"):
+                print(f"[RALPH] Performing reflection for iteration {iteration}...")
+                # Reflect on current iteration output
+                reflection_text = self.reflect_on_session(
+                    agent_proc.stdout + "\n" + result.stdout
+                )
+                updates = self.parse_reflection_output(reflection_text)
+                if updates:
+                    playbook_path = self.cursor_rules_dir / "_global.mdc"
+                    if resolved_agent_id:
+                        agents_config = self.load_agents()
+                        agent = next(
+                            (
+                                a
+                                for a in agents_config.agents
+                                if a.id == resolved_agent_id
+                            ),
+                            None,
+                        )
+                        if agent:
+                            playbook_path = self.base_path / agent.memory_file
+                    self.update_playbook(playbook_path, updates)
+                    print(f"[RALPH] Updated playbook: {playbook_path.name}")
+
             if result.returncode == 0:
                 print("[RALPH] ✅ Verification successful!")
                 success = True
-
-                # Final Reflection on success
-                if os.getenv("ANTHROPIC_API_KEY"):
-                    print("[RALPH] Performing final reflection...")
-                    reflection_text = self.reflect_on_session(
-                        agent_proc.stdout + "\n" + result.stdout
-                    )
-                    updates = self.parse_reflection_output(reflection_text)
-                    if updates:
-                        playbook_path = self.cursor_rules_dir / "_global.mdc"
-                        if resolved_agent_id:
-                            agents_config = self.load_agents()
-                            agent = next(
-                                (
-                                    a
-                                    for a in agents_config.agents
-                                    if a.id == resolved_agent_id
-                                ),
-                                None,
-                            )
-                            if agent:
-                                playbook_path = Path(agent.memory_file)
-                        self.update_playbook(playbook_path, updates)
                 break
             else:
                 print(

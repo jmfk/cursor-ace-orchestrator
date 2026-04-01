@@ -3,16 +3,16 @@
 This plan outlines the step-by-step implementation of the Cursor ACE Orchestrator, a Python-based CLI tool designed to provide long-term memory and coordination for coding agents.
 
 ## Phase 6: Refinement & Missing Features (Current Focus)
-- [x] **6.1 Consensus Protocol Refinement**: Implement the LLM-referee logic for `ace debate` (currently only sends mail).
-- [x] **6.2 SOP Engine Expansion**: Implement the `audit` SOP (currently only `onboarding` and `pr-review` exist).
-- [x] **6.3 Google Stitch Real Integration**: Replace simulated Stitch integration with real API calls or more robust local mocks.
-- [x] **6.4 Test Coverage**: Increase test coverage for `ACEService` and API endpoints (currently only basic tests exist).
 - [ ] **6.5 Documentation Update**: Ensure `README.md` reflects all Phase 4 and 5 features.
 - [ ] **6.6 FastAPI Backend Implementation**: Create the actual FastAPI app and endpoints (currently only the service layer exists).
 - [ ] **6.7 Memory Write-back Verification**: Add tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
 - [ ] **6.8 RALPH Loop Reflection Integration**: Ensure the loop correctly uses reflection to update memory between iterations.
 
 ## Phase 7: Completed Tasks
+- [x] **6.1 Consensus Protocol Refinement**: Implement the LLM-referee logic for `ace debate` (currently only sends mail).
+- [x] **6.2 SOP Engine Expansion**: Implement the `audit` SOP (currently only `onboarding` and `pr-review` exist).
+- [x] **6.3 Google Stitch Real Integration**: Replace simulated Stitch integration with real API calls or more robust local mocks.
+- [x] **6.4 Test Coverage**: Increase test coverage for `ACEService` and API endpoints (currently only basic tests exist).
 - [x] **0.1 Environment Setup**: Initialize Python project with `poetry` or `pip` + `venv`. Install dependencies: `typer`, `ruamel.yaml`, `pydantic`, `rich`, `anthropic`.
 - [x] **0.2 Core Directory Structure**: Implement `ace init` to create `.ace/` (agents.yaml, ownership.yaml, mail/, sessions/, decisions/) and `.ace-local/`.
 - [x] **0.3 Ownership Registry**: Implement `ace own` and `ace who` logic using longest-prefix matching for file paths.
