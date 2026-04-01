@@ -77,7 +77,7 @@ def meta_self_audit():
             console.print(f"    Strategies: {len(strategies)}")
             console.print(f"    Pitfalls: {len(pitfalls)}")
             console.print(f"    Decisions: {len(decisions)}")
-        
+
         # Display agent metadata
         console.print("  Metadata:")
         for name, value in agent.model_dump().items():
@@ -88,29 +88,35 @@ def meta_self_audit():
 @meta_app.command("cross-project-export")
 def meta_export(
     agent_id: str = typer.Argument(..., help="Agent ID to export learnings from"),
-    target_dir: str = typer.Option(".ace-meta/cross-project", "--target", "-t")
+    target_dir: str = typer.Option(".ace-meta/cross-project", "--target", "-t"),
 ):
     """Export learnings for cross-project sharing."""
     svc = get_service()
     target_path = Path(target_dir)
     learnings = svc.export_learnings(agent_id, target_path)
-    console.print(f"Exported [bold]{len(learnings)}[/bold] learnings to [blue]{target_path}[/blue]")
+    console.print(
+        f"Exported [bold]{len(learnings)}[/bold] learnings to [blue]{target_path}[/blue]"
+    )
 
 
 @meta_app.command("cross-project-import")
 def meta_import(
     source_file: str = typer.Argument(..., help="Path to the exported learnings YAML"),
-    agent_id: str = typer.Argument(..., help="Agent ID to import learnings into")
+    agent_id: str = typer.Argument(..., help="Agent ID to import learnings into"),
 ):
     """Import learnings from another project."""
     svc = get_service()
     count = svc.import_learnings(Path(source_file), agent_id)
-    console.print(f"Imported [bold]{count}[/bold] learnings into agent [green]{agent_id}[/green]")
+    console.print(
+        f"Imported [bold]{count}[/bold] learnings into agent [green]{agent_id}[/green]"
+    )
 
 
 @app.command()
 def token_stats(
-    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Filter by agent ID")
+    agent_id: Optional[str] = typer.Option(
+        None, "--agent", "-a", help="Filter by agent ID"
+    ),
 ):
     """Track and report token usage per agent/session."""
     svc = get_service()
@@ -131,7 +137,7 @@ def token_stats(
 
     total_tokens = 0
     total_cost = 0.0
-    
+
     for u in usages:
         table.add_row(
             u.agent_id,
@@ -140,7 +146,7 @@ def token_stats(
             str(u.completion_tokens),
             str(u.total_tokens),
             f"{u.cost:.4f}",
-            u.timestamp
+            u.timestamp,
         )
         total_tokens += u.total_tokens
         total_cost += u.cost
@@ -154,6 +160,7 @@ def token_stats(
 def profiler_dashboard():
     """Launch the performance profiling dashboard."""
     import webbrowser
+
     url = f"{API_BASE_URL}/profiler"
     console.print(f"Launching Performance Profiling Dashboard at: [blue]{url}[/blue]")
     webbrowser.open(url)
@@ -197,24 +204,21 @@ def init():
 
     if not google_key:
         console.print("[yellow]GOOGLE_API_KEY not found.[/yellow]")
-        google_key = typer.prompt(
-            "Please enter your GOOGLE_API_KEY", hide_input=True
-        )
+        google_key = typer.prompt("Please enter your GOOGLE_API_KEY", hide_input=True)
         if google_key:
             cred_file.parent.mkdir(parents=True, exist_ok=True)
             # Simple append/update logic
             lines = []
             if cred_file.exists():
                 lines = [
-                    line for line in cred_file.read_text(encoding="utf-8").splitlines()
+                    line
+                    for line in cred_file.read_text(encoding="utf-8").splitlines()
                     if not line.startswith("GOOGLE_API_KEY=")
                 ]
             lines.append(f"GOOGLE_API_KEY={google_key}")
             cred_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
             os.chmod(cred_file, 0o600)
-            console.print(
-                f"Saved GOOGLE_API_KEY to [green]{cred_file}[/green]"
-            )
+            console.print(f"Saved GOOGLE_API_KEY to [green]{cred_file}[/green]")
 
     # Check for CURSOR_API_KEY
     cursor_key = os.getenv("CURSOR_API_KEY")
@@ -226,29 +230,24 @@ def init():
 
     if not cursor_key:
         console.print("[yellow]CURSOR_API_KEY not found.[/yellow]")
-        cursor_key = typer.prompt(
-            "Please enter your CURSOR_API_KEY", hide_input=True
-        )
+        cursor_key = typer.prompt("Please enter your CURSOR_API_KEY", hide_input=True)
         if cursor_key:
             cred_file.parent.mkdir(parents=True, exist_ok=True)
             lines = []
             if cred_file.exists():
                 lines = [
-                    line for line in cred_file.read_text(encoding="utf-8").splitlines()
+                    line
+                    for line in cred_file.read_text(encoding="utf-8").splitlines()
                     if not line.startswith("CURSOR_API_KEY=")
                 ]
             lines.append(f"CURSOR_API_KEY={cursor_key}")
             cred_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
             os.chmod(cred_file, 0o600)
-            console.print(
-                f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]"
-            )
+            console.print(f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]")
 
     for subdir in ["mail", "sessions", "decisions", "specs"]:
         (svc.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
-        console.print(
-            f"Created directory: [green]{svc.ace_dir / subdir}[/green]"
-        )
+        console.print(f"Created directory: [green]{svc.ace_dir / subdir}[/green]")
 
     console.print(f"Created directory: [green]{svc.ace_local_dir}[/green]")
 
@@ -262,22 +261,16 @@ def init():
 
     svc.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"Created directory: [green]{svc.cursor_rules_dir}[/green]")
-    console.print(
-        "[bold green]ACE Orchestrator initialized successfully![/bold green]"
-    )
+    console.print("[bold green]ACE Orchestrator initialized successfully![/bold green]")
 
 
 @app.command()
 def own(path: str, agent: str):
     """Assign ownership of a path to an agent."""
-    res = api_call(
-        "POST", "/ownership", json={"path": path, "agent_id": agent}
-    )
+    res = api_call("POST", "/ownership", json={"path": path, "agent_id": agent})
     if not res:
         get_service().assign_ownership(path, agent)
-    console.print(
-        f"Assigned [blue]{path}[/blue] to agent [green]{agent}[/green]"
-    )
+    console.print(f"Assigned [blue]{path}[/blue] to agent [green]{agent}[/green]")
 
 
 @app.command()
@@ -287,14 +280,10 @@ def who(path: str):
     owner = get_service().resolve_owner(path)
     if owner:
         console.print(
-            f"Path [blue]{path}[/blue] is owned by "
-            f"agent [green]{owner}[/green]"
+            f"Path [blue]{path}[/blue] is owned by agent [green]{owner}[/green]"
         )
     else:
-        console.print(
-            f"Path [blue]{path}[/blue] is currently "
-            f"[yellow]unowned[/yellow]"
-        )
+        console.print(f"Path [blue]{path}[/blue] is currently [yellow]unowned[/yellow]")
 
 
 @app.command()
@@ -325,9 +314,7 @@ def agent_create(
     name: str = typer.Option(..., "--name", "-n", help="Agent name"),
     role: str = typer.Option(..., "--role", "-r", help="Agent role"),
     id: str = typer.Option(..., "--id", "-i", help="Agent unique ID"),
-    email: Optional[str] = typer.Option(
-        None, "--email", "-e", help="Agent email"
-    ),
+    email: Optional[str] = typer.Option(None, "--email", "-e", help="Agent email"),
     responsibilities: Optional[List[str]] = typer.Option(
         None, "--resp", "-p", help="Agent responsibilities"
     ),
@@ -345,17 +332,11 @@ def agent_create(
         },
     )
     if res:
-        console.print(
-            f"Created agent [green]{res['name']}[/green] (ID: {res['id']})"
-        )
+        console.print(f"Created agent [green]{res['name']}[/green] (ID: {res['id']})")
     else:
         try:
-            agent = get_service().create_agent(
-                id, name, role, email, responsibilities
-            )
-            console.print(
-                f"Created agent [green]{agent.name}[/green] (ID: {agent.id})"
-            )
+            agent = get_service().create_agent(id, name, role, email, responsibilities)
+            console.print(f"Created agent [green]{agent.name}[/green] (ID: {agent.id})")
         except ValueError as e:
             console.print(f"[red]Error: {e}[/red]")
             raise typer.Exit(code=1)
@@ -378,18 +359,14 @@ def agent_list():
 
     for agent in agents:
         if isinstance(agent, dict):
-            table.add_row(
-                agent["id"], agent["name"], agent["role"], agent["email"]
-            )
+            table.add_row(agent["id"], agent["name"], agent["role"], agent["email"])
         else:
             table.add_row(agent.id, agent.name, agent.role, agent.email)
     console.print(table)
 
 
 @agent_app.command("onboard")
-def agent_onboard(
-    agent_id: str = typer.Argument(..., help="Agent ID to onboard")
-):
+def agent_onboard(agent_id: str = typer.Argument(..., help="Agent ID to onboard")):
     """Run onboarding SOP for an agent."""
     res = api_call("POST", f"/agents/{agent_id}/onboard")
     if res:
@@ -416,15 +393,10 @@ def agent_review(
     ),
 ):
     """Run PR review SOP for an agent."""
-    res = api_call(
-        "POST",
-        f"/pr/{pr_id}/review",
-        json={"agent_id": agent_id}
-    )
+    res = api_call("POST", f"/pr/{pr_id}/review", json={"agent_id": agent_id})
     if res:
         console.print(
-            f"PR Review SOP started. File created: "
-            f"[green]{res['review_file']}[/green]"
+            f"PR Review SOP started. File created: [green]{res['review_file']}[/green]"
         )
     else:
         review_file = get_service().review_pr(pr_id, agent_id)
@@ -439,15 +411,13 @@ def agent_audit(agent_id: str = typer.Argument(..., help="Agent ID to audit")):
     res = api_call("POST", f"/agents/{agent_id}/audit")
     if res:
         console.print(
-            f"Agent Audit SOP started. File created: "
-            f"[green]{res['audit_file']}[/green]"
+            f"Agent Audit SOP started. File created: [green]{res['audit_file']}[/green]"
         )
     else:
         try:
             audit_file = get_service().audit_agent(agent_id)
             console.print(
-                f"Agent Audit SOP started. File created: "
-                f"[green]{audit_file}[/green]"
+                f"Agent Audit SOP started. File created: [green]{audit_file}[/green]"
             )
         except ValueError as e:
             console.print(f"[red]Error: {e}[/red]")
@@ -455,7 +425,7 @@ def agent_audit(agent_id: str = typer.Argument(..., help="Agent ID to audit")):
 
 @agent_app.command("security-audit")
 def agent_security_audit(
-    agent_id: str = typer.Argument(..., help="Agent ID to perform security audit")
+    agent_id: str = typer.Argument(..., help="Agent ID to perform security audit"),
 ):
     """Run security audit SOP for an agent."""
     res = api_call("POST", f"/agents/{agent_id}/security-audit")
@@ -481,16 +451,14 @@ def agent_propose(
     new_agent_id: str = typer.Option(..., "--id", "-i", help="New agent ID"),
     new_agent_name: str = typer.Option(..., "--name", "-n", help="New agent name"),
     new_agent_role: str = typer.Option(..., "--role", "-r", help="New agent role"),
-    responsibilities: List[str] = typer.Option(..., "--resp", "-p", help="Responsibilities"),
+    responsibilities: List[str] = typer.Option(
+        ..., "--resp", "-p", help="Responsibilities"
+    ),
 ):
     """Propose a new agent for a sub-module."""
     svc = get_service()
     proposal = svc.propose_agent(
-        parent_agent_id,
-        new_agent_id,
-        new_agent_name,
-        new_agent_role,
-        responsibilities
+        parent_agent_id, new_agent_id, new_agent_name, new_agent_role, responsibilities
     )
     console.print(f"Agent proposal created: [green]{proposal.id}[/green]")
     console.print(f"MACP debate initiated for [blue]{new_agent_id}[/blue].")
@@ -513,9 +481,7 @@ def agent_check_expansion(
 
 @app.command()
 def config_tokens(
-    mode: TokenMode = typer.Option(
-        ..., "--mode", "-m", help="Token consumption mode"
-    )
+    mode: TokenMode = typer.Option(..., "--mode", "-m", help="Token consumption mode"),
 ):
     """Set token consumption mode (low/medium/high)."""
     svc = get_service()
@@ -574,9 +540,7 @@ def run(
     svc = get_service()
     context, resolved_agent_id = svc.build_context(path, task_type, agent_id)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
         tmp.write(context)
         context_file = tmp.name
 
@@ -645,13 +609,9 @@ def run(
 def _perform_reflection(session_file: Path):
     svc = get_service()
     session_content = session_file.read_text(encoding="utf-8")
-    output_match = re.search(
-        r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL
-    )
+    output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
     if not output_match:
-        console.print(
-            "[red]Could not find output section in session log.[/red]"
-        )
+        console.print("[red]Could not find output section in session log.[/red]")
         return
 
     reflection_text = svc.reflect_on_session(output_match.group(1))
@@ -660,18 +620,12 @@ def _perform_reflection(session_file: Path):
 
     updates = svc.parse_reflection_output(reflection_text)
     if updates:
-        agent_id_match = re.search(
-            r"- \*\*Agent ID\*\*: `(.*?)`", session_content
-        )
+        agent_id_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", session_content)
         playbook_path = svc.cursor_rules_dir / "_global.mdc"
         if agent_id_match and agent_id_match.group(1) != "None":
             agents_config = svc.load_agents()
             agent = next(
-                (
-                    a
-                    for a in agents_config.agents
-                    if a.id == agent_id_match.group(1)
-                ),
+                (a for a in agents_config.agents if a.id == agent_id_match.group(1)),
                 None,
             )
             if agent:
@@ -686,7 +640,7 @@ def _perform_reflection(session_file: Path):
 def reflect(
     session_id: Optional[str] = typer.Option(
         None, "--session-id", "-s", help="Session ID to reflect on"
-    )
+    ),
 ):
     """Reflect on a session and extract learnings."""
     svc = get_service()
@@ -720,15 +674,11 @@ def decision_add(
     context: str = typer.Option(
         ..., "--context", "-c", help="Context for the decision"
     ),
-    decision: str = typer.Option(
-        ..., "--decision", "-d", help="The decision made"
-    ),
+    decision: str = typer.Option(..., "--decision", "-d", help="The decision made"),
     consequences: str = typer.Option(
         ..., "--consequences", "-q", help="Consequences of the decision"
     ),
-    status: str = typer.Option(
-        "accepted", "--status", "-s", help="Decision status"
-    ),
+    status: str = typer.Option("accepted", "--status", "-s", help="Decision status"),
     agent_id: Optional[str] = typer.Option(
         None, "--agent", "-a", help="Agent who made the decision"
     ),
@@ -749,16 +699,12 @@ def decision_add(
     )
     if res:
         console.print(
-            f"Created ADR: "
-            f"[green]{svc.decisions_dir / (res['id'] + '.md')}[/green]"
+            f"Created ADR: [green]{svc.decisions_dir / (res['id'] + '.md')}[/green]"
         )
     else:
-        adr = svc.add_decision(
-            title, context, decision, consequences, status, agent_id
-        )
+        adr = svc.add_decision(title, context, decision, consequences, status, agent_id)
         console.print(
-            f"Created ADR: "
-            f"[green]{svc.decisions_dir / f'{adr.id}.md'}[/green]"
+            f"Created ADR: [green]{svc.decisions_dir / f'{adr.id}.md'}[/green]"
         )
 
 
@@ -803,7 +749,7 @@ app.add_typer(memory_app, name="memory")
 
 @memory_app.command("index")
 def memory_index(
-    agent_id: str = typer.Argument(..., help="Agent ID to index memory for")
+    agent_id: str = typer.Argument(..., help="Agent ID to index memory for"),
 ):
     """Index an agent's playbook into vectorized memory."""
     svc = get_service()
@@ -818,7 +764,7 @@ def memory_index(
 def memory_search(
     agent_id: str = typer.Argument(..., help="Agent ID to search memory for"),
     query: str = typer.Argument(..., help="Search query"),
-    n: int = typer.Option(3, "--results", "-n", help="Number of results")
+    n: int = typer.Option(3, "--results", "-n", help="Number of results"),
 ):
     """Search vectorized memory for relevant entries."""
     svc = get_service()
@@ -831,7 +777,7 @@ def memory_search(
     table.add_column("ID", style="cyan")
     table.add_column("Content", style="green")
     table.add_column("Type", style="yellow")
-    
+
     for res in results:
         table.add_row(res["id"], res["content"], res["metadata"].get("type", "unknown"))
     console.print(table)
@@ -839,7 +785,7 @@ def memory_search(
 
 @memory_app.command("synthesize")
 def memory_synthesize(
-    agent_id: str = typer.Argument(..., help="Agent ID to synthesize memories for")
+    agent_id: str = typer.Argument(..., help="Agent ID to synthesize memories for"),
 ):
     """Synthesize shared memories from individual experiences (Phase 10.8)."""
     svc = get_service()
@@ -847,7 +793,9 @@ def memory_synthesize(
         synthesized = svc.synthesize_memories(agent_id)
 
     if not synthesized:
-        console.print(f"No significant memories found to synthesize for [blue]{agent_id}[/blue].")
+        console.print(
+            f"No significant memories found to synthesize for [blue]{agent_id}[/blue]."
+        )
         return
 
     table = Table(title=f"Synthesized Memories: {agent_id}")
@@ -859,10 +807,12 @@ def memory_synthesize(
         table.add_row(
             s.get("type", "unknown"),
             s.get("description", "N/A"),
-            s.get("justification", "N/A")
+            s.get("justification", "N/A"),
         )
     console.print(table)
-    console.print("\n[bold green]Synthesized learnings added to shared-learnings.mdc.[/bold green]")
+    console.print(
+        "\n[bold green]Synthesized learnings added to shared-learnings.mdc.[/bold green]"
+    )
 
 
 @app.command()
@@ -887,9 +837,7 @@ def memory_prune(
             if count > 0:
                 console.print(f"  [green]Done.[/green] Pruned {count} items.")
             else:
-                console.print(
-                    "  [yellow]No items met the pruning threshold.[/yellow]"
-                )
+                console.print("  [yellow]No items met the pruning threshold.[/yellow]")
     else:
         agents_config = svc.load_agents()
         agents = (
@@ -902,13 +850,9 @@ def memory_prune(
             console.print(f"Pruning memory for agent: [blue]{agent.id}[/blue]")
             pruned_count = svc.prune_memory(agent, threshold)
             if pruned_count > 0:
-                console.print(
-                    f"  [green]Done.[/green] Pruned {pruned_count} items."
-                )
+                console.print(f"  [green]Done.[/green] Pruned {pruned_count} items.")
             else:
-                console.print(
-                    "  [yellow]No items met the pruning threshold.[/yellow]"
-                )
+                console.print("  [yellow]No items met the pruning threshold.[/yellow]")
 
 
 @app.command()
@@ -938,23 +882,13 @@ def memory_sync():
     if not svc.decisions_dir.exists():
         content.append("No decisions found.")
     else:
-        adrs = sorted(
-            list(svc.decisions_dir.glob("ADR-*.md")), reverse=True
-        )[:5]
+        adrs = sorted(list(svc.decisions_dir.glob("ADR-*.md")), reverse=True)[:5]
         for adr_path in adrs:
             adr_content = adr_path.read_text(encoding="utf-8")
             title_match = re.search(r"# (ADR-\d+: .*)", adr_content)
             status_match = re.search(r"- \*\*Status\*\*: (.*)", adr_content)
-            title = (
-                title_match.group(1)
-                if title_match
-                else adr_path.name
-            )
-            status = (
-                status_match.group(1)
-                if status_match
-                else "unknown"
-            )
+            title = title_match.group(1) if title_match else adr_path.name
+            status = status_match.group(1) if status_match else "unknown"
             content.append(f"- **{title}** [{status}]")
 
     Path("AGENTS.md").write_text("\n".join(content), encoding="utf-8")
@@ -964,9 +898,7 @@ def memory_sync():
 @app.command()
 def loop(
     prompt: str = typer.Argument(..., help="The prompt to solve"),
-    test_cmd: str = typer.Option(
-        ..., "--test", "-t", help="Command to run tests"
-    ),
+    test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
     max_iterations: int = typer.Option(
         10, "--max", "-m", help="Maximum number of iterations"
     ),
@@ -979,18 +911,12 @@ def loop(
     git_commit: bool = typer.Option(
         False, "--git-commit", "-g", help="Automatically commit on success"
     ),
-    prd: Optional[str] = typer.Option(
-        None, "--prd", help="Path to the PRD file"
-    ),
+    prd: Optional[str] = typer.Option(None, "--prd", help="Path to the PRD file"),
     plan_file: Optional[str] = typer.Option(
         None, "--plan", help="Path to the plan file"
     ),
-    max_spend: float = typer.Option(
-        20.0, "--max-spend", help="Maximum spend in USD"
-    ),
-    model: str = typer.Option(
-        "gemini-3-flash", "--model", help="LLM model to use"
-    ),
+    max_spend: float = typer.Option(20.0, "--max-spend", help="Maximum spend in USD"),
+    model: str = typer.Option("gemini-3-flash", "--model", help="LLM model to use"),
     spec_id: Optional[str] = typer.Option(
         None, "--spec", help="Living Spec ID to target and automate"
     ),
@@ -1050,7 +976,7 @@ def loop(
             plan_file=plan_file,
             max_spend=max_spend,
             model=model,
-            spec_id=spec_id
+            spec_id=spec_id,
         )
 
     if success:
@@ -1069,9 +995,7 @@ def loop(
 @app.command()
 def ralph(
     prompt: str = typer.Argument(..., help="The prompt to solve"),
-    test_cmd: str = typer.Option(
-        ..., "--test", "-t", help="Command to run tests"
-    ),
+    test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
     max_iterations: int = typer.Option(
         10, "--max", "-m", help="Maximum number of iterations"
     ),
@@ -1084,18 +1008,12 @@ def ralph(
     git_commit: bool = typer.Option(
         False, "--git-commit", "-g", help="Automatically commit on success"
     ),
-    prd: Optional[str] = typer.Option(
-        None, "--prd", help="Path to the PRD file"
-    ),
+    prd: Optional[str] = typer.Option(None, "--prd", help="Path to the PRD file"),
     plan_file: Optional[str] = typer.Option(
         None, "--plan", help="Path to the plan file"
     ),
-    max_spend: float = typer.Option(
-        20.0, "--max-spend", help="Maximum spend in USD"
-    ),
-    model: str = typer.Option(
-        "gemini-3-flash", "--model", help="LLM model to use"
-    ),
+    max_spend: float = typer.Option(20.0, "--max-spend", help="Maximum spend in USD"),
+    model: str = typer.Option("gemini-3-flash", "--model", help="LLM model to use"),
     spec_id: Optional[str] = typer.Option(
         None, "--spec", help="Living Spec ID to target and automate"
     ),
@@ -1103,7 +1021,19 @@ def ralph(
     """
     Alias for 'ace loop'.
     """
-    loop(prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, max_spend, model, spec_id)
+    loop(
+        prompt,
+        test_cmd,
+        max_iterations,
+        path,
+        agent_id,
+        git_commit,
+        prd,
+        plan_file,
+        max_spend,
+        model,
+        spec_id,
+    )
 
 
 @app.command()
@@ -1126,9 +1056,7 @@ def mail_send(
     )
     if not res:
         get_service().send_mail(to, sender, subject, body)
-    console.print(
-        f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]"
-    )
+    console.print(f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]")
 
 
 @app.command()
@@ -1150,9 +1078,7 @@ def mail_list(agent_id: str):
 
     for msg in messages:
         if isinstance(msg, dict):
-            table.add_row(
-                msg["id"], msg["from"], msg["subject"], msg["status"]
-            )
+            table.add_row(msg["id"], msg["from"], msg["subject"], msg["status"])
         else:
             table.add_row(msg.id, msg.from_agent, msg.subject, msg.status)
     console.print(table)
@@ -1190,13 +1116,13 @@ def mail_read(agent_id: str, msg_id: str):
 
 @app.command()
 def debate(
-    proposal_id: Optional[str] = typer.Argument(None, help="The MACP proposal ID to debate"),
+    proposal_id: Optional[str] = typer.Argument(
+        None, help="The MACP proposal ID to debate"
+    ),
     agents: List[str] = typer.Option(
         ..., "--agent", "-a", help="Agents to participate"
     ),
-    turns: int = typer.Option(
-        3, "--turns", "-t", help="Number of debate turns"
-    ),
+    turns: int = typer.Option(3, "--turns", "-t", help="Number of debate turns"),
     proposal: Optional[str] = typer.Option(
         None, "--proposal", help="Legacy proposal content (alias for proposal_id)"
     ),
@@ -1206,7 +1132,9 @@ def debate(
         proposal_id = proposal
 
     if not proposal_id:
-        console.print("[red]Error: Missing argument 'PROPOSAL_ID' or option '--proposal'.[/red]")
+        console.print(
+            "[red]Error: Missing argument 'PROPOSAL_ID' or option '--proposal'.[/red]"
+        )
         raise typer.Exit(code=1)
 
     console.print(
@@ -1240,7 +1168,9 @@ def macp_propose(
     title: str = typer.Option(..., "--title", "-t", help="Proposal title"),
     description: str = typer.Option(..., "--desc", "-d", help="Proposal description"),
     proposer: str = typer.Option(..., "--from", "-f", help="Proposer agent ID"),
-    agents: List[str] = typer.Option(..., "--agent", "-a", help="Agents to participate"),
+    agents: List[str] = typer.Option(
+        ..., "--agent", "-a", help="Agents to participate"
+    ),
 ):
     """Create a new MACP proposal."""
     svc = get_service()
@@ -1265,7 +1195,9 @@ def macp_list():
     table.add_column("Turns", style="dim")
 
     for p in proposals:
-        table.add_row(p.id, p.title, p.proposer_id, p.status.value, str(p.turns_remaining))
+        table.add_row(
+            p.id, p.title, p.proposer_id, p.status.value, str(p.turns_remaining)
+        )
     console.print(table)
 
 
@@ -1282,7 +1214,7 @@ def macp_show(proposal_id: str = typer.Argument(..., help="Proposal ID")):
     console.print(f"Status: [yellow]{p.status.value}[/yellow]")
     console.print(f"Proposer: [green]{p.proposer_id}[/green]")
     console.print(f"\n[bold]Description:[/bold]\n{p.description}")
-    
+
     if p.votes:
         console.print("\n[bold]Votes:[/bold]")
         for aid, vote in p.votes.items():
@@ -1308,9 +1240,7 @@ app.add_typer(ui_app, name="ui")
 
 @ui_app.command("mockup")
 def ui_mockup(
-    description: str = typer.Argument(
-        ..., help="Description of the UI to mockup"
-    ),
+    description: str = typer.Argument(..., help="Description of the UI to mockup"),
     agent_id: str = typer.Option(
         ..., "--agent", "-a", help="Agent to handle the mockup"
     ),
@@ -1346,16 +1276,12 @@ def ui_mockup(
     if res:
         url = res["url"]
     else:
-        url = get_service().ui_mockup(
-            description, agent_id
-        )
+        url = get_service().ui_mockup(description, agent_id)
     console.print(f"Mockup generated at: [blue]{url}[/blue]")
 
 
 @ui_app.command("sync")
-def ui_sync(
-    url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")
-):
+def ui_sync(url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")):
     """Sync UI code from Google Stitch."""
     console.print(f"Syncing UI code from: [blue]{url}[/blue]")
     res = api_call("GET", "/ui/sync", params={"url": url})
@@ -1421,36 +1347,32 @@ def spec_show(id: str = typer.Argument(..., help="Spec ID")):
     console.print("\n[bold]Constraints:[/bold]")
     for c in spec.constraints:
         console.print(f"- {c}")
-    
+
     if spec.implementation:
-        console.print(
-            f"\n[bold]Implementation:[/bold]\n{spec.implementation}"
-        )
+        console.print(f"\n[bold]Implementation:[/bold]\n{spec.implementation}")
     if spec.verification:
-        console.print(
-            f"\n[bold]Verification:[/bold]\n{spec.verification}"
-        )
+        console.print(f"\n[bold]Verification:[/bold]\n{spec.verification}")
 
-@spec_app.command("update")
-def spec_update(
-    id: str = typer.Argument(..., help="Spec ID"),
-    status: Optional[str] = typer.Option(None, "--status", "-s"),
-    implementation: Optional[str] = typer.Option(None, "--impl", "-m"),
-    verification: Optional[str] = typer.Option(None, "--verify", "-v"),
-):
-    """Update an existing Living Spec."""
-    svc = get_service()
-    spec = svc.get_spec(id)
-    if not spec:
-        console.print(f"[red]Spec {id} not found.[/red]")
-        return
+    @spec_app.command("update")
+    def spec_update(
+        id: str = typer.Argument(..., help="Spec ID"),
+        status: Optional[str] = typer.Option(None, "--status", "-s"),
+        implementation: Optional[str] = typer.Option(None, "--impl", "-m"),
+        verification: Optional[str] = typer.Option(None, "--verify", "-v"),
+    ):
+        """Update an existing Living Spec."""
+        svc = get_service()
+        spec = svc.get_spec(id)
+        if not spec:
+            console.print(f"[red]Spec {id} not found.[/red]")
+            return
 
-    if status:
-        spec.status = status
-    if implementation:
-        spec.implementation = implementation
-    if verification:
-        spec.verification = verification
+        if status:
+            spec.status = status
+        if implementation:
+            spec.implementation = implementation
+        if verification:
+            spec.verification = verification
 
     svc.save_spec(spec)
     console.print(f"Updated Living Spec: [green]{spec.id}[/green]")
@@ -1460,9 +1382,13 @@ def spec_update(
 def subscribe(
     agent_id: str = typer.Argument(..., help="Agent ID to subscribe"),
     path: str = typer.Argument(..., help="Path or module to subscribe to"),
-    priority: str = typer.Option("medium", "--priority", "-p", help="Notification priority (low/medium/high/urgent)"),
-    notify_on_success: bool = typer.Option(True, "--notify-on-success/--no-notify-on-success", help="Notify on success"),
-    notify_on_failure: bool = typer.Option(True, "--notify-on-failure/--no-notify-on-failure", help="Notify on failure"),
+    priority: str = typer.Option("medium", "--priority", "-p", help="Priority"),
+    notify_on_success: bool = typer.Option(
+        True, "--notify-on-success/--no-notify-on-success", help="Notify on success"
+    ),
+    notify_on_failure: bool = typer.Option(
+        True, "--notify-on-failure/--no-notify-on-failure", help="Notify on failure"
+    ),
 ):
     """Subscribe an agent to changes in a specific module or path."""
     res = api_call(
@@ -1473,18 +1399,21 @@ def subscribe(
             "path": path,
             "priority": priority,
             "notify_on_success": notify_on_success,
-            "notify_on_failure": notify_on_failure
+            "notify_on_failure": notify_on_failure,
         },
     )
     if not res:
         svc = get_service()
-        success = svc.subscribe(agent_id, path, priority, notify_on_success, notify_on_failure)
+        success = svc.subscribe(
+            agent_id, path, priority, notify_on_success, notify_on_failure
+        )
     else:
         success = True
 
     if success:
         console.print(
-            f"Agent [green]{agent_id}[/green] subscribed to [blue]{path}[/blue] with priority [bold]{priority}[/bold]"
+            f"Agent [green]{agent_id}[/green] subscribed to [blue]{path}[/blue] "
+            f"with priority [bold]{priority}[/bold]"
         )
     else:
         console.print(
@@ -1498,8 +1427,12 @@ app.add_typer(task_app, name="task")
 
 @task_app.command("delegate")
 def task_delegate(
-    task_description: str = typer.Argument(..., help="The complex task to decompose and delegate"),
-    agent_id: str = typer.Option(..., "--agent", "-a", help="The parent agent ID performing delegation"),
+    task_description: str = typer.Argument(
+        ..., help="The complex task to decompose and delegate"
+    ),
+    agent_id: str = typer.Option(
+        ..., "--agent", "-a", help="The parent agent ID performing delegation"
+    ),
 ):
     """Decompose a complex task and delegate sub-tasks to agents."""
     svc = get_service()
@@ -1518,7 +1451,9 @@ def task_delegate(
     table.add_column("Complexity", style="yellow")
 
     for st in subtasks:
-        table.add_row(st["id"], st["description"], str(st.get("estimated_complexity", "N/A")))
+        table.add_row(
+            st["id"], st["description"], str(st.get("estimated_complexity", "N/A"))
+        )
 
     console.print(table)
 
@@ -1529,7 +1464,9 @@ def task_delegate(
         console.print("\n[bold]Delegations:[/bold]")
         for tid, aid in delegations.items():
             console.print(f"- Task [cyan]{tid}[/cyan] -> Agent [green]{aid}[/green]")
-        console.print("\n[bold green]Delegation complete. Agents have been notified via mail.[/bold green]")
+        console.print(
+            "\n[bold green]Delegation complete. Agents have been notified via mail.[/bold green]"
+        )
 
 
 if __name__ == "__main__":

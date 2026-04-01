@@ -30,7 +30,10 @@ def test_automated_security_audit_secrets(service, temp_workspace):
     results = sec_service.run_automated_audit("dev-1")
 
     assert results["summary"]["failed"] == 1
-    assert any(c["name"] == "Secret Scanning" and c["status"] == "failed" for c in results["checks"])
+    assert any(
+        c["name"] == "Secret Scanning" and c["status"] == "failed"
+        for c in results["checks"]
+    )
 
     # Check if mail was sent
     messages = service.list_mail("dev-1")

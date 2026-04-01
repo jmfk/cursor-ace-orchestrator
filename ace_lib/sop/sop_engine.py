@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List
 
+
 def generate_onboarding_sop(
     agent_id: str,
     name: str,
@@ -8,7 +9,7 @@ def generate_onboarding_sop(
     responsibilities: List[str],
     memory_file: str,
     status: str,
-    parent_id: str = None
+    parent_id: str = None,
 ) -> str:
     """Generate a formal onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
     resp_str = ", ".join(responsibilities) if responsibilities else "None"
@@ -47,6 +48,7 @@ def generate_onboarding_sop(
 - [ ] **Security**: Conduct `ace agent security-audit` on owned modules.
 """
 
+
 def generate_pr_review_sop(pr_id: str, agent_id: str) -> str:
     """Generate a formal PR review SOP for an agent (PRD-01 / Phase 9.5)."""
     return f"""# SOP: PR Review - {pr_id}
@@ -77,6 +79,7 @@ def generate_pr_review_sop(pr_id: str, agent_id: str) -> str:
 - [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
 - [ ] **Comments**:
 """
+
 
 def generate_audit_sop(agent_id: str, name: str) -> str:
     """Generate a formal audit SOP for an agent (PRD-01 / Phase 9.5)."""

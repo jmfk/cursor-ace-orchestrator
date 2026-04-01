@@ -24,13 +24,15 @@ def test_update_playbook_new_strategy(service):
     playbook_path = service.cursor_rules_dir / "test_role.mdc"
     playbook_path.write_text("# Test Playbook\n\n## Strategier & patterns\n")
 
-    updates = [{
-        "type": "str",
-        "id": "NEW",
-        "helpful": 1,
-        "harmful": 0,
-        "description": "Always use type hints."
-    }]
+    updates = [
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "Always use type hints.",
+        }
+    ]
 
     service.update_playbook(playbook_path, updates)
     content = playbook_path.read_text()
@@ -45,13 +47,15 @@ def test_update_playbook_existing_strategy(service):
         "<!-- [str-001] helpful=1 harmful=0 :: Always use type hints. -->\n"
     )
 
-    updates = [{
-        "type": "str",
-        "id": "001",
-        "helpful": 1,
-        "harmful": 0,
-        "description": "Always use type hints."
-    }]
+    updates = [
+        {
+            "type": "str",
+            "id": "001",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "Always use type hints.",
+        }
+    ]
 
     service.update_playbook(playbook_path, updates)
     content = playbook_path.read_text()
@@ -63,29 +67,31 @@ def test_update_playbook_new_pitfall(service):
     playbook_path = service.cursor_rules_dir / "test_role.mdc"
     playbook_path.write_text("# Test Playbook\n\n## Kända fallgropar\n")
 
-    updates = [{
-        "type": "mis",
-        "id": "NEW",
-        "helpful": 0,
-        "harmful": 1,
-        "description": "Avoid global variables."
-    }]
+    updates = [
+        {
+            "type": "mis",
+            "id": "NEW",
+            "helpful": 0,
+            "harmful": 1,
+            "description": "Avoid global variables.",
+        }
+    ]
 
     service.update_playbook(playbook_path, updates)
     content = playbook_path.read_text()
 
-    assert "<!-- [mis-001] helpful=0 harmful=1 :: Avoid global variables. -->" in content
+    assert (
+        "<!-- [mis-001] helpful=0 harmful=1 :: Avoid global variables. -->" in content
+    )
 
 
 def test_update_playbook_new_decision(service):
     playbook_path = service.cursor_rules_dir / "test_role.mdc"
     playbook_path.write_text("# Test Playbook\n\n## Arkitekturella beslut\n")
 
-    updates = [{
-        "type": "dec",
-        "id": "NEW",
-        "description": "Use FastAPI for the backend."
-    }]
+    updates = [
+        {"type": "dec", "id": "NEW", "description": "Use FastAPI for the backend."}
+    ]
 
     service.update_playbook(playbook_path, updates)
     content = playbook_path.read_text()
@@ -115,9 +121,21 @@ globs: ["**/*.py"]
 """)
 
     updates = [
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
-        {"type": "mis", "id": "NEW", "helpful": 0, "harmful": 1, "description": "New pitfall"},
-        {"type": "dec", "id": "NEW", "description": "New decision"}
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "New strategy",
+        },
+        {
+            "type": "mis",
+            "id": "NEW",
+            "helpful": 0,
+            "harmful": 1,
+            "description": "New pitfall",
+        },
+        {"type": "dec", "id": "NEW", "description": "New decision"},
     ]
 
     service.update_playbook(playbook_path, updates)
@@ -135,7 +153,7 @@ globs: ["**/*.py"]
     assert "## Arkitekturella beslut" in content
     assert "<!-- [dec-001] :: New decision -->" in content
     assert "> Some blockquote" in content
-    assert "---" in content # Frontmatter preserved
+    assert "---" in content  # Frontmatter preserved
 
 
 def test_update_playbook_no_existing_sections(service):
@@ -144,7 +162,13 @@ def test_update_playbook_no_existing_sections(service):
     playbook_path.write_text("# Empty Playbook\nJust some text.")
 
     updates = [
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy 1"}
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "Strategy 1",
+        }
     ]
 
     service.update_playbook(playbook_path, updates)
@@ -168,10 +192,28 @@ def test_update_playbook_mixed_updates(service):
 """)
 
     updates = [
-        {"type": "str", "id": "001", "helpful": 1, "harmful": 0, "description": "Existing strategy"},
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
-        {"type": "mis", "id": "001", "helpful": 0, "harmful": 1, "description": "Existing pitfall"},
-        {"type": "dec", "id": "NEW", "description": "New decision"}
+        {
+            "type": "str",
+            "id": "001",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "Existing strategy",
+        },
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "New strategy",
+        },
+        {
+            "type": "mis",
+            "id": "001",
+            "helpful": 0,
+            "harmful": 1,
+            "description": "Existing pitfall",
+        },
+        {"type": "dec", "id": "NEW", "description": "New decision"},
     ]
 
     service.update_playbook(playbook_path, updates)
@@ -189,8 +231,20 @@ def test_update_playbook_duplicate_new_ids(service):
     playbook_path.write_text("# Dupes Playbook\n\n## Strategier & patterns\n")
 
     updates = [
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy A"},
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy B"}
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "Strategy A",
+        },
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "Strategy B",
+        },
     ]
 
     service.update_playbook(playbook_path, updates)

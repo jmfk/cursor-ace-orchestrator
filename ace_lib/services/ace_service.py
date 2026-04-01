@@ -51,15 +51,14 @@ class ACEService:
         if not self._chroma_client:
             import chromadb
             from chromadb.config import Settings
+
             self.vector_db_dir.mkdir(parents=True, exist_ok=True)
             # Phase 10.14: Optimize ChromaDB settings for performance and reliability
             self._chroma_client = chromadb.PersistentClient(
                 path=str(self.vector_db_dir),
                 settings=Settings(
-                    allow_reset=True,
-                    anonymized_telemetry=False,
-                    is_persistent=True
-                )
+                    allow_reset=True, anonymized_telemetry=False, is_persistent=True
+                ),
             )
         return self._chroma_client
 
@@ -77,7 +76,7 @@ class ACEService:
 
         content = playbook_path.read_text(encoding="utf-8")
         client = self._get_chroma_client()
-        
+
         # Use a more robust collection naming and retrieval
         collection_name = f"playbook_{agent_id.replace('-', '_')}"
         collection = client.get_or_create_collection(name=collection_name)
@@ -100,31 +99,35 @@ class ACEService:
             entry_id = f"{l_type}-{l_id}"
             ids.append(entry_id)
             documents.append(desc)
-            metadatas.append({
-                "type": l_type,
-                "agent_id": agent_id,
-                "helpful": int(helpful or 0),
-                "harmful": int(harmful or 0),
-                "last_indexed": datetime.now().isoformat()
-            })
+            metadatas.append(
+                {
+                    "type": l_type,
+                    "agent_id": agent_id,
+                    "helpful": int(helpful or 0),
+                    "harmful": int(harmful or 0),
+                    "last_indexed": datetime.now().isoformat(),
+                }
+            )
 
         if ids:
             # Batch updates for better performance
             batch_size = 100
             for i in range(0, len(ids), batch_size):
                 collection.upsert(
-                    ids=ids[i:i+batch_size],
-                    documents=documents[i:i+batch_size],
-                    metadatas=metadatas[i:i+batch_size]
+                    ids=ids[i : i + batch_size],
+                    documents=documents[i : i + batch_size],
+                    metadatas=metadatas[i : i + batch_size],
                 )
         return True
 
     @profiler.profile
-    def search_memory(self, agent_id: str, query: str, n_results: int = 3) -> List[Dict]:
+    def search_memory(
+        self, agent_id: str, query: str, n_results: int = 3
+    ) -> List[Dict]:
         """Search vectorized memory with improved error handling and filtering (Phase 10.14)."""
         if not agent_id:
             return []
-            
+
         client = self._get_chroma_client()
         try:
             # We use a more robust collection naming and retrieval
@@ -142,12 +145,16 @@ class ACEService:
             formatted_results = []
             if results["ids"] and results["ids"][0]:
                 for i in range(len(results["ids"][0])):
-                    formatted_results.append({
-                        "id": results["ids"][0][i],
-                        "content": results["documents"][0][i],
-                        "metadata": results["metadatas"][0][i],
-                        "distance": results["distances"][0][i] if "distances" in results else None
-                    })
+                    formatted_results.append(
+                        {
+                            "id": results["ids"][0][i],
+                            "content": results["documents"][0][i],
+                            "metadata": results["metadatas"][0][i],
+                            "distance": results["distances"][0][i]
+                            if "distances" in results
+                            else None,
+                        }
+                    )
             return formatted_results
         except Exception:
             # Silently fail if collection doesn't exist yet
@@ -294,7 +301,7 @@ class ACEService:
             "name": agent.name,
             "role": agent.role,
             "parent": agent.parent_id,
-            "children": []
+            "children": [],
         }
 
         for sub_id in agent.sub_agent_ids:
@@ -349,9 +356,7 @@ class ACEService:
         # 1. Global rules
         global_rules_file = self.cursor_rules_dir / "_global.mdc"
         if global_rules_file.exists():
-            context_parts.append(
-                f"### GLOBAL RULES\n{global_rules_file.read_text()}"
-            )
+            context_parts.append(f"### GLOBAL RULES\n{global_rules_file.read_text()}")
 
         # 2. Resolve agent and playbook
         resolved_agent_id = agent_id
@@ -377,7 +382,11 @@ class ACEService:
 
         # 2.1 Vectorized Memory Search (Phase 8.1)
         # If we have a path or task description, search for relevant entries
-        search_query = task_description if task_description else (path if path else "general tasks")
+        search_query = (
+            task_description
+            if task_description
+            else (path if path else "general tasks")
+        )
         vector_results = self.search_memory(resolved_agent_id, search_query)
         if vector_results:
             context_parts.append("### RELEVANT MEMORY (Vector Search)")
@@ -394,7 +403,9 @@ class ACEService:
             if decisions:
                 context_parts.append("### RECENT DECISIONS")
                 for d in decisions:
-                    context_parts.append(f"#### {d.name}\n{d.read_text(encoding='utf-8')}")
+                    context_parts.append(
+                        f"#### {d.name}\n{d.read_text(encoding='utf-8')}"
+                    )
 
         # 4. Session continuity
         config = self.load_config()
@@ -421,9 +432,7 @@ class ACEService:
         # 5. Shared learnings
         shared_file = self.ace_dir / "shared-learnings.mdc"
         if shared_file.exists():
-            context_parts.append(
-                f"### SHARED LEARNINGS\n{shared_file.read_text()}"
-            )
+            context_parts.append(f"### SHARED LEARNINGS\n{shared_file.read_text()}")
 
         # 6. Task framing
         module_name = path if path else "the project"
@@ -442,7 +451,7 @@ class ACEService:
         if task_description:
             # Simple heuristic: longer description -> higher complexity
             complexity = min(10, max(1, len(task_description) // 100))
-        
+
         # Max tokens allowed based on complexity
         # Low complexity (1) = 15,000 chars (~3.7k tokens)
         # High complexity (10) = 60,000 chars (~15k tokens)
@@ -467,14 +476,24 @@ class ACEService:
         # 6. Recent Sessions (Prune second)
         # 7. Shared Learnings (Prune third)
         # 8. Vector Search Results (Prune fourth)
-        
+
         sections = context.split("### ")
         if not sections:
             return context[:max_chars]
-            
+
         # Reconstruct with priority
-        keep_headers = ["GLOBAL RULES", "AGENT PLAYBOOK", "TASK FRAMING", "RALPH LOOP PROMPT"]
-        prune_priority = ["RECENT DECISIONS", "RECENT SESSIONS", "SHARED LEARNINGS", "RELEVANT MEMORY"]
+        keep_headers = [
+            "GLOBAL RULES",
+            "AGENT PLAYBOOK",
+            "TASK FRAMING",
+            "RALPH LOOP PROMPT",
+        ]
+        prune_priority = [
+            "RECENT DECISIONS",
+            "RECENT SESSIONS",
+            "SHARED LEARNINGS",
+            "RELEVANT MEMORY",
+        ]
 
         new_sections = []
         # Always keep the first part (if any) before the first ###
@@ -500,7 +519,7 @@ class ACEService:
                     break
             if is_keep:
                 continue
-                
+
             is_prune = False
             for ph in prune_priority:
                 if ph in header_line:
@@ -510,7 +529,7 @@ class ACEService:
 
             if not is_prune:
                 other_list.append("### " + s)
-        
+
         # Start building the pruned context
         pruned_context = "".join(new_sections) + "".join(keep_list)
 
@@ -518,12 +537,17 @@ class ACEService:
         for s in other_list:
             if len(pruned_context) + len(s) < max_chars:
                 pruned_context += s
-        
+
         # Add prune_map sections in REVERSE priority (keep most important ones longer)
         # Actually, we should add them in order of importance.
         # RELEVANT MEMORY is probably more important than SHARED LEARNINGS, etc.
         # Let's re-order priority for ADDING:
-        add_priority = ["RELEVANT MEMORY", "SHARED LEARNINGS", "RECENT SESSIONS", "RECENT DECISIONS"]
+        add_priority = [
+            "RELEVANT MEMORY",
+            "SHARED LEARNINGS",
+            "RECENT SESSIONS",
+            "RECENT DECISIONS",
+        ]
 
         for ph in add_priority:
             for s in prune_map[ph]:
@@ -533,7 +557,7 @@ class ACEService:
             remaining = max_chars - len(pruned_context)
             if remaining > 200:
                 trunc_msg = "\n... [TRUNCATED] ...\n"
-                pruned_context += s[:remaining - len(trunc_msg)] + trunc_msg
+                pruned_context += s[: remaining - len(trunc_msg)] + trunc_msg
             break
             if len(pruned_context) >= max_chars:
                 break
@@ -559,15 +583,9 @@ class ACEService:
             sessions.append(
                 {
                     "id": s.stem.replace("session_", ""),
-                    "command": (
-                        command_match.group(1) if command_match else "unknown"
-                    ),
-                    "agent_id": (
-                        agent_match.group(1) if agent_match else "unknown"
-                    ),
-                    "timestamp": datetime.fromtimestamp(
-                        s.stat().st_mtime
-                    ).isoformat(),
+                    "command": (command_match.group(1) if command_match else "unknown"),
+                    "agent_id": (agent_match.group(1) if agent_match else "unknown"),
+                    "timestamp": datetime.fromtimestamp(s.stat().st_mtime).isoformat(),
                 }
             )
         return sessions
@@ -665,11 +683,7 @@ class ACEService:
             )
             if isinstance(message.content, list):
                 return "".join(
-                    [
-                        block.text
-                        for block in message.content
-                        if hasattr(block, "text")
-                    ]
+                    [block.text for block in message.content if hasattr(block, "text")]
                 )
             return str(message.content)
         except Exception:
@@ -688,12 +702,8 @@ class ACEService:
                     {
                         "type": match.group(1),
                         "id": match.group(2),
-                        "helpful": (
-                            int(match.group(3)) if match.group(3) else 0
-                        ),
-                        "harmful": (
-                            int(match.group(4)) if match.group(4) else 0
-                        ),
+                        "helpful": (int(match.group(3)) if match.group(3) else 0),
+                        "harmful": (int(match.group(4)) if match.group(4) else 0),
                         "description": match.group(5).strip(),
                     }
                 )
@@ -706,11 +716,13 @@ class ACEService:
 
         content = playbook_path.read_text(encoding="utf-8")
         agent_id = None
-        
+
         # Try to resolve agent_id from the playbook path
         agents_config = self.load_agents()
         for a in agents_config.agents:
-            if playbook_path.name == f"{a.role}.mdc" or str(playbook_path).endswith(a.memory_file):
+            if playbook_path.name == f"{a.role}.mdc" or str(playbook_path).endswith(
+                a.memory_file
+            ):
                 agent_id = a.id
                 break
 
@@ -729,17 +741,20 @@ class ACEService:
                 new_h = old_h + update.get("helpful", 0)
                 new_m = old_m + update.get("harmful", 0)
 
-                new_line = (f"<!-- [{update_type}-{update_id}]"
-                            + (f" helpful={new_h} harmful={new_m}"
-                               if update_type != "dec" else "")
-                            + f" :: {update['description']} -->")
+                new_line = (
+                    f"<!-- [{update_type}-{update_id}]"
+                    + (
+                        f" helpful={new_h} harmful={new_m}"
+                        if update_type != "dec"
+                        else ""
+                    )
+                    + f" :: {update['description']} -->"
+                )
                 content = content.replace(match.group(0), new_line)
             else:
                 # Handle NEW entries
                 if update_id == "NEW":
-                    existing_ids = re.findall(
-                        rf"\[{update_type}-(\d+)\]", content
-                    )
+                    existing_ids = re.findall(rf"\[{update_type}-(\d+)\]", content)
                     next_id = max([int(i) for i in existing_ids] + [0]) + 1
                     update_id = f"{next_id:03d}"
 
@@ -764,7 +779,7 @@ class ACEService:
                     content = content.rstrip() + f"\n\n{header}\n{new_line}\n"
 
         playbook_path.write_text(content, encoding="utf-8")
-        
+
         # Phase 8.1: Re-index playbook after update
         if agent_id:
             self.index_playbook(agent_id)
@@ -792,32 +807,22 @@ class ACEService:
             decision_match = re.search(
                 r"## Decision\n(.*?)\n\n## Consequences", content, re.DOTALL
             )
-            consequences_match = re.search(
-                r"## Consequences\n(.*)", content, re.DOTALL
-            )
+            consequences_match = re.search(r"## Consequences\n(.*)", content, re.DOTALL)
 
             decisions.append(
                 Decision(
                     id=adr_path.stem,
-                    title=(
-                        title_match.group(1) if title_match else adr_path.name
-                    ),
-                    status=(
-                        status_match.group(1) if status_match else "unknown"
-                    ),
+                    title=(title_match.group(1) if title_match else adr_path.name),
+                    status=(status_match.group(1) if status_match else "unknown"),
                     created_at=(
                         date_match.group(1)
                         if date_match
                         else datetime.now().isoformat()
                     ),
                     agent_id=agent_match.group(1) if agent_match else None,
-                    context=(
-                        context_match.group(1).strip() if context_match else ""
-                    ),
+                    context=(context_match.group(1).strip() if context_match else ""),
                     decision=(
-                        decision_match.group(1).strip()
-                        if decision_match
-                        else ""
+                        decision_match.group(1).strip() if decision_match else ""
                     ),
                     consequences=(
                         consequences_match.group(1).strip()
@@ -948,7 +953,7 @@ class ACEService:
                     f"Title: {title}\n"
                     f"Description: {description}\n\n"
                     f"Please participate in the debate using 'ace macp debate {proposal_id}'."
-                )
+                ),
             )
 
         self._save_macp_proposal(proposal)
@@ -1008,19 +1013,21 @@ class ACEService:
             proposal.status = ConsensusStatus.CONSENSUS
             proposal.updated_at = datetime.now().isoformat()
             self._save_macp_proposal(proposal)
-            
+
             # Notify participants
             participants = set(proposal.votes.keys())
             for line in proposal.history:
                 match = re.search(r"Agent (\w+)", line)
                 if match:
                     participants.add(match.group(1))
-            
+
             # Ensure proposer and participants are notified
             participants.add(proposal.proposer_id)
 
             for aid in participants:
-                self.send_mail(aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus)
+                self.send_mail(
+                    aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus
+                )
 
             return consensus
         except Exception as e:
@@ -1045,7 +1052,11 @@ class ACEService:
                 agent = next((a for a in agents_config.agents if a.id == aid), None)
                 role = agent.role if agent else "expert"
 
-                history_str = "\n".join(proposal.history) if proposal.history else "No previous turns."
+                history_str = (
+                    "\n".join(proposal.history)
+                    if proposal.history
+                    else "No previous turns."
+                )
 
                 prompt = (
                     f"You are agent {aid} with role {role}.\n"
@@ -1063,7 +1074,9 @@ class ACEService:
                         max_tokens=512,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    perspective = "".join([b.text for b in message.content if hasattr(b, "text")])
+                    perspective = "".join(
+                        [b.text for b in message.content if hasattr(b, "text")]
+                    )
 
                     if "ESCALATE" in perspective.upper():
                         proposal.status = ConsensusStatus.ESCALATED
@@ -1071,11 +1084,15 @@ class ACEService:
                         self._save_macp_proposal(proposal)
                         return f"MACP {proposal_id} ESCALATED by {aid}."
 
-                    vote_match = re.search(r"VOTE:\s*(SUPPORT|OPPOSE|ABSTAIN)", perspective.upper())
+                    vote_match = re.search(
+                        r"VOTE:\s*(SUPPORT|OPPOSE|ABSTAIN)", perspective.upper()
+                    )
                     if vote_match:
                         proposal.votes[aid] = vote_match.group(1)
 
-                    proposal.history.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
+                    proposal.history.append(
+                        f"Turn {turn} - Agent {aid} ({role}): {perspective}"
+                    )
                 except Exception as e:
                     proposal.history.append(f"Turn {turn} - Agent {aid}: Error: {e}")
 
@@ -1119,18 +1136,28 @@ class ACEService:
         # Initial state hash for stagnation detection
         while iteration < max_iterations:
             if total_cost >= max_spend:
-                print(f"[RALPH] Reached maximum spending limit (${max_spend}). Stopping.")
+                print(
+                    f"[RALPH] Reached maximum spending limit (${max_spend}). Stopping."
+                )
                 break
 
             iteration += 1
-            print(f"\n[RALPH] Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f})")
+            print(
+                f"\n[RALPH] Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f})"
+            )
 
             # 1. Initial State Analysis (if it's the first iteration and we have a plan file)
-            if iteration == 1 and os.path.exists(prd_path) and os.path.exists(plan_file):
-                print(f"[RALPH] Step 0: Analyzing current project state against {prd_path}...")
+            if (
+                iteration == 1
+                and os.path.exists(prd_path)
+                and os.path.exists(plan_file)
+            ):
+                print(
+                    f"[RALPH] Step 0: Analyzing current project state against {prd_path}..."
+                )
                 plan_content = Path(plan_file).read_text(encoding="utf-8")
                 prd_content = Path(prd_path).read_text(encoding="utf-8")
-                
+
                 spec_context = ""
                 if spec_id:
                     spec = self.get_spec(spec_id)
@@ -1159,7 +1186,10 @@ class ACEService:
             # 1. Context Refresh & Build (Phase 4.1)
             os.environ["ACE_LOOP_PROMPT"] = prompt
             context, resolved_agent_id = self.build_context(
-                path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id, task_description=prompt
+                path=path,
+                task_type=TaskType.IMPLEMENT,
+                agent_id=agent_id,
+                task_description=prompt,
             )
 
             if spec_id:
@@ -1204,17 +1234,19 @@ class ACEService:
             # Log token usage (simulated for now, as cursor-agent doesn't return it yet)
             input_tokens = len(prompt.split()) * 1.3
             output_tokens = len(agent_proc.stdout.split()) * 1.3
-            cost = (input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40)
+            cost = input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40
             total_cost += cost
 
-            self.log_token_usage(TokenUsage(
-                agent_id=resolved_agent_id or "unknown",
-                session_id=f"loop_{iteration}",
-                prompt_tokens=int(input_tokens),
-                completion_tokens=int(output_tokens),
-                total_tokens=int(input_tokens + output_tokens),
-                cost=cost
-            ))
+            self.log_token_usage(
+                TokenUsage(
+                    agent_id=resolved_agent_id or "unknown",
+                    session_id=f"loop_{iteration}",
+                    prompt_tokens=int(input_tokens),
+                    completion_tokens=int(output_tokens),
+                    total_tokens=int(input_tokens + output_tokens),
+                    cost=cost,
+                )
+            )
 
             # 3. Verify (Phase 4.1)
             print(f"[RALPH] Verifying with: {test_cmd}")
@@ -1224,31 +1256,37 @@ class ACEService:
 
             # --- Automated Security Audit Integration (Phase 10.18) ---
             if resolved_agent_id:
-                print(f"[RALPH] Running automated security audit for {resolved_agent_id}...")
+                print(
+                    f"[RALPH] Running automated security audit for {resolved_agent_id}..."
+                )
                 from ace_lib.agents.security_audit import SecurityAuditService
+
                 sec_service = SecurityAuditService(self)
                 try:
                     sec_results = sec_service.run_automated_audit(resolved_agent_id)
                     if sec_results["summary"]["failed"] > 0:
-                        print(f"[RALPH] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures.")
+                        print(
+                            f"[RALPH] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures."
+                        )
                         # We don't necessarily fail the loop, but we log it
                 except Exception as e:
                     print(f"[RALPH] Security audit error: {e}")
 
             # --- Agentic Feedback Loop (Phase 6.7) ---
             # Automatically flag success/failure based on test-output
-            test_passed = (result.returncode == 0)
+            test_passed = result.returncode == 0
             feedback_status = "SUCCESS" if test_passed else "FAILURE"
             print(f"[RALPH] Test result: {feedback_status}")
 
             # Notify subscribers of failure if applicable
             if not test_passed and path:
-                self.notify_subscribers(path, f"RALPH Loop failed for: {prompt}", success=False)
+                self.notify_subscribers(
+                    path, f"RALPH Loop failed for: {prompt}", success=False
+                )
 
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             session_file = (
-                self.sessions_dir
-                / f"session_loop_{session_id}_{iteration}.md"
+                self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
             )
             self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1275,10 +1313,7 @@ class ACEService:
             # 4. Reflection (Phase 4.1)
             reflection_text = ""
             if self.get_anthropic_client():
-                print(
-                    f"[RALPH] Performing reflection for "
-                    f"iteration {iteration}..."
-                )
+                print(f"[RALPH] Performing reflection for iteration {iteration}...")
                 # Reflect on current iteration output, including test success/failure
                 reflection_input = (
                     f"TASK STATUS: {feedback_status}\n"
@@ -1308,12 +1343,10 @@ class ACEService:
                                 for a in agents_config.agents
                                 if a.id == resolved_agent_id
                             ),
-                            None
+                            None,
                         )
                         if agent:
-                            playbook_path = (
-                                self.base_path / agent.memory_file
-                            )
+                            playbook_path = self.base_path / agent.memory_file
                     self.update_playbook(playbook_path, updates)
                     print(f"[RALPH] Updated playbook: {playbook_path.name}")
 
@@ -1349,7 +1382,9 @@ class ACEService:
                 try:
                     status = subprocess.run(
                         ["git", "status", "--porcelain"],
-                        capture_output=True, text=True, check=False
+                        capture_output=True,
+                        text=True,
+                        check=False,
                     )
                     if status.stdout.strip():
                         commit_msg = f"RALPH Loop: {prompt[:50]}"
@@ -1359,7 +1394,9 @@ class ACEService:
                             try:
                                 diff = subprocess.run(
                                     ["git", "diff"],
-                                    capture_output=True, text=True, check=False
+                                    capture_output=True,
+                                    text=True,
+                                    check=False,
                                 ).stdout
                                 msg_prompt = (
                                     "Generate a concise, one-line git commit message "
@@ -1387,17 +1424,18 @@ class ACEService:
                 print("[RALPH] ✅ Verification successful!")
                 # Notify subscribers of the change
                 if path:
-                    self.notify_subscribers(path, f"RALPH Loop successful for: {prompt}", success=True)
+                    self.notify_subscribers(
+                        path, f"RALPH Loop successful for: {prompt}", success=True
+                    )
 
                 # Update plan.md if it exists
                 if os.path.exists(plan_file):
                     print(f"[RALPH] Updating {plan_file}...")
-                    update_plan_prompt = (
-                        f"Update '{plan_file}' and 'changelog.md' based on the successful completion of: {prompt[:100]}"
-                    )
+                    update_plan_prompt = f"Update '{plan_file}' and 'changelog.md' based on the successful completion of: {prompt[:100]}"
                     subprocess.run(
-                        f"cursor-agent --print --model {model} --force --trust \"{update_plan_prompt}\"",
-                        shell=True, env=env
+                        f'cursor-agent --print --model {model} --force --trust "{update_plan_prompt}"',
+                        shell=True,
+                        env=env,
                     )
 
                 # Update Living Spec if applicable (Phase 10.23)
@@ -1410,13 +1448,19 @@ class ACEService:
 
             # Stagnation detection
             try:
-                status_out = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+                status_out = subprocess.run(
+                    ["git", "status", "--porcelain"], capture_output=True, text=True
+                ).stdout
                 state_hash = hashlib.sha256(status_out.encode()).hexdigest()
                 state_history.append(state_hash)
                 if len(state_history) > 3:
                     state_history.pop(0)
-                if len(state_history) == 3 and all(h == state_history[0] for h in state_history):
-                    print("[RALPH] ⚠️ Stagnation detected! State has not changed for 3 iterations.")
+                if len(state_history) == 3 and all(
+                    h == state_history[0] for h in state_history
+                ):
+                    print(
+                        "[RALPH] ⚠️ Stagnation detected! State has not changed for 3 iterations."
+                    )
                     prompt = (
                         f"STAGNATION DETECTED. You are stuck in the same state. "
                         "Analyze why and try a different approach.\n\n"
@@ -1459,7 +1503,9 @@ class ACEService:
                 "---\nname: shared-learnings\ntype: global\n---\n"
                 "# Shared ACE Learnings\n\n## Strategier & patterns\n"
             )
-            shared_file.write_text(header + "\n".join(all_learnings) + "\n", encoding="utf-8")
+            shared_file.write_text(
+                header + "\n".join(all_learnings) + "\n", encoding="utf-8"
+            )
             return True
         return False
 
@@ -1468,9 +1514,7 @@ class ACEService:
     def onboard_agent(self, agent_id: str):
         """Run onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
         agents_config = self.load_agents()
-        agent = next(
-            (a for a in agents_config.agents if a.id == agent_id), None
-        )
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
         if not agent:
             raise ValueError(f"Agent {agent_id} not found.")
 
@@ -1480,6 +1524,7 @@ class ACEService:
 
         onboarding_file = sop_dir / f"onboarding_{agent_id}.md"
         from ace_lib.sop import sop_engine
+
         content = sop_engine.generate_onboarding_sop(
             agent_id=agent.id,
             name=agent.name,
@@ -1487,7 +1532,7 @@ class ACEService:
             responsibilities=agent.responsibilities,
             memory_file=agent.memory_file,
             status=agent.status,
-            parent_id=agent.parent_id
+            parent_id=agent.parent_id,
         )
         onboarding_file.write_text(content, encoding="utf-8")
 
@@ -1495,7 +1540,8 @@ class ACEService:
         memory_path = self.base_path / agent.memory_file
         if not memory_path.exists():
             memory_path.parent.mkdir(parents=True, exist_ok=True)
-            memory_path.write_text(f"""---
+            memory_path.write_text(
+                f"""---
 name: {agent.role}
 type: role
 ---
@@ -1509,7 +1555,9 @@ type: role
 
 ## Arkitekturella beslut
 <!-- [dec-001] :: Initial decision for {agent.role} -->
-""", encoding="utf-8")
+""",
+                encoding="utf-8",
+            )
 
         # Inject SOP into agent's inbox
         self.send_mail(
@@ -1520,7 +1568,7 @@ type: role
                 f"Your onboarding SOP has been generated: "
                 f"{onboarding_file.relative_to(self.base_path)}\n\n"
                 "Please follow the steps outlined in the file."
-            )
+            ),
         )
 
         return onboarding_file
@@ -1533,6 +1581,7 @@ type: role
 
         review_file = sop_dir / f"review_{pr_id}_{agent_id}.md"
         from ace_lib.sop import sop_engine
+
         content = sop_engine.generate_pr_review_sop(pr_id, agent_id)
         review_file.write_text(content, encoding="utf-8")
 
@@ -1544,7 +1593,7 @@ type: role
             body=(
                 f"You have been assigned to review PR {pr_id}. "
                 f"SOP: {review_file.relative_to(self.base_path)}"
-            )
+            ),
         )
 
         return review_file
@@ -1552,9 +1601,7 @@ type: role
     def audit_agent(self, agent_id: str):
         """Run audit SOP for an agent (PRD-01 / Phase 9.5)."""
         agents_config = self.load_agents()
-        agent = next(
-            (a for a in agents_config.agents if a.id == agent_id), None
-        )
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
         if not agent:
             raise ValueError(f"Agent {agent_id} not found.")
 
@@ -1562,8 +1609,11 @@ type: role
         sop_dir = self.ace_dir / "sops"
         sop_dir.mkdir(exist_ok=True)
 
-        audit_file = sop_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+        audit_file = (
+            sop_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+        )
         from ace_lib.sop import sop_engine
+
         content = sop_engine.generate_audit_sop(agent_id, agent.name)
         audit_file.write_text(content, encoding="utf-8")
 
@@ -1575,7 +1625,7 @@ type: role
             body=(
                 f"An audit of your activities and playbook has been initiated. "
                 f"SOP: {audit_file.relative_to(self.base_path)}"
-            )
+            ),
         )
 
         return audit_file
@@ -1583,9 +1633,7 @@ type: role
     def security_audit(self, agent_id: str):
         """Run security audit SOP for an agent."""
         agents_config = self.load_agents()
-        agent = next(
-            (a for a in agents_config.agents if a.id == agent_id), None
-        )
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
         if not agent:
             raise ValueError(f"Agent {agent_id} not found.")
 
@@ -1593,8 +1641,8 @@ type: role
         sop_dir.mkdir(exist_ok=True)
 
         security_audit_file = (
-            sop_dir /
-            f"security_audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+            sop_dir
+            / f"security_audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
         )
         content = f"""# SOP: Security Audit - {agent.name} ({agent.id})
 - **Auditor**: Orchestrator
@@ -1621,7 +1669,9 @@ type: role
 
     # --- Autonomous Agent Expansion ---
 
-    def check_agent_expansion(self, agent_id: str, threshold: int = 10) -> Optional[str]:
+    def check_agent_expansion(
+        self, agent_id: str, threshold: int = 10
+    ) -> Optional[str]:
         """Check if an agent's complexity exceeds threshold and propose expansion."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
@@ -1637,7 +1687,9 @@ type: role
             complexity += len(entries)
 
         if complexity > threshold:
-            print(f"[EXPANSION] Agent {agent_id} complexity ({complexity}) exceeds threshold ({threshold}).")
+            print(
+                f"[EXPANSION] Agent {agent_id} complexity ({complexity}) exceeds threshold ({threshold})."
+            )
 
             # Propose a sub-agent
             sub_agent_id = f"{agent_id}-sub-{datetime.now().strftime('%H%M%S')}"
@@ -1652,7 +1704,7 @@ type: role
                 proposer_id="orchestrator",
                 title=proposal_title,
                 description=proposal_desc,
-                agent_ids=[agent_id, "orchestrator"]
+                agent_ids=[agent_id, "orchestrator"],
             )
 
             return sub_agent_id
@@ -1676,12 +1728,12 @@ type: role
             f"- **Responsibilities**: {', '.join(responsibilities)}\n"
             f"- **Parent Agent**: {parent_agent_id}\n"
         )
-        
+
         proposal = self.create_macp_proposal(
             proposer_id=parent_agent_id,
             title=proposal_title,
             description=proposal_desc,
-            agent_ids=[parent_agent_id, "orchestrator"]
+            agent_ids=[parent_agent_id, "orchestrator"],
         )
         return proposal
 
@@ -1693,6 +1745,7 @@ type: role
         api_key = self.get_stitch_key()
 
         from ace_lib.stitch.stitch_engine import generate_mockup, extract_components
+
         mockup_url, ui_code = generate_mockup(description, agent_id, api_key)
         mockup_id = mockup_url.split("/")[-1]
 
@@ -1743,18 +1796,23 @@ type: role
         try:
             # We check if playwright is installed by trying to import it
             from playwright.sync_api import sync_playwright
+
             print(f"[STITCH] Running visual verification for {mockup_id}...")
-            
+
             with sync_playwright() as p:
                 browser = p.chromium.launch()
                 page = browser.new_page()
-                
+
                 # In a real scenario, we'd render the TSX.
                 # For this implementation, we simulate by checking if the code is valid TSX/JSX
                 # and maybe doing a simple HTML render if it's pure HTML.
                 # Here we just take a "screenshot" of a blank page to show it works.
-                page.set_content(f"<html><body><div id='root'>Rendering {mockup_id}...</div></body></html>")
-                screenshot_path = self.ace_dir / "ui_mockups" / f"{mockup_id}_screenshot.png"
+                page.set_content(
+                    f"<html><body><div id='root'>Rendering {mockup_id}...</div></body></html>"
+                )
+                screenshot_path = (
+                    self.ace_dir / "ui_mockups" / f"{mockup_id}_screenshot.png"
+                )
                 page.screenshot(path=str(screenshot_path))
                 browser.close()
 
@@ -1765,7 +1823,7 @@ type: role
                 f"Timestamp: {datetime.now().isoformat()}\n"
                 f"Screenshot: {screenshot_path.name}\n"
                 f"Details: Playwright verification completed successfully.",
-                encoding="utf-8"
+                encoding="utf-8",
             )
         except ImportError:
             # Playwright not installed, skip verification
@@ -1778,7 +1836,7 @@ type: role
                 f"Status: FAILED\n"
                 f"Timestamp: {datetime.now().isoformat()}\n"
                 f"Error: {str(e)}",
-                encoding="utf-8"
+                encoding="utf-8",
             )
 
     def _generate_mockup_with_agent(self, description: str) -> str:
@@ -1796,15 +1854,14 @@ type: role
             env["CURSOR_API_KEY"] = cursor_key
 
         agent_cmd = (
-            "cursor-agent --print --model gemini-3-flash --force --trust "
-            f'"{prompt}"'
+            f'cursor-agent --print --model gemini-3-flash --force --trust "{prompt}"'
         )
 
         print(f"[STITCH] Generating mockup via agent for: {description}")
         result = subprocess.run(
             agent_cmd, shell=True, capture_output=True, text=True, env=env
         )
-        
+
         code_match = re.search(
             r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
             result.stdout,
@@ -1818,6 +1875,7 @@ type: role
         components_dir.mkdir(parents=True, exist_ok=True)
 
         from ace_lib.stitch import stitch_engine
+
         components = stitch_engine.extract_components(code)
         for name, content in components.items():
             (components_dir / f"{name}.tsx").write_text(content, encoding="utf-8")
@@ -1829,6 +1887,7 @@ type: role
         api_key = self.get_stitch_key()
 
         from ace_lib.stitch import stitch_engine
+
         ui_code = stitch_engine.sync_mockup(url, api_key)
         if ui_code:
             # Perform visual diffing if we have an existing mockup (PRD-01 / Phase 8.3)
@@ -1846,13 +1905,16 @@ type: role
                         print(f"[STITCH] Visual diff detected for {mockup_id}.")
                         # In a real scenario, we'd use a visual diffing tool.
                         # For now, we log the diff.
-                        diff_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
+                        diff_file = (
+                            self.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
+                        )
                         import difflib
+
                         diff = difflib.unified_diff(
                             old_code.splitlines(),
                             ui_code.splitlines(),
                             fromfile="local",
-                            tofile="stitch"
+                            tofile="stitch",
                         )
                         diff_file.write_text("\n".join(diff))
 
@@ -1890,9 +1952,7 @@ type: role
 
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
-        agent = next(
-            (a for a in agents_config.agents if a.id == agent_id), None
-        )
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
         if not agent:
             return 0
         return self.prune_memory(agent, threshold)
@@ -1956,7 +2016,7 @@ type: role
         # 3. Pitfalls (mis) are only archived if they have extremely high helpful counts
         #    (meaning they are no longer relevant or too obvious).
         # 4. Decisions (dec) are never archived via this logic as they are historical records.
-        
+
         pattern = (
             r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)"
             r"\s*::\s*(.*?) -->"
@@ -1974,7 +2034,7 @@ type: role
 
             should_archive = False
             if l_type == "str":
-                if utility < 0: # More harmful than helpful
+                if utility < 0:  # More harmful than helpful
                     should_archive = True
                 elif helpful < usage_threshold and harmful > 0:
                     # Low usage and has caused some harm
@@ -1986,11 +2046,11 @@ type: role
                 # Pitfalls are archived if they are "solved" or too obvious
                 if helpful > 20 and harmful == 0:
                     should_archive = True
-            
+
             if should_archive:
                 pruned_count += 1
                 return f"<!-- [ARCHIVED] {match.group(0)} -->"
-            
+
             return match.group(0)
 
         new_content = re.sub(pattern, adaptive_prune_match, content)
@@ -2050,7 +2110,9 @@ type: role
         md_file.write_text(md_content, encoding="utf-8")
         return spec
 
-    def automate_spec_update(self, spec_id: str, session_output: str) -> Optional[LivingSpec]:
+    def automate_spec_update(
+        self, spec_id: str, session_output: str
+    ) -> Optional[LivingSpec]:
         """Automatically update a living spec based on session output (Phase 10.23)."""
         spec = self.get_spec(spec_id)
         if not spec:
@@ -2070,8 +2132,10 @@ type: role
             f"Current Verification: {spec.verification or 'None'}\n\n"
             f"Session Output:\n{session_output}\n\n"
             "Extract the actual technical implementation details and verification results. "
-            "Format your output as a JSON object with 'implementation', 'verification', and 'status' (draft/implemented/verified).\n"
-            "Example: {\"implementation\": \"Added auth middleware in /src/middleware/auth.ts\", \"verification\": \"All 5 tests passed in test_auth.py\", \"status\": \"verified\"}"
+            "Format your output as a JSON object with 'implementation', 'verification', "
+            "and 'status' (draft/implemented/verified).\n"
+            'Example: {"implementation": "Added auth middleware in /src/middleware/auth.ts", '
+            '"verification": "All 5 tests passed in test_auth.py", "status": "verified"}'
         )
 
         try:
@@ -2081,6 +2145,7 @@ type: role
                 messages=[{"role": "user", "content": prompt}],
             )
             import json
+
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
             json_match = re.search(r"\{.*\}", content, re.DOTALL)
             if json_match:
@@ -2097,12 +2162,11 @@ type: role
 
         return spec
 
-    def create_spec(self, id: str, title: str, intent: str, constraints: List[str] = None) -> LivingSpec:
+    def create_spec(
+        self, id: str, title: str, intent: str, constraints: List[str] = None
+    ) -> LivingSpec:
         spec = LivingSpec(
-            id=id,
-            title=title,
-            intent=intent,
-            constraints=constraints or []
+            id=id, title=title, intent=intent, constraints=constraints or []
         )
         return self.save_spec(spec)
 
@@ -2124,7 +2188,7 @@ type: role
             r"<!-- \[(str|mis|dec)-([^\]]+)\]"
             r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
         )
-        
+
         learnings = []
         for match in re.finditer(pattern, content):
             l_type, l_id, helpful, harmful, desc = match.groups()
@@ -2135,7 +2199,7 @@ type: role
                 type=l_type,
                 description=desc,
                 helpful=int(helpful or 0),
-                harmful=int(harmful or 0)
+                harmful=int(harmful or 0),
             )
             learnings.append(learning)
 
@@ -2143,7 +2207,7 @@ type: role
         export_file = target_dir / f"learnings_{self.base_path.name}_{agent_id}.yaml"
         with open(export_file, "w", encoding="utf-8") as f:
             yaml.dump([learning.model_dump(mode="json") for learning in learnings], f)
-        
+
         return learnings
 
     def import_learnings(self, source_file: Path, agent_id: str):
@@ -2180,26 +2244,28 @@ type: role
             # 1. Filter low-value
             if learning.harmful > learning.helpful:
                 continue
-            
+
             # 3. Anonymize/Clean description (Phase 10.10)
             # Replace potential project names or local paths with generic placeholders
             clean_desc = learning.description
             # Simple heuristic: replace /Users/... or C:\... with <PATH>
-            clean_desc = re.sub(r'(/Users/\w+|[A-Z]:\\[\w\\]+)', '<PATH>', clean_desc)
-            
+            clean_desc = re.sub(r"(/Users/\w+|[A-Z]:\\[\w\\]+)", "<PATH>", clean_desc)
+
             full_import_desc = f"[X-PROJ from {learning.source_project}] {clean_desc}"
-            
+
             # 2. Check for duplicates
             if full_import_desc in existing_content:
                 continue
-            
-            updates.append({
-                "type": learning.type,
-                "id": "NEW",
-                "helpful": learning.helpful,
-                "harmful": learning.harmful,
-                "description": full_import_desc
-            })
+
+            updates.append(
+                {
+                    "type": learning.type,
+                    "id": "NEW",
+                    "helpful": learning.helpful,
+                    "harmful": learning.harmful,
+                    "description": full_import_desc,
+                }
+            )
             import_count += 1
 
         if updates:
@@ -2234,14 +2300,19 @@ type: role
         path: str,
         priority: str = "medium",
         notify_on_success: bool = True,
-        notify_on_failure: bool = True
+        notify_on_failure: bool = True,
     ):
         from ace_lib.models.schemas import NotificationPriority
+
         config = self.load_subscriptions()
         # Avoid exact duplicates
         existing = next(
-            (s for s in config.subscriptions if s.agent_id == agent_id and s.path == path),
-            None
+            (
+                s
+                for s in config.subscriptions
+                if s.agent_id == agent_id and s.path == path
+            ),
+            None,
         )
         if existing:
             # Update existing subscription
@@ -2249,27 +2320,35 @@ type: role
             existing.notify_on_success = notify_on_success
             existing.notify_on_failure = notify_on_failure
         else:
-            config.subscriptions.append(Subscription(
-                agent_id=agent_id,
-                path=path,
-                priority=NotificationPriority(priority),
-                notify_on_success=notify_on_success,
-                notify_on_failure=notify_on_failure
-            ))
+            config.subscriptions.append(
+                Subscription(
+                    agent_id=agent_id,
+                    path=path,
+                    priority=NotificationPriority(priority),
+                    notify_on_success=notify_on_success,
+                    notify_on_failure=notify_on_failure,
+                )
+            )
         self.save_subscriptions(config)
         return True
 
-    def notify_subscribers(self, changed_path: str, change_description: str, success: bool = True):
+    def notify_subscribers(
+        self, changed_path: str, change_description: str, success: bool = True
+    ):
         config = self.load_subscriptions()
         for sub in config.subscriptions:
             if changed_path.startswith(sub.path):
                 # Check if notification is desired for this outcome
-                if (success and not sub.notify_on_success) or (not success and not sub.notify_on_failure):
+                if (success and not sub.notify_on_success) or (
+                    not success and not sub.notify_on_failure
+                ):
                     continue
 
-                priority_prefix = f"[{sub.priority.upper()}] " if sub.priority != "medium" else ""
+                priority_prefix = (
+                    f"[{sub.priority.upper()}] " if sub.priority != "medium" else ""
+                )
                 status_str = "SUCCESS" if success else "FAILURE"
-                
+
                 self.send_mail(
                     to_agent=sub.agent_id,
                     from_agent="orchestrator",
@@ -2279,12 +2358,13 @@ type: role
                         f"Path: {changed_path}\n"
                         f"Priority: {sub.priority}\n"
                         f"Change: {change_description}"
-                    )
+                    ),
                 )
 
     def get_profiler_logs(self) -> List[Dict]:
         """Read profiler logs from the JSONL file."""
         import json
+
         log_file = Path(".ace/profiling.jsonl")
         if not log_file.exists():
             return []
@@ -2300,12 +2380,21 @@ type: role
 
     # --- Task Decomposition & Delegation ---
 
-    def decompose_task(self, task_description: str, agent_id: Optional[str] = None) -> List[Dict]:
+    def decompose_task(
+        self, task_description: str, agent_id: Optional[str] = None
+    ) -> List[Dict]:
         """Decompose a complex task into smaller sub-tasks using an LLM."""
         import json
+
         client = self.get_anthropic_client()
         if not client:
-            return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
+            return [
+                {
+                    "id": "subtask-1",
+                    "description": task_description,
+                    "status": "pending",
+                }
+            ]
 
         prompt = (
             "You are an ACE Task Decomposer. Your goal is to break down a complex coding task "
@@ -2313,8 +2402,8 @@ type: role
             f"Original Task: {task_description}\n\n"
             "Format your output as a JSON list of objects, each with 'id', 'description', "
             "and 'estimated_complexity' (1-10).\n"
-            "Example: [{\"id\": \"task-1\", \"description\": \"Implement auth middleware\", "
-            "\"estimated_complexity\": 5}]"
+            'Example: [{"id": "task-1", "description": "Implement auth middleware", '
+            '"estimated_complexity": 5}]'
         )
 
         try:
@@ -2331,12 +2420,26 @@ type: role
                 for st in subtasks:
                     st["status"] = "pending"
                 return subtasks
-            return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
+            return [
+                {
+                    "id": "subtask-1",
+                    "description": task_description,
+                    "status": "pending",
+                }
+            ]
         except Exception as e:
             print(f"Error decomposing task: {e}")
-            return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
+            return [
+                {
+                    "id": "subtask-1",
+                    "description": task_description,
+                    "status": "pending",
+                }
+            ]
 
-    def delegate_tasks(self, subtasks: List[Dict], parent_agent_id: str) -> Dict[str, str]:
+    def delegate_tasks(
+        self, subtasks: List[Dict], parent_agent_id: str
+    ) -> Dict[str, str]:
         """Delegate sub-tasks to existing or new sub-agents."""
         delegations = {}
         agents_config = self.load_agents()
@@ -2346,12 +2449,14 @@ type: role
             # or assign to a new sub-agent if complexity is high.
             assigned_agent_id = None
             desc = task["description"].lower()
-            
+
             for agent in agents_config.agents:
-                if agent.role.lower() in desc or any(r.lower() in desc for r in agent.responsibilities):
+                if agent.role.lower() in desc or any(
+                    r.lower() in desc for r in agent.responsibilities
+                ):
                     assigned_agent_id = agent.id
                     break
-            
+
             if not assigned_agent_id:
                 # If no existing agent matches, and complexity is high, propose a new one
                 if task.get("estimated_complexity", 0) > 7:
@@ -2360,17 +2465,17 @@ type: role
                     # In a real scenario, we'd trigger an MACP proposal here
                 else:
                     assigned_agent_id = parent_agent_id
-            
+
             delegations[task["id"]] = assigned_agent_id
-            
+
             # Notify the assigned agent via mail
             self.send_mail(
                 to_agent=assigned_agent_id,
                 from_agent=parent_agent_id,
                 subject=f"DELEGATED TASK: {task['id']}",
-                body=f"You have been delegated the following sub-task:\n\n{task['description']}"
+                body=f"You have been delegated the following sub-task:\n\n{task['description']}",
             )
-            
+
         return delegations
 
     def synthesize_memories(self, agent_id: str) -> List[Dict]:
@@ -2401,15 +2506,17 @@ type: role
             # 2. Critical pitfall: m > 3
             # 3. High frequency: (h + m) > 10
             if (h - m) > 5 or m > 3 or (h + m) > 10:
-                learnings.append({
-                    "type": l_type,
-                    "id": l_id,
-                    "helpful": h,
-                    "harmful": m,
-                    "description": desc,
-                    "agent_id": agent_id,
-                    "utility": h - m
-                })
+                learnings.append(
+                    {
+                        "type": l_type,
+                        "id": l_id,
+                        "helpful": h,
+                        "harmful": m,
+                        "description": desc,
+                        "agent_id": agent_id,
+                        "utility": h - m,
+                    }
+                )
 
         if not learnings:
             return []
@@ -2425,8 +2532,11 @@ type: role
             return learnings
 
         learnings_str = "\n".join(
-            [f"- [{item['type']}-{item['id']}] {item['description']} "
-             f"(H:{item['helpful']}, M:{item['harmful']})" for item in learnings]
+            [
+                f"- [{item['type']}-{item['id']}] {item['description']} "
+                f"(H:{item['helpful']}, M:{item['harmful']})"
+                for item in learnings
+            ]
         )
         prompt = (
             f"You are the ACE Memory Synthesizer. Analyze the following learnings from agent {agent_id} "
@@ -2435,8 +2545,8 @@ type: role
             "Phase 10.13 Refinement: Focus on cross-cutting concerns and reusable patterns. "
             "Identify if multiple specific strategies point to a single broader principle.\n\n"
             "Format your output as a JSON list of objects with 'type' (str/mis), 'description', and 'justification'.\n"
-            "Example: [{\"type\": \"str\", \"description\": \"Use centralized error handling for all API calls\", "
-            "\"justification\": \"Multiple instances of [str-001] and [str-005] show this reduces boilerplate.\"}]"
+            'Example: [{"type": "str", "description": "Use centralized error handling for all API calls", '
+            '"justification": "Multiple instances of [str-001] and [str-005] show this reduces boilerplate."}]'
         )
 
         try:
@@ -2446,6 +2556,7 @@ type: role
                 messages=[{"role": "user", "content": prompt}],
             )
             import json
+
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
             json_match = re.search(r"\[.*\]", content, re.DOTALL)
             if json_match:
@@ -2473,17 +2584,17 @@ type: role
             l_type = s.get("type", "str")
             desc = s.get("description")
             just = s.get("justification", "")
-            
+
             # Avoid duplicates
             if desc in content:
                 continue
-                
-            ts = datetime.now().strftime('%H%M%S')
+
+            ts = datetime.now().strftime("%H%M%S")
             entry = (
                 f"<!-- [syn-{l_type}-{agent_id}-{ts}] helpful=1 harmful=0 :: "
                 f"{desc} (Justification: {just}) -->\n"
             )
-            
+
             section_map = {
                 "str": "## Strategier & patterns",
                 "mis": "## Kända fallgropar",
@@ -2494,7 +2605,7 @@ type: role
                 content = parts[0] + header + "\n" + entry + parts[1]
             else:
                 content += f"\n{header}\n{entry}"
-        
+
         shared_file.write_text(content, encoding="utf-8")
 
     # --- Token Monitoring ---
@@ -2510,7 +2621,7 @@ type: role
                 data = yaml.load(f)
                 if data:
                     usages = data
-        
+
         usages.append(usage.model_dump())
         with open(usage_file, "w", encoding="utf-8") as f:
             yaml.dump(usages, f)

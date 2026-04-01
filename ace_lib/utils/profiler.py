@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable
 from datetime import datetime
 
+
 class Profiler:
     def __init__(self, log_file: Path = Path(".ace/profiling.jsonl")):
         self.log_file = log_file
@@ -17,19 +18,21 @@ class Profiler:
             result = func(*args, **kwargs)
             end_time = time.perf_counter()
             duration = end_time - start_time
-            
+
             log_entry = {
                 "timestamp": datetime.now().isoformat(),
                 "function": func.__name__,
                 "duration_seconds": duration,
                 "args_count": len(args),
-                "kwargs_keys": list(kwargs.keys())
+                "kwargs_keys": list(kwargs.keys()),
             }
-            
+
             with open(self.log_file, "a") as f:
                 f.write(json.dumps(log_entry) + "\n")
-                
+
             return result
+
         return wrapper
+
 
 profiler = Profiler()

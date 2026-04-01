@@ -8,7 +8,14 @@ import re
 from pathlib import Path
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import (
-    Agent, Decision, TokenMode, TaskType, Config, OwnershipConfig, MailMessage, SubscriptionsConfig
+    Agent,
+    Decision,
+    TokenMode,
+    TaskType,
+    Config,
+    OwnershipConfig,
+    MailMessage,
+    SubscriptionsConfig,
 )
 
 # Configure logging
@@ -37,6 +44,7 @@ async def log_requests(request: Request, call_next):
     )
     return response
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {exc}", exc_info=True)
@@ -57,7 +65,7 @@ async def create_agent(
     name: str = Body(...),
     role: str = Body(...),
     email: Optional[str] = Body(None),
-    responsibilities: List[str] = Body([])
+    responsibilities: List[str] = Body([]),
 ):
     try:
         return service.create_agent(id, name, role, email, responsibilities)
@@ -71,10 +79,7 @@ async def get_ownership():
 
 
 @app.post("/ownership")
-async def assign_ownership(
-    path: str = Body(...),
-    agent_id: str = Body(...)
-):
+async def assign_ownership(path: str = Body(...), agent_id: str = Body(...)):
     return service.assign_ownership(path, agent_id)
 
 
@@ -82,11 +87,9 @@ async def assign_ownership(
 async def build_context(
     path: Optional[str] = None,
     task_type: TaskType = TaskType.IMPLEMENT,
-    agent_id: Optional[str] = None
+    agent_id: Optional[str] = None,
 ):
-    context, resolved_agent_id = service.build_context(
-        path, task_type, agent_id
-    )
+    context, resolved_agent_id = service.build_context(path, task_type, agent_id)
     return {"context": context, "agent_id": resolved_agent_id}
 
 
@@ -102,7 +105,7 @@ async def add_decision(
     decision: str = Body(...),
     consequences: str = Body(...),
     status: str = Body("accepted"),
-    agent_id: Optional[str] = Body(None)
+    agent_id: Optional[str] = Body(None),
 ):
     return service.add_decision(
         title, context, decision, consequences, status, agent_id
@@ -140,16 +143,14 @@ async def send_mail(
     to_agent: str = Body(...),
     from_agent: str = Body(...),
     subject: str = Body(...),
-    body: str = Body(...)
+    body: str = Body(...),
 ):
     return service.send_mail(to_agent, from_agent, subject, body)
 
 
 @app.post("/debate")
 async def debate(
-    proposal: str = Body(...),
-    agent_ids: List[str] = Body(...),
-    turns: int = Body(3)
+    proposal: str = Body(...), agent_ids: List[str] = Body(...), turns: int = Body(3)
 ):
     consensus = service.debate(proposal, agent_ids, turns)
     return {"consensus": consensus}
@@ -161,7 +162,7 @@ async def run_loop(
     test_cmd: str = Body(...),
     max_iterations: int = Body(10),
     path: Optional[str] = Body(None),
-    agent_id: Optional[str] = Body(None)
+    agent_id: Optional[str] = Body(None),
 ):
     success, iterations = service.run_loop(
         prompt, test_cmd, max_iterations, path, agent_id
@@ -194,10 +195,7 @@ async def review_pr(pr_id: str, agent_id: str = Body(..., embed=True)):
 
 
 @app.post("/ui/mockup")
-async def ui_mockup(
-    description: str = Body(...),
-    agent_id: str = Body(...)
-):
+async def ui_mockup(description: str = Body(...), agent_id: str = Body(...)):
     url = service.ui_mockup(description, agent_id)
     return {"url": url}
 
@@ -227,13 +225,10 @@ async def reflect_session(session_id: str):
     if not content:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    output_match = re.search(
-        r"## Output\n```\n(.*?)\n```", content, re.DOTALL
-    )
+    output_match = re.search(r"## Output\n```\n(.*?)\n```", content, re.DOTALL)
     if not output_match:
         raise HTTPException(
-            status_code=400,
-            detail="Could not find output section in session log"
+            status_code=400, detail="Could not find output section in session log"
         )
 
     reflection_text = service.reflect_on_session(output_match.group(1))
@@ -246,11 +241,8 @@ async def reflect_session(session_id: str):
         if agent_id_match and agent_id_match.group(1) != "None":
             agents_config = service.load_agents()
             agent = next(
-                (
-                    a for a in agents_config.agents
-                    if a.id == agent_id_match.group(1)
-                ),
-                None
+                (a for a in agents_config.agents if a.id == agent_id_match.group(1)),
+                None,
             )
             if agent:
                 playbook_path = Path(agent.memory_file)
@@ -264,7 +256,8 @@ async def prune_memory(agent_id: Optional[str] = None, threshold: int = 0):
     agents_config = service.load_agents()
     agents = (
         [a for a in agents_config.agents if a.id == agent_id]
-        if agent_id else agents_config.agents
+        if agent_id
+        else agents_config.agents
     )
 
     results = {}
@@ -295,11 +288,14 @@ async def subscribe(
     path: str = Body(...),
     priority: str = Body("medium"),
     notify_on_success: bool = Body(True),
-    notify_on_failure: bool = Body(True)
+    notify_on_failure: bool = Body(True),
 ):
-    return service.subscribe(agent_id, path, priority, notify_on_success, notify_on_failure)
+    return service.subscribe(
+        agent_id, path, priority, notify_on_success, notify_on_failure
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

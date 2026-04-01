@@ -72,9 +72,7 @@ def test_get_context(client):
         "/agents",
         json={"id": "test-agent", "name": "Test Agent", "role": "tester"},
     )
-    client.post(
-        "/ownership", json={"path": "src/test", "agent_id": "test-agent"}
-    )
+    client.post("/ownership", json={"path": "src/test", "agent_id": "test-agent"})
 
     response = client.get("/context", params={"path": "src/test"})
     assert response.status_code == 200
@@ -113,8 +111,7 @@ def test_review_pr(client):
 
 def test_ui_mockup(client):
     response = client.post(
-        "/ui/mockup",
-        json={"description": "Login page", "agent_id": "test-agent"}
+        "/ui/mockup", json={"description": "Login page", "agent_id": "test-agent"}
     )
     assert response.status_code == 200
     assert "url" in response.json()
@@ -123,15 +120,13 @@ def test_ui_mockup(client):
 def test_debate(client, monkeypatch):
     # Mock debate to avoid LLM call
     import ace_api.main
+
     monkeypatch.setattr(
-        ace_api.main.service,
-        "debate",
-        lambda p, a, t=3: "Consensus reached"
+        ace_api.main.service, "debate", lambda p, a, t=3: "Consensus reached"
     )
 
     response = client.post(
-        "/debate",
-        json={"proposal": "Use FastAPI", "agent_ids": ["agent-1", "agent-2"]}
+        "/debate", json={"proposal": "Use FastAPI", "agent_ids": ["agent-1", "agent-2"]}
     )
     assert response.status_code == 200
     assert response.json()["consensus"] == "Consensus reached"
@@ -140,16 +135,12 @@ def test_debate(client, monkeypatch):
 def test_loop(client, monkeypatch):
     # Mock run_loop to avoid execution
     import ace_api.main
+
     monkeypatch.setattr(
-        ace_api.main.service,
-        "run_loop",
-        lambda p, t, m, path, aid: (True, 1)
+        ace_api.main.service, "run_loop", lambda p, t, m, path, aid: (True, 1)
     )
 
-    response = client.post(
-        "/loop",
-        json={"prompt": "Fix bug", "test_cmd": "pytest"}
-    )
+    response = client.post("/loop", json={"prompt": "Fix bug", "test_cmd": "pytest"})
     assert response.status_code == 200
     assert response.json()["success"] is True
     assert response.json()["iterations"] == 1

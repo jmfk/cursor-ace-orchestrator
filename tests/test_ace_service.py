@@ -24,9 +24,7 @@ def test_init_directories(service, temp_workspace):
 
 def test_agent_creation(service):
     """Test creating an agent."""
-    agent = service.create_agent(
-        id="test-agent", name="Test Agent", role="tester"
-    )
+    agent = service.create_agent(id="test-agent", name="Test Agent", role="tester")
     assert agent.id == "test-agent"
     assert agent.role == "tester"
 
@@ -82,10 +80,7 @@ def test_audit_sop(service):
 def test_mail_system(service):
     """Test sending and reading mail."""
     service.send_mail(
-        to_agent="agent-b",
-        from_agent="agent-a",
-        subject="Hello",
-        body="Test body"
+        to_agent="agent-b", from_agent="agent-a", subject="Hello", body="Test body"
     )
 
     messages = service.list_mail("agent-b")
@@ -105,7 +100,7 @@ def test_decision_management(service):
         context="Need a web framework",
         decision="Use FastAPI for the backend",
         consequences="Fast and type-safe",
-        agent_id="architect-1"
+        agent_id="architect-1",
     )
     assert decision.id == "ADR-001"
     assert decision.title == "Use FastAPI"
@@ -127,9 +122,7 @@ def test_context_building(service):
     playbook = service.cursor_rules_dir / "developer.mdc"
     playbook.write_text("Developer playbook")
 
-    context, agent_id = service.build_context(
-        path="src/main.py", agent_id="dev-1"
-    )
+    context, agent_id = service.build_context(path="src/main.py", agent_id="dev-1")
 
     assert agent_id == "dev-1"
     assert "GLOBAL RULES" in context
@@ -170,15 +163,15 @@ def test_playbook_update(service):
             "id": "NEW",
             "helpful": 1,
             "harmful": 0,
-            "description": "New strategy"
+            "description": "New strategy",
         },
         {
             "type": "mis",
             "id": "NEW",
             "helpful": 0,
             "harmful": 1,
-            "description": "New pitfall"
-        }
+            "description": "New pitfall",
+        },
     ]
 
     success = service.update_playbook(playbook_path, updates)
@@ -218,13 +211,10 @@ def test_stitch_mockup(service, monkeypatch):
     # Mock generate_mockup
     mock_url = "https://stitch.google.com/canvas/test_mockup"
     mock_code = (
-        "// Generated via Stitch API\n"
-        "export const Mockup = () => <div>Mockup</div>;"
+        "// Generated via Stitch API\nexport const Mockup = () => <div>Mockup</div>;"
     )
     monkeypatch.setattr(
-        stitch_engine,
-        "generate_mockup",
-        lambda *args, **kwargs: (mock_url, mock_code)
+        stitch_engine, "generate_mockup", lambda *args, **kwargs: (mock_url, mock_code)
     )
 
     # Mock extract_components to avoid real regex
@@ -233,18 +223,14 @@ def test_stitch_mockup(service, monkeypatch):
         "extract_components",
         lambda *args, **kwargs: {
             "Mockup": "export const Mockup = () => <div>Mockup</div>;"
-        }
+        },
     )
 
     # Mock get_stitch_key
     monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
 
     # Mock _generate_mockup_with_agent to avoid subprocess call
-    monkeypatch.setattr(
-        service,
-        "_generate_mockup_with_agent",
-        lambda desc: mock_code
-    )
+    monkeypatch.setattr(service, "_generate_mockup_with_agent", lambda desc: mock_code)
 
     url = service.ui_mockup("Login page", "agent-1")
     assert url == mock_url
@@ -269,23 +255,20 @@ def test_stitch_sync(service, monkeypatch):
     mockup_dir = service.ace_dir / "ui_mockups"
     mockup_dir.mkdir(parents=True, exist_ok=True)
     mockup_file = mockup_dir / f"{mockup_id}.md"
-    mockup_file.write_text("""# UI Mockup
+    mockup_file.write_text(
+        """# UI Mockup
 ## Design & Code
 ```tsx
 export const Test = () => <div>Old Test</div>;
 ```
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
     new_code = "export const Test = () => <div>New Test</div>;"
+    monkeypatch.setattr(stitch_engine, "sync_mockup", lambda *args, **kwargs: new_code)
     monkeypatch.setattr(
-        stitch_engine,
-        "sync_mockup",
-        lambda *args, **kwargs: new_code
-    )
-    monkeypatch.setattr(
-        stitch_engine,
-        "extract_components",
-        lambda *args, **kwargs: {"Test": new_code}
+        stitch_engine, "extract_components", lambda *args, **kwargs: {"Test": new_code}
     )
 
     # Mock get_stitch_key
@@ -324,7 +307,9 @@ def test_memory_synthesis(service, monkeypatch):
     mock_client = MagicMock()
     mock_message = MagicMock()
     mock_message.content = [
-        MagicMock(text='[{"type": "str", "description": "Synthesized Pattern", "justification": "Test"}]')
+        MagicMock(
+            text='[{"type": "str", "description": "Synthesized Pattern", "justification": "Test"}]'
+        )
     ]
     mock_client.messages.create.return_value = mock_message
     monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
@@ -365,18 +350,14 @@ def test_ralph_loop_reflection_integration(service, monkeypatch):
     monkeypatch.setattr(
         service,
         "reflect_on_session",
-        lambda x: (
-            "[str-NEW] helpful=1 harmful=0 :: New strategy from loop"
-        )
+        lambda x: "[str-NEW] helpful=1 harmful=0 :: New strategy from loop",
     )
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     # Setup playbook
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     playbook_path = service.cursor_rules_dir / "developer.mdc"
-    playbook_path.write_text(
-        "# Developer Playbook\n## Strategier & patterns\n"
-    )
+    playbook_path.write_text("# Developer Playbook\n## Strategier & patterns\n")
 
     service.create_agent(id="dev-1", name="Dev 1", role="developer")
 
@@ -394,7 +375,7 @@ def test_ralph_loop_reflection_integration(service, monkeypatch):
         agent_id="dev-1",
         plan_file=str(plan_path),
         max_spend=10.0,
-        model="test-model"
+        model="test-model",
     )
 
     assert success is True
@@ -433,7 +414,7 @@ def test_multi_turn_debate(service, monkeypatch):
         proposer_id="agent-1",
         title="Use GraphQL",
         description="We should use GraphQL",
-        agent_ids=["agent-1", "agent-2"]
+        agent_ids=["agent-1", "agent-2"],
     )
 
     # Set token mode to HIGH to ensure full turns
@@ -442,9 +423,7 @@ def test_multi_turn_debate(service, monkeypatch):
     service.save_config(config)
 
     consensus = service.debate(
-        proposal_id=proposal.id,
-        agent_ids=["agent-1", "agent-2"],
-        turns=2
+        proposal_id=proposal.id, agent_ids=["agent-1", "agent-2"], turns=2
     )
 
     assert consensus == "Perspective or Consensus"
@@ -485,7 +464,7 @@ def test_consensus_debate(service, monkeypatch):
         proposer_id="agent-1",
         title="Use FastAPI",
         description="We should use FastAPI",
-        agent_ids=["agent-1", "agent-2"]
+        agent_ids=["agent-1", "agent-2"],
     )
 
     # Set token mode
@@ -494,9 +473,7 @@ def test_consensus_debate(service, monkeypatch):
     service.save_config(config)
 
     consensus = service.debate(
-        proposal_id=proposal.id,
-        agent_ids=["agent-1", "agent-2"],
-        turns=1
+        proposal_id=proposal.id, agent_ids=["agent-1", "agent-2"], turns=1
     )
 
     assert "FastAPI" in consensus
@@ -507,14 +484,14 @@ def test_consensus_debate(service, monkeypatch):
 def test_subscriptions_and_notifications(service):
     """Test agent subscriptions and notifications."""
     service.create_agent(id="sub-agent", name="Sub Agent", role="developer")
-    
+
     # Subscribe
     success = service.subscribe("sub-agent", "src/auth")
     assert success is True
-    
+
     # Notify
     service.notify_subscribers("src/auth/login.py", "Added login logic")
-    
+
     # Check mail
     messages = service.list_mail("sub-agent")
     assert len(messages) == 1
@@ -525,16 +502,17 @@ def test_subscriptions_and_notifications(service):
 def test_token_usage_logging(service):
     """Test logging token usage."""
     from ace_lib.models.schemas import TokenUsage
+
     usage = TokenUsage(
         agent_id="test-agent",
         session_id="test-session",
         prompt_tokens=100,
         completion_tokens=50,
         total_tokens=150,
-        cost=0.001
+        cost=0.001,
     )
     service.log_token_usage(usage)
-    
+
     report = service.get_token_report("test-agent")
     assert len(report) == 1
     assert report[0].total_tokens == 150
@@ -569,9 +547,7 @@ def test_vector_memory(service):
 def test_agent_hierarchy(service):
     """Test agent hierarchy and sub-agent creation."""
     service.create_agent(id="parent", name="Parent Agent", role="lead")
-    service.create_agent(
-        id="child", name="Child Agent", role="dev", parent_id="parent"
-    )
+    service.create_agent(id="child", name="Child Agent", role="dev", parent_id="parent")
 
     # Reload parent to check sub_agent_ids
     agents_config = service.load_agents()
@@ -587,9 +563,7 @@ def test_agent_hierarchy(service):
 def test_onboarding_sop_with_parent(service):
     """Test generating onboarding SOP with parent agent."""
     service.create_agent(id="parent", name="Parent Agent", role="lead")
-    service.create_agent(
-        id="child", name="Child Agent", role="dev", parent_id="parent"
-    )
+    service.create_agent(id="child", name="Child Agent", role="dev", parent_id="parent")
     onboarding_file = service.onboard_agent("child")
 
     assert onboarding_file.exists()
@@ -618,6 +592,7 @@ def test_adaptive_context_pruning(service):
     # Set token mode to HIGH to include more sessions
     config = service.load_config()
     from ace_lib.models.schemas import TokenMode
+
     config.token_mode = TokenMode.HIGH
     service.save_config(config)
 
@@ -652,14 +627,14 @@ def test_adaptive_memory_pruning(service):
     # Adaptive prune
     pruned_count = service.adaptive_memory_prune("dev-1", usage_threshold=5)
 
-    assert pruned_count == 4 # str-001, str-003, str-004, and mis-002 should be pruned
+    assert pruned_count == 4  # str-001, str-003, str-004, and mis-002 should be pruned
     content = playbook_path.read_text()
     assert "[ARCHIVED] <!-- [str-001]" in content
     assert "[ARCHIVED] <!-- [str-003]" in content
     assert "[ARCHIVED] <!-- [str-004]" in content
     assert "[ARCHIVED] <!-- [mis-002]" in content
     assert "<!-- [str-002]" in content
-    assert "<!-- [mis-001]" in content # Common pitfalls are kept
+    assert "<!-- [mis-001]" in content  # Common pitfalls are kept
 
 
 def test_living_spec_automation(service, monkeypatch):
@@ -667,18 +642,20 @@ def test_living_spec_automation(service, monkeypatch):
     from unittest.mock import MagicMock
 
     # Setup spec
-    spec = service.create_spec(
+    service.create_spec(
         id="test-spec",
         title="Test Spec",
         intent="Test Intent",
-        constraints=["Constraint 1"]
+        constraints=["Constraint 1"],
     )
 
     # Mock LLM
     mock_client = MagicMock()
     mock_message = MagicMock()
     mock_message.content = [
-        MagicMock(text='{"implementation": "Implemented feature X", "verification": "Passed all tests", "status": "verified"}')
+        MagicMock(
+            text='{"implementation": "Implemented feature X", "verification": "Passed all tests", "status": "verified"}'
+        )
     ]
     mock_client.messages.create.return_value = mock_message
     monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)

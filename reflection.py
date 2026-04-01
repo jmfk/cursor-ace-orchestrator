@@ -60,9 +60,7 @@ class ReflectionEngine:
         for match in re.finditer(self.DEC_PATTERN, text, re.MULTILINE):
             result.entries.append(
                 ReflectionEntry(
-                    id=match.group(1),
-                    type="dec",
-                    content=match.group(2).strip()
+                    id=match.group(1), type="dec", content=match.group(2).strip()
                 )
             )
 
@@ -104,8 +102,9 @@ class PlaybookUpdater:
             with open(self.playbook_path, "w") as f:
                 f.write(new_content)
 
-    def _update_section(self, content: str, section_header: str,
-                        entry: ReflectionEntry) -> str:
+    def _update_section(
+        self, content: str, section_header: str, entry: ReflectionEntry
+    ) -> str:
         """Update a section with a new or existing entry."""
         # Find the section
         section_start = content.find(section_header)
@@ -115,8 +114,7 @@ class PlaybookUpdater:
             section_start = content.find(section_header)
 
         # Find the end of the section (next header or end of file)
-        next_section = content.find(
-            "\n## ", section_start + len(section_header))
+        next_section = content.find("\n## ", section_start + len(section_header))
         if next_section == -1:
             section_content = content[section_start:]
             post_content = ""
@@ -129,9 +127,7 @@ class PlaybookUpdater:
         if entry_id_marker in section_content:
             # Update existing entry
             if entry.type == "dec":
-                new_entry_line = (
-                    f"<!-- [dec-{entry.id}] :: {entry.content} -->"
-                )
+                new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
                 old_entry_pattern = rf"<!-- \[dec-{entry.id}\] :: .*? -->"
             else:
                 new_entry_line = (
@@ -146,15 +142,15 @@ class PlaybookUpdater:
 
             match = re.search(old_entry_pattern, section_content)
             if match:
-                section_content = (section_content[:match.start()] +
-                                   new_entry_line +
-                                   section_content[match.end():])
+                section_content = (
+                    section_content[: match.start()]
+                    + new_entry_line
+                    + section_content[match.end() :]
+                )
         else:
             # Add new entry
             if entry.type == "dec":
-                new_entry_line = (
-                    f"<!-- [dec-{entry.id}] :: {entry.content} -->"
-                )
+                new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
             else:
                 new_entry_line = (
                     f"<!-- [{entry.type}-{entry.id}] "
@@ -162,8 +158,6 @@ class PlaybookUpdater:
                     f"{entry.content} -->"
                 )
 
-            section_content = (
-                section_content.rstrip() + f"\n{new_entry_line}\n"
-            )
+            section_content = section_content.rstrip() + f"\n{new_entry_line}\n"
 
         return content[:section_start] + section_content + post_content

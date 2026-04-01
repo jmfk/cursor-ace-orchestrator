@@ -13,9 +13,12 @@ def test_ui_mockup_command(tmp_path, monkeypatch):
 
     # Mock load_agents to return a test agent
     test_agent = Agent(
-        id="ui-agent-01", name="Vogue", role="ui-agent",
-        email="vogue@ace.local", memory_file=".cursor/rules/ui.mdc",
-        status="active"
+        id="ui-agent-01",
+        name="Vogue",
+        role="ui-agent",
+        email="vogue@ace.local",
+        memory_file=".cursor/rules/ui.mdc",
+        status="active",
     )
 
     def mock_load_agents():
@@ -49,9 +52,12 @@ def test_ui_sync_command(tmp_path, monkeypatch):
 
     # Mock load_agents to return a test agent
     test_agent = Agent(
-        id="ui-agent-01", name="Vogue", role="ui-agent",
-        email="vogue@ace.local", memory_file=".cursor/rules/ui.mdc",
-        status="active"
+        id="ui-agent-01",
+        name="Vogue",
+        role="ui-agent",
+        email="vogue@ace.local",
+        memory_file=".cursor/rules/ui.mdc",
+        status="active",
     )
 
     def mock_load_agents():
@@ -61,9 +67,7 @@ def test_ui_sync_command(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # Run ace ui sync
-    result = runner.invoke(
-        app, ["ui", "sync", "https://stitch.google.com/canvas/123"]
-    )
+    result = runner.invoke(app, ["ui", "sync", "https://stitch.google.com/canvas/123"])
 
     assert result.exit_code == 0
     assert "Syncing UI code from:" in result.stdout

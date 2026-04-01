@@ -29,13 +29,13 @@ def test_ownership_longest_prefix_match(temp_ace_dir, monkeypatch):
     """Test that ownership is resolved using longest prefix match."""
     # Setup ownership
     from ace import reset_service
+
     reset_service(temp_ace_dir)
     monkeypatch.setenv("ACE_API_URL", "http://non-existent-url")
 
     config = OwnershipConfig()
     config.modules["src/auth"] = OwnershipModule(agent_id="auth-agent")
-    config.modules["src/auth/special"] = OwnershipModule(
-        agent_id="special-agent")
+    config.modules["src/auth/special"] = OwnershipModule(agent_id="special-agent")
     save_ownership(config)
 
     # Test matching
@@ -65,6 +65,7 @@ def test_agent_registry(temp_ace_dir, monkeypatch):
     """Test agent creation and listing in the registry."""
     # Ensure we are not using the global service from ace.py
     import ace
+
     svc = ACEService(temp_ace_dir)
 
     monkeypatch.setattr(ace, "service", svc)
@@ -81,10 +82,7 @@ def test_agent_registry(temp_ace_dir, monkeypatch):
     # Create agent
     result = runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Test", "--role", "tester",
-            "--id", "test-01"
-        ]
+        ["agent", "create", "--name", "Test", "--role", "tester", "--id", "test-01"],
     )
     assert result.exit_code == 0
     assert "Created agent Test" in result.stdout
@@ -97,10 +95,7 @@ def test_agent_registry(temp_ace_dir, monkeypatch):
     # Duplicate ID
     result = runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Test2", "--role", "tester",
-            "--id", "test-01"
-        ]
+        ["agent", "create", "--name", "Test2", "--role", "tester", "--id", "test-01"],
     )
     assert result.exit_code == 1
     assert "Error: Agent with ID test-01 already exists." in result.stdout
@@ -109,6 +104,7 @@ def test_agent_registry(temp_ace_dir, monkeypatch):
 def test_config_tokens(temp_ace_dir, monkeypatch):
     """Test setting and loading token consumption mode."""
     from ace import app, reset_service
+
     reset_service(temp_ace_dir)
 
     from typer.testing import CliRunner
@@ -130,6 +126,7 @@ def test_config_tokens(temp_ace_dir, monkeypatch):
 def test_build_context(temp_ace_dir, monkeypatch):
     """Test composing the context slice for an agent call."""
     import ace
+
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -148,9 +145,7 @@ def test_build_context(temp_ace_dir, monkeypatch):
 
     # Setup agent and playbook
     runner.invoke(
-        app,
-        ["agent", "create", "--name", "Auth", "--role", "auth",
-         "--id", "auth-01"]
+        app, ["agent", "create", "--name", "Auth", "--role", "auth", "--id", "auth-01"]
     )
     playbook = rules_dir / "auth.mdc"
     playbook.write_text("Auth playbook content")
@@ -161,10 +156,7 @@ def test_build_context(temp_ace_dir, monkeypatch):
     # Build context
     result = runner.invoke(
         app,
-        [
-            "build-context", "--path", "src/auth/login.ts",
-            "--task-type", "implement"
-        ]
+        ["build-context", "--path", "src/auth/login.ts", "--task-type", "implement"],
     )
     assert result.exit_code == 0
     assert "GLOBAL RULES" in result.stdout
@@ -173,14 +165,14 @@ def test_build_context(temp_ace_dir, monkeypatch):
     assert "Auth playbook content" in result.stdout
     assert "TASK FRAMING" in result.stdout
     assert (
-        "You are implementing new functionality in src/auth/login.ts"
-        in result.stdout
+        "You are implementing new functionality in src/auth/login.ts" in result.stdout
     )
 
 
 def test_run_session_logging(temp_ace_dir, monkeypatch):
     """Test that running a command logs the session correctly."""
     from ace import app, reset_service
+
     reset_service(temp_ace_dir)
 
     from typer.testing import CliRunner
@@ -214,6 +206,7 @@ def test_run_session_logging(temp_ace_dir, monkeypatch):
 def test_session_continuity(temp_ace_dir, monkeypatch):
     """Test that recent sessions are included in the context."""
     import ace
+
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -271,10 +264,20 @@ def test_update_playbook(tmp_path):
 """)
 
     updates = [
-        {"type": "str", "id": "NEW", "helpful": 1,
-            "harmful": 0, "description": "New strategy"},
-        {"type": "dec", "id": "001", "helpful": 0,
-            "harmful": 0, "description": "Existing decision"},
+        {
+            "type": "str",
+            "id": "NEW",
+            "helpful": 1,
+            "harmful": 0,
+            "description": "New strategy",
+        },
+        {
+            "type": "dec",
+            "id": "001",
+            "helpful": 0,
+            "harmful": 0,
+            "description": "Existing decision",
+        },
     ]
 
     # Add new
@@ -283,7 +286,9 @@ def test_update_playbook(tmp_path):
     assert "[str-001] helpful=1 harmful=0 :: New strategy" in content
 
     # Update existing (simulated by adding it first then updating)
-    playbook.write_text(content + "\n<!-- [dec-001] :: Existing decision -->", encoding="utf-8")
+    playbook.write_text(
+        content + "\n<!-- [dec-001] :: Existing decision -->", encoding="utf-8"
+    )
     updates[1]["description"] = "Updated decision"
     update_playbook(playbook, updates[1:])
     content = playbook.read_text(encoding="utf-8")
@@ -294,6 +299,7 @@ def test_update_playbook(tmp_path):
 def test_decision_management(temp_ace_dir, monkeypatch):
     """Test adding and listing architectural decisions."""
     from ace import app, reset_service
+
     reset_service(temp_ace_dir)
 
     from typer.testing import CliRunner
@@ -356,6 +362,7 @@ def test_decision_management(temp_ace_dir, monkeypatch):
 def test_memory_prune(temp_ace_dir, monkeypatch):
     """Test pruning harmful strategies from an agent's memory."""
     from ace import app, reset_service
+
     reset_service(temp_ace_dir)
 
     from typer.testing import CliRunner
@@ -365,10 +372,7 @@ def test_memory_prune(temp_ace_dir, monkeypatch):
     # Setup agent and playbook with harmful strategy
     runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Test", "--role", "tester",
-            "--id", "test-01"
-        ]
+        ["agent", "create", "--name", "Test", "--role", "tester", "--id", "test-01"],
     )
 
     playbook_path = Path(".cursor/rules/tester.mdc")
@@ -388,13 +392,17 @@ def test_memory_prune(temp_ace_dir, monkeypatch):
 
     # Verify file content
     content = playbook_path.read_text(encoding="utf-8")
-    assert "<!-- [PRUNED] <!-- [str-001] helpful=1 harmful=5 :: Bad strategy --> -->" in content
+    assert (
+        "<!-- [PRUNED] <!-- [str-001] helpful=1 harmful=5 :: Bad strategy --> -->"
+        in content
+    )
     assert "<!-- [str-002] helpful=5 harmful=1 :: Good strategy -->" in content
 
 
 def test_memory_sync(temp_ace_dir, monkeypatch):
     """Test syncing AGENTS.md with the registry and decisions."""
     from ace import app, reset_service
+
     reset_service(temp_ace_dir)
 
     from typer.testing import CliRunner
@@ -405,9 +413,15 @@ def test_memory_sync(temp_ace_dir, monkeypatch):
     runner.invoke(
         app,
         [
-            "agent", "create", "--name", "Auth Agent", "--role", "auth",
-            "--id", "auth-01"
-        ]
+            "agent",
+            "create",
+            "--name",
+            "Auth Agent",
+            "--role",
+            "auth",
+            "--id",
+            "auth-01",
+        ],
     )
     runner.invoke(
         app,
@@ -442,6 +456,7 @@ def test_memory_sync(temp_ace_dir, monkeypatch):
 def test_mail_system(temp_ace_dir, monkeypatch):
     """Test the agent mail system."""
     import ace
+
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -455,26 +470,27 @@ def test_mail_system(temp_ace_dir, monkeypatch):
     # Create agents
     runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Agent A", "--role", "role-a",
-            "--id", "agent-a"
-        ]
+        ["agent", "create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"],
     )
     runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Agent B", "--role", "role-b",
-            "--id", "agent-b"
-        ]
+        ["agent", "create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"],
     )
 
     # Send mail
     result = runner.invoke(
         app,
         [
-            "mail-send", "--to", "agent-b", "--from", "agent-a",
-            "--subject", "Hello", "--body", "How are you?"
-        ]
+            "mail-send",
+            "--to",
+            "agent-b",
+            "--from",
+            "agent-a",
+            "--subject",
+            "Hello",
+            "--body",
+            "How are you?",
+        ],
     )
     assert result.exit_code == 0
     assert "Message sent from agent-a to agent-b" in result.stdout
@@ -502,6 +518,7 @@ def test_mail_system(temp_ace_dir, monkeypatch):
 def test_debate(temp_ace_dir, monkeypatch):
     """Test the debate command."""
     import ace
+
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -512,8 +529,9 @@ def test_debate(temp_ace_dir, monkeypatch):
         # Call the original debate logic but it will fail at client creation
         # So we just manually do what debate does before failing
         for aid in agent_ids:
-            svc.send_mail(aid, "orchestrator", "DEBATE PROPOSAL",
-                          f"Proposal: {proposal}")
+            svc.send_mail(
+                aid, "orchestrator", "DEBATE PROPOSAL", f"Proposal: {proposal}"
+            )
         return "Consensus reached."
 
     monkeypatch.setattr(svc, "debate", mocked_debate)
@@ -526,17 +544,11 @@ def test_debate(temp_ace_dir, monkeypatch):
     # Create agents
     runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Agent A", "--role", "role-a",
-            "--id", "agent-a"
-        ]
+        ["agent", "create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"],
     )
     runner.invoke(
         app,
-        [
-            "agent", "create", "--name", "Agent B", "--role", "role-b",
-            "--id", "agent-b"
-        ]
+        ["agent", "create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"],
     )
 
     # Initiate debate
@@ -544,12 +556,23 @@ def test_debate(temp_ace_dir, monkeypatch):
     result = runner.invoke(
         app,
         [
-            "macp", "propose", "--title", "Use Python", "--desc", "Python is good",
-            "--from", "agent-a", "--agent", "agent-a", "--agent", "agent-b"
-        ]
+            "macp",
+            "propose",
+            "--title",
+            "Use Python",
+            "--desc",
+            "Python is good",
+            "--from",
+            "agent-a",
+            "--agent",
+            "agent-a",
+            "--agent",
+            "agent-b",
+        ],
     )
     assert result.exit_code == 0
     import re
+
     proposal_id_match = re.search(r"MACP-\d+-\d+", result.stdout)
     assert proposal_id_match
     proposal_id = proposal_id_match.group(0)
@@ -557,9 +580,15 @@ def test_debate(temp_ace_dir, monkeypatch):
     result = runner.invoke(
         app,
         [
-            "debate", proposal_id, "--agent", "agent-a",
-            "--agent", "agent-b", "--turns", "2"
-        ]
+            "debate",
+            proposal_id,
+            "--agent",
+            "agent-a",
+            "--agent",
+            "agent-b",
+            "--turns",
+            "2",
+        ],
     )
     assert result.exit_code == 0
     assert "Consensus / Recommendation:" in result.stdout
@@ -573,12 +602,14 @@ def test_debate(temp_ace_dir, monkeypatch):
 def test_ui_mockup(temp_ace_dir, monkeypatch):
     """Test the UI mockup command."""
     from ace import app, reset_service, get_service
+
     reset_service(temp_ace_dir)
     svc = get_service()
 
     # Mock ui_mockup to avoid API call/subprocess
-    monkeypatch.setattr(svc, "ui_mockup", lambda d,
-                        a: "https://stitch.google.com/canvas/mock_123")
+    monkeypatch.setattr(
+        svc, "ui_mockup", lambda d, a: "https://stitch.google.com/canvas/mock_123"
+    )
 
     from typer.testing import CliRunner
 
@@ -594,12 +625,14 @@ def test_ui_mockup(temp_ace_dir, monkeypatch):
 def test_ui_sync(temp_ace_dir, monkeypatch):
     """Test the UI sync command."""
     from ace import app, reset_service, get_service
+
     reset_service(temp_ace_dir)
     svc = get_service()
 
     # Mock ui_sync
     monkeypatch.setattr(
-        svc, "ui_sync", lambda u: "export const UI = () => <div>Mock</div>;")
+        svc, "ui_sync", lambda u: "export const UI = () => <div>Mock</div>;"
+    )
 
     from typer.testing import CliRunner
 
@@ -614,6 +647,7 @@ def test_ui_sync(temp_ace_dir, monkeypatch):
 def test_subscriptions_granular(temp_ace_dir, monkeypatch):
     """Test granular subscription options."""
     import ace
+
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -628,10 +662,13 @@ def test_subscriptions_granular(temp_ace_dir, monkeypatch):
     result = runner.invoke(
         app,
         [
-            "subscribe", "agent-a", "src/auth",
-            "--priority", "high",
-            "--no-notify-on-success"
-        ]
+            "subscribe",
+            "agent-a",
+            "src/auth",
+            "--priority",
+            "high",
+            "--no-notify-on-success",
+        ],
     )
 
     assert result.exit_code == 0
@@ -650,6 +687,7 @@ def test_subscriptions_granular(temp_ace_dir, monkeypatch):
     # Test notification logic
     # Mock send_mail to check if it's called
     sent_mails = []
+
     def mock_send_mail(to_agent, from_agent, subject, body):
         sent_mails.append({"to": to_agent, "subject": subject})
 

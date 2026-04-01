@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict
 from ace_lib.services.ace_service import ACEService
 
+
 class SecurityAuditService:
     def __init__(self, ace_service: ACEService):
         self.ace_service = ace_service
@@ -19,13 +20,15 @@ class SecurityAuditService:
 
         # Find owned modules
         ownership = self.ace_service.load_ownership()
-        owned_paths = [path for path, mod in ownership.modules.items() if mod.agent_id == agent_id]
+        owned_paths = [
+            path for path, mod in ownership.modules.items() if mod.agent_id == agent_id
+        ]
 
         results = {
             "agent_id": agent_id,
             "timestamp": datetime.now().isoformat(),
             "checks": [],
-            "summary": {"passed": 0, "failed": 0, "warnings": 0}
+            "summary": {"passed": 0, "failed": 0, "warnings": 0},
         }
 
         for path in owned_paths:
@@ -51,7 +54,9 @@ class SecurityAuditService:
                     results["summary"]["warnings"] += 1
                 else:
                     results["summary"]["passed"] += 1
-            elif (full_path / "requirements.txt").exists() or (full_path / "pyproject.toml").exists():
+            elif (full_path / "requirements.txt").exists() or (
+                full_path / "pyproject.toml"
+            ).exists():
                 dep_check = self._audit_pip(full_path)
                 results["checks"].append(dep_check)
                 if dep_check["status"] == "failed":
@@ -72,7 +77,7 @@ class SecurityAuditService:
                     f"Summary: {results['summary']['failed']} failures, "
                     f"{results['summary']['warnings']} warnings.\n\n"
                     f"Please review your modules and fix the identified issues."
-                )
+                ),
             )
 
         return results
@@ -92,18 +97,27 @@ class SecurityAuditService:
 
         for root, _, files in os.walk(path):
             for file in files:
-                if file.endswith(('.py', '.js', '.ts', '.tsx', '.json', '.yaml', '.yml', '.env')):
+                if file.endswith(
+                    (".py", ".js", ".ts", ".tsx", ".json", ".yaml", ".yml", ".env")
+                ):
                     file_path = Path(root) / file
                     try:
-                        content = file_path.read_text(encoding='utf-8')
+                        content = file_path.read_text(encoding="utf-8")
                         for name, pattern in patterns.items():
                             matches = re.finditer(pattern, content, re.IGNORECASE)
                             for match in matches:
-                                findings.append({
-                                    "file": str(file_path.relative_to(self.ace_service.base_path)),
-                                    "type": name,
-                                    "line": content.count('\n', 0, match.start()) + 1
-                                })
+                                findings.append(
+                                    {
+                                        "file": str(
+                                            file_path.relative_to(
+                                                self.ace_service.base_path
+                                            )
+                                        ),
+                                        "type": name,
+                                        "line": content.count("\n", 0, match.start())
+                                        + 1,
+                                    }
+                                )
                     except Exception:
                         continue
 
@@ -111,7 +125,7 @@ class SecurityAuditService:
             "name": "Secret Scanning",
             "path": str(path.relative_to(self.ace_service.base_path)),
             "status": "failed" if findings else "passed",
-            "findings": findings
+            "findings": findings,
         }
 
     def _audit_npm(self, path: Path) -> Dict:
@@ -122,25 +136,26 @@ class SecurityAuditService:
                 cwd=path,
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             import json
+
             data = json.loads(result.stdout)
             vulnerabilities = data.get("metadata", {}).get("vulnerabilities", {})
             total_vulnerabilities = sum(vulnerabilities.values())
-            
+
             return {
                 "name": "NPM Dependency Audit",
                 "path": str(path.relative_to(self.ace_service.base_path)),
                 "status": "failed" if total_vulnerabilities > 0 else "passed",
-                "details": vulnerabilities
+                "details": vulnerabilities,
             }
         except Exception:
             return {
                 "name": "NPM Dependency Audit",
                 "path": str(path.relative_to(self.ace_service.base_path)),
                 "status": "warning",
-                "error": "NPM audit failed."
+                "error": "NPM audit failed.",
             }
 
     def _audit_pip(self, path: Path) -> Dict:
@@ -153,21 +168,22 @@ class SecurityAuditService:
                 cwd=path,
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             import json
+
             data = json.loads(result.stdout)
-            
+
             return {
                 "name": "PIP Dependency Audit",
                 "path": str(path.relative_to(self.ace_service.base_path)),
                 "status": "failed" if data else "passed",
-                "details": data
+                "details": data,
             }
         except Exception:
             return {
                 "name": "PIP Dependency Audit",
                 "path": str(path.relative_to(self.ace_service.base_path)),
                 "status": "warning",
-                "error": "Safety check tool not found or failed. Run 'pip install safety'."
+                "error": "Safety check tool not found or failed. Run 'pip install safety'.",
             }

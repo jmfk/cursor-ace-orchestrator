@@ -1,5 +1,8 @@
 from reflection import (
-    ReflectionEngine, ReflectionEntry, ReflectionResult, PlaybookUpdater
+    ReflectionEngine,
+    ReflectionEntry,
+    ReflectionResult,
+    PlaybookUpdater,
 )
 
 
@@ -70,9 +73,7 @@ description: "Test playbook"
     # 2. Update existing decision
     reflections = ReflectionResult(
         entries=[
-            ReflectionEntry(
-                id="001", type="dec", content="Use PostgreSQL."
-            ),
+            ReflectionEntry(id="001", type="dec", content="Use PostgreSQL."),
         ]
     )
     updater.update(reflections)

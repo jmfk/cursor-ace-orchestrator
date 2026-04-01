@@ -13,9 +13,7 @@ def ace_service(tmp_path):
 
 
 def test_agent_creation(ace_service):
-    agent = ace_service.create_agent(
-        id="test-agent", name="Test Agent", role="tester"
-    )
+    agent = ace_service.create_agent(id="test-agent", name="Test Agent", role="tester")
     assert agent.id == "test-agent"
     assert agent.role == "tester"
 
@@ -28,20 +26,14 @@ def test_ownership_resolution(ace_service):
     ace_service.assign_ownership("src/auth", "auth-agent")
     ace_service.assign_ownership("src/auth/login", "login-agent")
 
-    assert (
-        ace_service.resolve_owner("src/auth/utils.py") == "auth-agent"
-    )
-    assert (
-        ace_service.resolve_owner("src/auth/login/form.py") == "login-agent"
-    )
+    assert ace_service.resolve_owner("src/auth/utils.py") == "auth-agent"
+    assert ace_service.resolve_owner("src/auth/login/form.py") == "login-agent"
     assert ace_service.resolve_owner("src/other.py") is None
 
 
 def test_context_building(ace_service):
     # Setup
-    ace_service.create_agent(
-        id="auth-agent", name="Auth Agent", role="auth"
-    )
+    ace_service.create_agent(id="auth-agent", name="Auth Agent", role="auth")
     ace_service.assign_ownership("src/auth", "auth-agent")
 
     playbook_path = ace_service.cursor_rules_dir / "auth.mdc"
@@ -62,10 +54,7 @@ def test_context_building(ace_service):
 
 def test_mail_system(ace_service):
     ace_service.send_mail(
-        to_agent="agent-b",
-        from_agent="agent-a",
-        subject="Hello",
-        body="Test body"
+        to_agent="agent-b", from_agent="agent-a", subject="Hello", body="Test body"
     )
     messages = ace_service.list_mail("agent-b")
     assert len(messages) == 1
@@ -82,13 +71,13 @@ def test_decision_listing(ace_service):
         title="Title 1",
         context="Context 1",
         decision="Decision 1",
-        consequences="Consequences 1"
+        consequences="Consequences 1",
     )
     ace_service.add_decision(
         title="Title 2",
         context="Context 2",
         decision="Decision 2",
-        consequences="Consequences 2"
+        consequences="Consequences 2",
     )
 
     decisions = ace_service.list_decisions()
