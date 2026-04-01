@@ -413,8 +413,9 @@ class ACEService:
             # Simple heuristic: longer description -> higher complexity
             complexity = min(10, max(1, len(task_description) // 100))
         
-        # Max tokens allowed based on complexity (simplified)
-        # Low complexity = tighter window, High complexity = larger window
+        # Max tokens allowed based on complexity
+        # Low complexity (1) = 15,000 chars (~3.7k tokens)
+        # High complexity (10) = 60,000 chars (~15k tokens)
         max_chars = 10000 + (complexity * 5000)
         
         if len(full_context) > max_chars:
@@ -425,14 +426,16 @@ class ACEService:
         return full_context, resolved_agent_id
 
     def prune_context(self, context: str, max_chars: int) -> str:
-        """Prune context by removing less relevant sections or truncating."""
+        """Prune context by removing less relevant sections or truncating (Phase 10.6)."""
         # Priority:
         # 1. Global Rules (Keep)
         # 2. Agent Playbook (Keep)
         # 3. Task Framing (Keep)
-        # 4. Recent Decisions (Prune first)
-        # 5. Recent Sessions (Prune second)
-        # 6. Shared Learnings (Prune third)
+        # 4. RALPH Loop Prompt (Keep)
+        # 5. Recent Decisions (Prune first)
+        # 6. Recent Sessions (Prune second)
+        # 7. Shared Learnings (Prune third)
+        # 8. Vector Search Results (Prune fourth)
         
         sections = context.split("### ")
         if not sections:
@@ -440,6 +443,7 @@ class ACEService:
             
         # Reconstruct with priority
         keep_headers = ["GLOBAL RULES", "AGENT PLAYBOOK", "TASK FRAMING", "RALPH LOOP PROMPT"]
+        prune_priority = ["RECENT DECISIONS", "RECENT SESSIONS", "SHARED LEARNINGS", "RELEVANT MEMORY"]
         
         new_sections = []
         # Always keep the first part (if any) before the first ###
@@ -452,35 +456,58 @@ class ACEService:
 
         # Separate sections
         keep_list = []
-        prune_list = []
+        prune_map = {header: [] for header in prune_priority}
+        other_list = []
         
         for s in sections:
-            header = s.split("\n")[0].strip()
+            header_line = s.split("\n")[0].strip()
             is_keep = False
             for kh in keep_headers:
-                if kh in header:
+                if kh in header_line:
                     keep_list.append("### " + s)
                     is_keep = True
                     break
-            if not is_keep:
-                prune_list.append("### " + s)
+            if is_keep:
+                continue
+                
+            is_prune = False
+            for ph in prune_priority:
+                if ph in header_line:
+                    prune_map[ph].append("### " + s)
+                    is_prune = True
+                    break
+            
+            if not is_prune:
+                other_list.append("### " + s)
         
         # Start building the pruned context
-        pruned_context = "".join(keep_list)
+        pruned_context = "".join(new_sections) + "".join(keep_list)
         
-        # Add prune_list sections until limit
-        for s in prune_list:
+        # Add other sections first (not in prune priority but not in keep)
+        for s in other_list:
             if len(pruned_context) + len(s) < max_chars:
                 pruned_context += s
-            else:
-                # Truncate the last section if we have space
-                remaining = max_chars - len(pruned_context)
-                if remaining > 100:
-                    # Subtract length of truncation message to stay under limit
-                    trunc_msg = "\n... [TRUNCATED] ...\n"
-                    pruned_context += s[:remaining - len(trunc_msg)] + trunc_msg
+        
+        # Add prune_map sections in REVERSE priority (keep most important ones longer)
+        # Actually, we should add them in order of importance.
+        # RELEVANT MEMORY is probably more important than SHARED LEARNINGS, etc.
+        # Let's re-order priority for ADDING:
+        add_priority = ["RELEVANT MEMORY", "SHARED LEARNINGS", "RECENT SESSIONS", "RECENT DECISIONS"]
+
+        for ph in add_priority:
+            for s in prune_map[ph]:
+                if len(pruned_context) + len(s) < max_chars:
+                    pruned_context += s
+                else:
+                    # Truncate the last section if we have space
+                    remaining = max_chars - len(pruned_context)
+                    if remaining > 200:
+                        trunc_msg = "\n... [TRUNCATED] ...\n"
+                        pruned_context += s[:remaining - len(trunc_msg)] + trunc_msg
+                    break
+            if len(pruned_context) >= max_chars:
                 break
-                
+
         return pruned_context
 
     # --- Reflection Engine ---
