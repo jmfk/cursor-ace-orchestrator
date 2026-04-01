@@ -762,6 +762,7 @@ class ACEService:
             return "Consensus: Debate mediation requires ANTHROPIC_API_KEY."
 
         debate_history = []
+        votes = {aid: None for aid in agent_ids}
         
         for turn in range(1, turns + 1):
             turn_perspectives = []
@@ -775,15 +776,15 @@ class ACEService:
                 # Build prompt for the current turn
                 history_str = "\n".join(debate_history) if debate_history else "No previous turns."
                 
-                # Check for human-in-the-loop escalation
-                
                 if turn == 1:
                     prompt = (
                         f"You are agent {aid} with role {role}.\n"
                         f"Review this proposal: {proposal}\n"
                         "Provide your initial perspective, critique, or support. "
                         "Focus on architectural impact and project standards. "
-                        "If you feel this requires human intervention, include the word 'ESCALATE'."
+                        "If you feel this requires human intervention, include the word 'ESCALATE'.\n"
+                        "At the end of your response, provide your current vote as "
+                        "either 'VOTE: SUPPORT', 'VOTE: OPPOSE', or 'VOTE: ABSTAIN'."
                     )
                 else:
                     prompt = (
@@ -792,7 +793,9 @@ class ACEService:
                         f"Debate History:\n{history_str}\n\n"
                         f"This is turn {turn} of {turns}. Review the other agents' perspectives "
                         "and refine your position. Address their concerns or reinforce your points. "
-                        "If you feel this requires human intervention, include the word 'ESCALATE'."
+                        "If you feel this requires human intervention, include the word 'ESCALATE'.\n"
+                        "At the end of your response, provide your current vote as "
+                        "either 'VOTE: SUPPORT', 'VOTE: OPPOSE', or 'VOTE: ABSTAIN'."
                     )
 
                 try:
@@ -816,6 +819,11 @@ class ACEService:
                             f"Perspective: {perspective}"
                         )
                         return msg
+                    
+                    # Extract vote
+                    vote_match = re.search(r"VOTE:\s*(SUPPORT|OPPOSE|ABSTAIN)", perspective.upper())
+                    if vote_match:
+                        votes[aid] = vote_match.group(1)
                         
                     turn_perspectives.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
                 except Exception as e:
@@ -826,12 +834,14 @@ class ACEService:
             debate_history.extend(turn_perspectives)
 
         # Final LLM-Referee logic
+        votes_summary = "\n".join([f"- Agent {aid}: {vote or 'No vote'}" for aid, vote in votes.items()])
         referee_prompt = (
             "You are the ACE Orchestrator Referee. "
             "You must mediate a multi-turn debate between multiple agents and reach "
             "a consensus.\n\n"
             f"Original Proposal: {proposal}\n\n"
             "Full Debate History:\n" + "\n".join(debate_history) + "\n\n"
+            f"Final Votes:\n{votes_summary}\n\n"
             "Analyze the evolution of the debate, identify common ground, and "
             "provide a final recommendation or consensus decision. "
             "If no consensus is reached, explain why and suggest next steps. "
@@ -858,7 +868,10 @@ class ACEService:
                     to_agent=aid,
                     from_agent="orchestrator",
                     subject="DEBATE CONSENSUS REACHED",
-                    body=f"The debate on '{proposal}' has concluded.\n\nConsensus:\n{consensus}"
+                    body=(
+                        f"The debate on '{proposal}' has concluded.\n\n"
+                        f"Consensus:\n{consensus}\n\nFinal Votes:\n{votes_summary}"
+                    )
                 )
                 
             return consensus
@@ -1424,7 +1437,7 @@ class ACEService:
                 browser = p.chromium.launch()
                 page = browser.new_page()
                 
-                # In a real scenario, we'd render the TSX. 
+                # In a real scenario, we'd render the TSX.
                 # For this implementation, we simulate by checking if the code is valid TSX/JSX
                 # and maybe doing a simple HTML render if it's pure HTML.
                 # Here we just take a "screenshot" of a blank page to show it works.
@@ -1560,6 +1573,7 @@ class ACEService:
             return code_match.group(1)
 
         return f"// Error: No code found in mockup {mockup_id}."
+
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
         agent = next(

@@ -331,6 +331,7 @@ def test_multi_turn_debate(service, monkeypatch):
     messages_2 = service.list_mail("agent-2")
     assert len(messages_1) > 0
     assert len(messages_2) > 0
+    assert "Final Votes" in messages_1[0].body
     
     def test_consensus_debate(self, service, monkeypatch):
         """Test consensus debate mediation."""
