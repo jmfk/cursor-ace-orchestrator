@@ -1,12 +1,12 @@
-import typer
 from pathlib import Path
 import os
-from datetime import datetime
-from typing import Optional, List, Dict
 import subprocess
 import tempfile
 import re
+from datetime import datetime
+from typing import Optional, List, Dict
 import requests
+import typer
 from rich.console import Console
 from rich.table import Table
 
@@ -68,7 +68,7 @@ def meta_self_audit():
         # Run a specialized self-reflection on the agent's memory
         playbook_path = svc.base_path / agent.memory_file
         if playbook_path.exists():
-            content = playbook_path.read_text()
+            content = playbook_path.read_text(encoding="utf-8")
             console.print(f"  Analyzing playbook: [dim]{playbook_path.name}[/dim]")
             # Here we could call an LLM to analyze the playbook for consistency
             # For now, we just report the size and count of strategies
@@ -227,11 +227,11 @@ def init():
             lines = []
             if cred_file.exists():
                 lines = [
-                    line for line in cred_file.read_text().splitlines()
+                    line for line in cred_file.read_text(encoding="utf-8").splitlines()
                     if not line.startswith("CURSOR_API_KEY=")
                 ]
             lines.append(f"CURSOR_API_KEY={cursor_key}")
-            cred_file.write_text("\n".join(lines) + "\n")
+            cred_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
             os.chmod(cred_file, 0o600)
             console.print(
                 f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]"
@@ -616,7 +616,7 @@ def run(
 {full_output}
 ```
 """
-    session_file.write_text(session_content)
+    session_file.write_text(session_content, encoding="utf-8")
     console.print(f"Session logged to: [green]{session_file}[/green]")
 
     if exit_code == 0:
@@ -635,7 +635,7 @@ def run(
 
 def _perform_reflection(session_file: Path):
     svc = get_service()
-    session_content = session_file.read_text()
+    session_content = session_file.read_text(encoding="utf-8")
     output_match = re.search(
         r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL
     )
@@ -905,7 +905,7 @@ def memory_sync():
             list(svc.decisions_dir.glob("ADR-*.md")), reverse=True
         )[:5]
         for adr_path in adrs:
-            adr_content = adr_path.read_text()
+            adr_content = adr_path.read_text(encoding="utf-8")
             title_match = re.search(r"# (ADR-\d+: .*)", adr_content)
             status_match = re.search(r"- \*\*Status\*\*: (.*)", adr_content)
             title = (
@@ -920,7 +920,7 @@ def memory_sync():
             )
             content.append(f"- **{title}** [{status}]")
 
-    Path("AGENTS.md").write_text("\n".join(content))
+    Path("AGENTS.md").write_text("\n".join(content), encoding="utf-8")
     console.print("Updated [green]AGENTS.md[/green]")
 
 
@@ -965,7 +965,7 @@ def loop(
         # Try to load from credentials
         cred_file = Path.home() / ".ace" / "credentials"
         if cred_file.exists():
-            for line in cred_file.read_text().splitlines():
+            for line in cred_file.read_text(encoding="utf-8").splitlines():
                 if line.startswith("ANTHROPIC_API_KEY="):
                     anthropic_key = line.split("=", 1)[1].strip()
                     os.environ["ANTHROPIC_API_KEY"] = anthropic_key
@@ -982,7 +982,7 @@ def loop(
     if not cursor_key:
         cred_file = Path.home() / ".ace" / "credentials"
         if cred_file.exists():
-            for line in cred_file.read_text().splitlines():
+            for line in cred_file.read_text(encoding="utf-8").splitlines():
                 if line.startswith("CURSOR_API_KEY="):
                     cursor_key = line.split("=", 1)[1].strip()
                     os.environ["CURSOR_API_KEY"] = cursor_key
@@ -1227,7 +1227,7 @@ def ui_mockup(
     stitch_key = os.getenv("STITCH_API_KEY")
 
     if not stitch_key and cred_file.exists():
-        for line in cred_file.read_text().splitlines():
+        for line in cred_file.read_text(encoding="utf-8").splitlines():
             if line.startswith("STITCH_API_KEY="):
                 stitch_key = line.split("=", 1)[1].strip()
                 os.environ["STITCH_API_KEY"] = stitch_key
@@ -1374,6 +1374,46 @@ def subscribe(
         console.print(
             f"Agent [green]{agent_id}[/green] is already subscribed to [blue]{path}[/blue]"
         )
+
+
+task_app = typer.Typer(help="Task decomposition and delegation commands")
+app.add_typer(task_app, name="task")
+
+
+@task_app.command("delegate")
+def task_delegate(
+    task_description: str = typer.Argument(..., help="The complex task to decompose and delegate"),
+    agent_id: str = typer.Option(..., "--agent", "-a", help="The parent agent ID performing delegation"),
+):
+    """Decompose a complex task and delegate sub-tasks to agents."""
+    svc = get_service()
+    console.print(f"🚀 [bold blue]Decomposing task:[/bold blue] {task_description}")
+    
+    with console.status("[bold green]Analyzing and decomposing..."):
+        subtasks = svc.decompose_task(task_description, agent_id)
+    
+    if not subtasks:
+        console.print("[red]Failed to decompose task.[/red]")
+        return
+
+    table = Table(title="Task Decomposition")
+    table.add_column("ID", style="cyan")
+    table.add_column("Description", style="green")
+    table.add_column("Complexity", style="yellow")
+    
+    for st in subtasks:
+        table.add_row(st["id"], st["description"], str(st.get("estimated_complexity", "N/A")))
+    
+    console.print(table)
+    
+    if typer.confirm("Do you want to delegate these tasks?"):
+        with console.status("[bold green]Delegating tasks..."):
+            delegations = svc.delegate_tasks(subtasks, agent_id)
+        
+        console.print("\n[bold]Delegations:[/bold]")
+        for tid, aid in delegations.items():
+            console.print(f"- Task [cyan]{tid}[/cyan] -> Agent [green]{aid}[/green]")
+        console.print("\n[bold green]Delegation complete. Agents have been notified via mail.[/bold green]")
 
 
 if __name__ == "__main__":

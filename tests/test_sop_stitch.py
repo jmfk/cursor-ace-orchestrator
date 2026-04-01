@@ -37,7 +37,10 @@ def test_stitch_mockup_generation(monkeypatch):
 
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"url": "https://stitch.google.com/canvas/test", "code": "export const App = () => <div>App</div>;"}
+    mock_response.json.return_value = {
+        "url": "https://stitch.google.com/canvas/test",
+        "code": "export const App = () => <div>App</div>;"
+    }
     monkeypatch.setattr(requests, "post", lambda *args, **kwargs: mock_response)
 
     url, code = generate_mockup("Test app", "agent-1", api_key="test-key")

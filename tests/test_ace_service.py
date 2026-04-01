@@ -211,97 +211,97 @@ def test_memory_pruning(service, temp_workspace):
     assert "<!-- [str-002]" in content
 
 
-    def test_stitch_mockup(service, temp_workspace, monkeypatch):
-        """Test Google Stitch mockup generation."""
-        from ace_lib.stitch import stitch_engine
+def test_stitch_mockup(service, temp_workspace, monkeypatch):
+    """Test Google Stitch mockup generation."""
+    from ace_lib.stitch import stitch_engine
 
-        # Mock generate_mockup
-        mock_url = "https://stitch.google.com/canvas/test_mockup"
-        mock_code = (
-            "// Generated via Stitch API\n"
-            "export const Mockup = () => <div>Mockup</div>;"
-        )
-        monkeypatch.setattr(
-            stitch_engine,
-            "generate_mockup",
-            lambda *args, **kwargs: (mock_url, mock_code)
-        )
+    # Mock generate_mockup
+    mock_url = "https://stitch.google.com/canvas/test_mockup"
+    mock_code = (
+        "// Generated via Stitch API\n"
+        "export const Mockup = () => <div>Mockup</div>;"
+    )
+    monkeypatch.setattr(
+        stitch_engine,
+        "generate_mockup",
+        lambda *args, **kwargs: (mock_url, mock_code)
+    )
 
-        # Mock extract_components to avoid real regex
-        monkeypatch.setattr(
-            stitch_engine,
-            "extract_components",
-            lambda *args, **kwargs: {
-                "Mockup": "export const Mockup = () => <div>Mockup</div>;"
-            }
-        )
+    # Mock extract_components to avoid real regex
+    monkeypatch.setattr(
+        stitch_engine,
+        "extract_components",
+        lambda *args, **kwargs: {
+            "Mockup": "export const Mockup = () => <div>Mockup</div>;"
+        }
+    )
 
-        # Mock get_stitch_key
-        monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
+    # Mock get_stitch_key
+    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
 
-        # Mock _generate_mockup_with_agent to avoid subprocess call
-        monkeypatch.setattr(
-            service,
-            "_generate_mockup_with_agent",
-            lambda desc: mock_code
-        )
+    # Mock _generate_mockup_with_agent to avoid subprocess call
+    monkeypatch.setattr(
+        service,
+        "_generate_mockup_with_agent",
+        lambda desc: mock_code
+    )
 
-        url = service.ui_mockup("Login page", "agent-1")
-        assert url == mock_url
+    url = service.ui_mockup("Login page", "agent-1")
+    assert url == mock_url
 
-        mockup_id = url.split("/")[-1]
-        mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
-        assert mockup_file.exists()
-        content = mockup_file.read_text()
-        assert "// Generated via Stitch API" in content
-        assert "Login page" in content
+    mockup_id = url.split("/")[-1]
+    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+    assert mockup_file.exists()
+    content = mockup_file.read_text(encoding="utf-8")
+    assert "// Generated via Stitch API" in content
+    assert "Login page" in content
 
-        # Check component extraction
-        comp_file = service.ace_dir / "ui_mockups" / "components" / mockup_id / "Mockup.tsx"
-        assert comp_file.exists()
+    # Check component extraction
+    comp_file = service.ace_dir / "ui_mockups" / "components" / mockup_id / "Mockup.tsx"
+    assert comp_file.exists()
 
 
-    def test_stitch_sync(service, temp_workspace, monkeypatch):
-        """Test Google Stitch code sync."""
-        from ace_lib.stitch import stitch_engine
+def test_stitch_sync(service, temp_workspace, monkeypatch):
+    """Test Google Stitch code sync."""
+    from ace_lib.stitch import stitch_engine
 
-        mockup_id = "test_mockup"
-        mockup_dir = service.ace_dir / "ui_mockups"
-        mockup_dir.mkdir(parents=True, exist_ok=True)
-        mockup_file = mockup_dir / f"{mockup_id}.md"
-        mockup_file.write_text("""# UI Mockup
-    ## Design & Code
-    ```tsx
-    export const Test = () => <div>Old Test</div>;
-    ```
-    """)
+    mockup_id = "test_mockup"
+    mockup_dir = service.ace_dir / "ui_mockups"
+    mockup_dir.mkdir(parents=True, exist_ok=True)
+    mockup_file = mockup_dir / f"{mockup_id}.md"
+    mockup_file.write_text("""# UI Mockup
+## Design & Code
+```tsx
+export const Test = () => <div>Old Test</div>;
+```
+""", encoding="utf-8")
 
-        new_code = "export const Test = () => <div>New Test</div>;"
-        monkeypatch.setattr(
-            stitch_engine,
-            "sync_mockup",
-            lambda *args, **kwargs: new_code
-        )
-        monkeypatch.setattr(
-            stitch_engine,
-            "extract_components",
-            lambda *args, **kwargs: {"Test": new_code}
-        )
+    new_code = "export const Test = () => <div>New Test</div>;"
+    monkeypatch.setattr(
+        stitch_engine,
+        "sync_mockup",
+        lambda *args, **kwargs: new_code
+    )
+    monkeypatch.setattr(
+        stitch_engine,
+        "extract_components",
+        lambda *args, **kwargs: {"Test": new_code}
+    )
 
-        # Mock get_stitch_key
-        monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
+    # Mock get_stitch_key
+    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
 
-        url = f"https://stitch.google.com/canvas/{mockup_id}"
-        code = service.ui_sync(url)
-        assert code == new_code
+    url = f"https://stitch.google.com/canvas/{mockup_id}"
+    code = service.ui_sync(url)
+    assert code == new_code
 
-        # Check if file was updated
-        content = mockup_file.read_text()
-        assert "New Test" in content
+    # Check if file was updated
+    content = mockup_file.read_text(encoding="utf-8")
+    assert "New Test" in content
 
-        # Check diff file
-        diff_file = mockup_dir / f"{mockup_id}_diff.txt"
-        assert diff_file.exists()
+    # Check diff file
+    diff_file = mockup_dir / f"{mockup_id}_diff.txt"
+    assert diff_file.exists()
 
 
 def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch):
@@ -516,3 +516,34 @@ def test_vector_memory(service, temp_workspace):
     results = service.search_memory("dev-1", "backend")
     assert len(results) > 0
     assert "FastAPI" in results[0]["content"]
+
+
+def test_agent_hierarchy(service):
+    """Test agent hierarchy and sub-agent creation."""
+    service.create_agent(id="parent", name="Parent Agent", role="lead")
+    service.create_agent(
+        id="child", name="Child Agent", role="dev", parent_id="parent"
+    )
+
+    # Reload parent to check sub_agent_ids
+    agents_config = service.load_agents()
+    parent_reloaded = next(a for a in agents_config.agents if a.id == "parent")
+    assert "child" in parent_reloaded.sub_agent_ids
+
+    hierarchy = service.get_agent_hierarchy("parent")
+    assert hierarchy["id"] == "parent"
+    assert len(hierarchy["children"]) == 1
+    assert hierarchy["children"][0]["id"] == "child"
+
+
+def test_onboarding_sop_with_parent(service):
+    """Test generating onboarding SOP with parent agent."""
+    service.create_agent(id="parent", name="Parent Agent", role="lead")
+    service.create_agent(
+        id="child", name="Child Agent", role="dev", parent_id="parent"
+    )
+    onboarding_file = service.onboard_agent("child")
+
+    assert onboarding_file.exists()
+    content = onboarding_file.read_text(encoding="utf-8")
+    assert "- **Parent Agent**: parent" in content

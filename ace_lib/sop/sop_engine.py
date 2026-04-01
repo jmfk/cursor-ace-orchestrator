@@ -7,16 +7,18 @@ def generate_onboarding_sop(
     role: str,
     responsibilities: List[str],
     memory_file: str,
-    status: str
+    status: str,
+    parent_id: str = None
 ) -> str:
     """Generate a formal onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
     resp_str = ", ".join(responsibilities) if responsibilities else "None"
+    parent_info = f"- **Parent Agent**: {parent_id}\n" if parent_id else ""
     return f"""# SOP: Agent Onboarding - {name} ({agent_id})
 - **Role**: {role}
 - **Responsibilities**: {resp_str}
 - **Memory File**: {memory_file}
 - **Status**: {status}
-- **Date**: {datetime.now().isoformat()}
+{parent_info}- **Date**: {datetime.now().isoformat()}
 
 ## 1. Context Acquisition
 - [ ] **Registry**: Read `AGENTS.md` to understand the current agent landscape.

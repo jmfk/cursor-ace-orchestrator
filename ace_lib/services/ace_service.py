@@ -69,7 +69,7 @@ class ACEService:
         if not playbook_path.exists():
             return False
 
-        content = playbook_path.read_text()
+        content = playbook_path.read_text(encoding="utf-8")
         client = self._get_chroma_client()
         collection = client.get_or_create_collection(name=f"playbook_{agent_id}")
 
@@ -107,7 +107,7 @@ class ACEService:
                 query_texts=[query],
                 n_results=n_results
             )
-            
+
             formatted_results = []
             if results["ids"] and results["ids"][0]:
                 for i in range(len(results["ids"][0])):
@@ -139,7 +139,7 @@ class ACEService:
         config_file = self.ace_dir / "config.yaml"
         if not config_file.exists():
             return Config()
-        with open(config_file, "r") as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             return Config(**data) if data else Config()
 
@@ -147,7 +147,7 @@ class ACEService:
         self._cache["config"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         config_file = self.ace_dir / "config.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config.model_dump(mode="json"), f)
 
     # --- Ownership Management ---
@@ -160,7 +160,7 @@ class ACEService:
         ownership_file = self.ace_dir / "ownership.yaml"
         if not ownership_file.exists():
             return OwnershipConfig()
-        with open(ownership_file, "r") as f:
+        with open(ownership_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             return OwnershipConfig(**data) if data else OwnershipConfig()
 
@@ -168,7 +168,7 @@ class ACEService:
         self._cache["ownership"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         ownership_file = self.ace_dir / "ownership.yaml"
-        with open(ownership_file, "w") as f:
+        with open(ownership_file, "w", encoding="utf-8") as f:
             yaml.dump(config.model_dump(mode="json"), f)
 
     def assign_ownership(self, path: str, agent_id: str):
@@ -199,7 +199,7 @@ class ACEService:
         agents_file = self.ace_dir / "agents.yaml"
         if not agents_file.exists():
             return AgentsConfig()
-        with open(agents_file, "r") as f:
+        with open(agents_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             return AgentsConfig(**data) if data else AgentsConfig()
 
@@ -207,7 +207,7 @@ class ACEService:
         self._cache["agents"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         agents_file = self.ace_dir / "agents.yaml"
-        with open(agents_file, "w") as f:
+        with open(agents_file, "w", encoding="utf-8") as f:
             yaml.dump(config.model_dump(mode="json"), f)
 
     def create_agent(
@@ -237,7 +237,7 @@ class ACEService:
             responsibilities=responsibilities or [],
             parent_id=parent_id,
         )
-        
+
         if parent_id:
             parent = next((a for a in config.agents if a.id == parent_id), None)
             if parent:
@@ -341,7 +341,7 @@ class ACEService:
                         f"### AGENT PLAYBOOK ({agent.role})\n"
                         f"{playbook_path.read_text()}"
                     )
-                    
+
                     # 2.1 Vectorized Memory Search (Phase 8.1)
                     # If we have a path or task description, search for relevant entries
                     search_query = path if path else "general tasks"
@@ -363,7 +363,7 @@ class ACEService:
             if decisions:
                 context_parts.append("### RECENT DECISIONS")
                 for d in decisions:
-                    context_parts.append(f"#### {d.name}\n{d.read_text()}")
+                    context_parts.append(f"#### {d.name}\n{d.read_text(encoding='utf-8')}")
 
         # 4. Session continuity
         config = self.load_config()
@@ -384,7 +384,7 @@ class ACEService:
                 context_parts.append("### RECENT SESSIONS")
                 for s in recent_sessions:
                     context_parts.append(
-                        f"#### Session: {s.name}\n{s.read_text()}"
+                        f"#### Session: {s.name}\n{s.read_text(encoding='utf-8')}"
                     )
 
         # 5. Shared learnings
@@ -417,7 +417,7 @@ class ACEService:
         )
         sessions = []
         for s in session_files:
-            content = s.read_text()
+            content = s.read_text(encoding="utf-8")
             # Extract basic metadata from markdown
             command_match = re.search(r"- \*\*Command\*\*: `(.*?)`", content)
             agent_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", content)
@@ -441,7 +441,7 @@ class ACEService:
         session_file = self.sessions_dir / f"session_{session_id}.md"
         if not session_file.exists():
             return None
-        return session_file.read_text()
+        return session_file.read_text(encoding="utf-8")
 
     def get_anthropic_client(self):
         api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -449,12 +449,12 @@ class ACEService:
             # Fallback to ~/.ace/credentials
             cred_file = Path.home() / ".ace" / "credentials"
             if cred_file.exists():
-                for line in cred_file.read_text().splitlines():
+                for line in cred_file.read_text(encoding="utf-8").splitlines():
                     if line.startswith("ANTHROPIC_API_KEY="):
                         api_key = line.split("=", 1)[1].strip()
                         break
         if not api_key:
-            return None # Return None instead of raising error
+            return None  # Return None instead of raising error
         return anthropic.Anthropic(api_key=api_key)
 
     def get_google_client(self):
@@ -463,7 +463,7 @@ class ACEService:
             # Fallback to ~/.ace/credentials
             cred_file = Path.home() / ".ace" / "credentials"
             if cred_file.exists():
-                for line in cred_file.read_text().splitlines():
+                for line in cred_file.read_text(encoding="utf-8").splitlines():
                     if line.startswith("GOOGLE_API_KEY="):
                         api_key = line.split("=", 1)[1].strip()
                         break
@@ -480,7 +480,7 @@ class ACEService:
             # Fallback to ~/.ace/credentials
             cred_file = Path.home() / ".ace" / "credentials"
             if cred_file.exists():
-                for line in cred_file.read_text().splitlines():
+                for line in cred_file.read_text(encoding="utf-8").splitlines():
                     if line.startswith("CURSOR_API_KEY="):
                         api_key = line.split("=", 1)[1].strip()
                         break
@@ -492,7 +492,7 @@ class ACEService:
             # Fallback to ~/.ace/credentials
             cred_file = Path.home() / ".ace" / "credentials"
             if cred_file.exists():
-                for line in cred_file.read_text().splitlines():
+                for line in cred_file.read_text(encoding="utf-8").splitlines():
                     if line.startswith("STITCH_API_KEY="):
                         api_key = line.split("=", 1)[1].strip()
                         break
@@ -569,7 +569,7 @@ class ACEService:
         if not playbook_path.exists():
             return False
 
-        content = playbook_path.read_text()
+        content = playbook_path.read_text(encoding="utf-8")
         agent_id = None
         
         # Try to resolve agent_id from the playbook path
@@ -628,7 +628,7 @@ class ACEService:
                 else:
                     content = content.rstrip() + f"\n\n{header}\n{new_line}\n"
 
-        playbook_path.write_text(content)
+        playbook_path.write_text(content, encoding="utf-8")
         
         # Phase 8.1: Re-index playbook after update
         if agent_id:
@@ -644,7 +644,7 @@ class ACEService:
         adrs = sorted(list(self.decisions_dir.glob("ADR-*.md")))
         decisions = []
         for adr_path in adrs:
-            content = adr_path.read_text()
+            content = adr_path.read_text(encoding="utf-8")
             title_match = re.search(r"# ADR-\d+: (.*)", content)
             status_match = re.search(r"- \*\*Status\*\*: (.*)", content)
             date_match = re.search(r"- \*\*Date\*\*: (.*)", content)
@@ -735,7 +735,7 @@ class ACEService:
             f"## Decision\n{decision}\n\n"
             f"## Consequences\n{consequences}\n"
         )
-        adr_file.write_text(adr_content)
+        adr_file.write_text(adr_content, encoding="utf-8")
         return new_decision
 
     # --- Mail System ---
@@ -747,7 +747,7 @@ class ACEService:
         mail_files = sorted(list(agent_mail_dir.glob("*.yaml")), reverse=True)
         messages = []
         for f in mail_files:
-            with open(f, "r") as m:
+            with open(f, "r", encoding="utf-8") as m:
                 data = yaml.load(m)
                 messages.append(MailMessage(**data))
         return messages
@@ -756,12 +756,12 @@ class ACEService:
         mail_file = self.mail_dir / agent_id / f"{msg_id}.yaml"
         if not mail_file.exists():
             return None
-        with open(mail_file, "r") as f:
+        with open(mail_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
 
         # Mark as read
         data["status"] = "read"
-        with open(mail_file, "w") as f:
+        with open(mail_file, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
         return MailMessage(**data)
@@ -781,7 +781,7 @@ class ACEService:
             body=body,
         )
 
-        with open(agent_mail_dir / f"{msg_id}.yaml", "w") as f:
+        with open(agent_mail_dir / f"{msg_id}.yaml", "w", encoding="utf-8") as f:
             yaml.dump(msg.model_dump(mode="json", by_alias=True), f)
         return msg
 
@@ -800,7 +800,7 @@ class ACEService:
             status=ConsensusStatus.PROPOSED,
             turns_remaining=3,
         )
-        
+
         # Notify agents
         for aid in agent_ids:
             self.send_mail(
@@ -815,20 +815,20 @@ class ACEService:
                     f"Please participate in the debate using 'ace macp debate {proposal_id}'."
                 )
             )
-            
+
         self._save_macp_proposal(proposal)
         return proposal
 
     def _save_macp_proposal(self, proposal: MACPProposal):
         proposal_file = self.macp_dir / f"{proposal.id}.yaml"
-        with open(proposal_file, "w") as f:
+        with open(proposal_file, "w", encoding="utf-8") as f:
             yaml.dump(proposal.model_dump(mode="json"), f)
 
     def get_macp_proposal(self, proposal_id: str) -> Optional[MACPProposal]:
         proposal_file = self.macp_dir / f"{proposal_id}.yaml"
         if not proposal_file.exists():
             return None
-        with open(proposal_file, "r") as f:
+        with open(proposal_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             return MACPProposal(**data) if data else None
 
@@ -838,7 +838,7 @@ class ACEService:
         proposal_files = sorted(list(self.macp_dir.glob("*.yaml")), reverse=True)
         proposals = []
         for f in proposal_files:
-            with open(f, "r") as m:
+            with open(f, "r", encoding="utf-8") as m:
                 data = yaml.load(m)
                 if data:
                     proposals.append(MACPProposal(**data))
@@ -899,7 +899,7 @@ class ACEService:
 
         proposal.status = ConsensusStatus.DEBATING
         proposal.turns_remaining = turns
-        
+
         client = self.get_anthropic_client()
         if not client:
             return "Consensus: Debate mediation requires ANTHROPIC_API_KEY."
@@ -911,7 +911,7 @@ class ACEService:
                 role = agent.role if agent else "expert"
 
                 history_str = "\n".join(proposal.history) if proposal.history else "No previous turns."
-                
+
                 prompt = (
                     f"You are agent {aid} with role {role}.\n"
                     f"MACP Proposal: {proposal.title}\n"
@@ -929,21 +929,21 @@ class ACEService:
                         messages=[{"role": "user", "content": prompt}],
                     )
                     perspective = "".join([b.text for b in message.content if hasattr(b, "text")])
-                    
+
                     if "ESCALATE" in perspective.upper():
                         proposal.status = ConsensusStatus.ESCALATED
                         proposal.history.append(f"Turn {turn} - Agent {aid}: ESCALATED")
                         self._save_macp_proposal(proposal)
                         return f"MACP {proposal_id} ESCALATED by {aid}."
-                    
+
                     vote_match = re.search(r"VOTE:\s*(SUPPORT|OPPOSE|ABSTAIN)", perspective.upper())
                     if vote_match:
                         proposal.votes[aid] = vote_match.group(1)
-                        
+
                     proposal.history.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
                 except Exception as e:
                     proposal.history.append(f"Turn {turn} - Agent {aid}: Error: {e}")
-            
+
             proposal.turns_remaining -= 1
             self._save_macp_proposal(proposal)
 
@@ -967,7 +967,7 @@ class ACEService:
         iteration = 0
         success = False
         state_history = []
-        
+
         # Use provided PRD and plan file or defaults
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
         plan_file = plan_file or "plan.md"
@@ -980,7 +980,7 @@ class ACEService:
             # 0. Initial State Analysis (if it's the first iteration and we have a plan file)
             if iteration == 1 and os.path.exists(prd_path) and os.path.exists(plan_file):
                 print(f"[RALPH] Step 0: Analyzing current project state against {prd_path}...")
-                plan_content = Path(plan_file).read_text()
+                plan_content = Path(plan_file).read_text(encoding="utf-8")
                 analysis_prompt = (
                     f"Analyze the current codebase and project structure relative to {prd_path}. "
                     f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
@@ -1076,7 +1076,7 @@ class ACEService:
                 f"### Stdout\n```\n{result.stdout}\n```\n"
                 f"### Stderr\n```\n{result.stderr}\n```\n"
             )
-            session_file.write_text(session_content)
+            session_file.write_text(session_content, encoding="utf-8")
 
             # 4. Reflection (Phase 4.1)
             reflection_text = ""
@@ -1093,7 +1093,7 @@ class ACEService:
                 )
                 reflection_text = self.reflect_on_session(reflection_input)
                 updates = self.parse_reflection_output(reflection_text)
-                
+
                 # If test failed, ensure we increment harmful for the strategy used
                 # and if it passed, increment helpful (Phase 3.4).
                 if updates:
@@ -1239,7 +1239,7 @@ class ACEService:
         for agent in agents_config.agents:
             playbook_path = self.base_path / agent.memory_file
             if playbook_path.exists():
-                content = playbook_path.read_text()
+                content = playbook_path.read_text(encoding="utf-8")
                 # Extract strategies and pitfalls
                 pattern = r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s*::\s*(.*?) -->"
                 for match in re.finditer(pattern, content):
@@ -1256,7 +1256,7 @@ class ACEService:
                 "---\nname: shared-learnings\ntype: global\n---\n"
                 "# Shared ACE Learnings\n\n## Strategier & patterns\n"
             )
-            shared_file.write_text(header + "\n".join(all_learnings) + "\n")
+            shared_file.write_text(header + "\n".join(all_learnings) + "\n", encoding="utf-8")
             return True
         return False
 
@@ -1274,7 +1274,7 @@ class ACEService:
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sop_dir = self.ace_dir / "sops"
         sop_dir.mkdir(exist_ok=True)
-        
+
         onboarding_file = sop_dir / f"onboarding_{agent_id}.md"
         from ace_lib.sop import sop_engine
         content = sop_engine.generate_onboarding_sop(
@@ -1283,9 +1283,10 @@ class ACEService:
             role=agent.role,
             responsibilities=agent.responsibilities,
             memory_file=agent.memory_file,
-            status=agent.status
+            status=agent.status,
+            parent_id=agent.parent_id
         )
-        onboarding_file.write_text(content)
+        onboarding_file.write_text(content, encoding="utf-8")
 
         # Ensure memory file exists
         memory_path = self.base_path / agent.memory_file
@@ -1305,7 +1306,7 @@ type: role
 
 ## Arkitekturella beslut
 <!-- [dec-001] :: Initial decision for {agent.role} -->
-""")
+""", encoding="utf-8")
 
         # Inject SOP into agent's inbox
         self.send_mail(
@@ -1326,11 +1327,11 @@ type: role
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sop_dir = self.ace_dir / "sops"
         sop_dir.mkdir(exist_ok=True)
-        
+
         review_file = sop_dir / f"review_{pr_id}_{agent_id}.md"
         from ace_lib.sop import sop_engine
         content = sop_engine.generate_pr_review_sop(pr_id, agent_id)
-        review_file.write_text(content)
+        review_file.write_text(content, encoding="utf-8")
 
         # Notify agent of PR review task
         self.send_mail(
@@ -1357,11 +1358,11 @@ type: role
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sop_dir = self.ace_dir / "sops"
         sop_dir.mkdir(exist_ok=True)
-        
+
         audit_file = sop_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
         from ace_lib.sop import sop_engine
         content = sop_engine.generate_audit_sop(agent_id, agent.name)
-        audit_file.write_text(content)
+        audit_file.write_text(content, encoding="utf-8")
 
         # Notify agent of audit
         self.send_mail(
@@ -1412,7 +1413,7 @@ type: role
 - [ ] **Action**: [SECURE/FIX/REVOKE]
 - [ ] **Notes**:
 """
-        security_audit_file.write_text(content)
+        security_audit_file.write_text(content, encoding="utf-8")
         return security_audit_file
 
     # --- Autonomous Agent Expansion ---
@@ -1428,13 +1429,13 @@ type: role
         complexity = len(agent.responsibilities)
         playbook_path = self.base_path / agent.memory_file
         if playbook_path.exists():
-            content = playbook_path.read_text()
+            content = playbook_path.read_text(encoding="utf-8")
             entries = re.findall(r"<!-- \[(str|mis|dec)-.*? -->", content)
             complexity += len(entries)
 
         if complexity > threshold:
             print(f"[EXPANSION] Agent {agent_id} complexity ({complexity}) exceeds threshold ({threshold}).")
-            
+
             # Propose a sub-agent
             sub_agent_id = f"{agent_id}-sub-{datetime.now().strftime('%H%M%S')}"
             proposal_title = f"Autonomous Expansion: {sub_agent_id}"
@@ -1442,7 +1443,7 @@ type: role
                 f"Agent {agent_id} has reached a complexity of {complexity}. "
                 f"Proposing a new sub-agent {sub_agent_id} to handle a subset of responsibilities."
             )
-            
+
             # Use MACP to debate expansion
             self.create_macp_proposal(
                 proposer_id="orchestrator",
@@ -1450,7 +1451,7 @@ type: role
                 description=proposal_desc,
                 agent_ids=[agent_id, "orchestrator"]
             )
-            
+
             return sub_agent_id
         return None
 
@@ -1515,7 +1516,7 @@ type: role
         )
         # Ensure parent directory exists just in case
         mockup_file.parent.mkdir(parents=True, exist_ok=True)
-        mockup_file.write_text(content)
+        mockup_file.write_text(content, encoding="utf-8")
 
         if ui_code:
             components = extract_components(ui_code)
@@ -1532,7 +1533,7 @@ type: role
         components_dir = self.ace_dir / "ui_mockups" / "components" / mockup_id
         components_dir.mkdir(parents=True, exist_ok=True)
         for name, content in components.items():
-            (components_dir / f"{name}.tsx").write_text(content)
+            (components_dir / f"{name}.tsx").write_text(content, encoding="utf-8")
 
     def _verify_stitch_mockup(self, mockup_id: str, code: str):
         """Perform visual verification of the mockup using Playwright (PRD-01 / Phase 7.2)."""
@@ -1562,7 +1563,8 @@ type: role
                 f"Status: PASSED\n"
                 f"Timestamp: {datetime.now().isoformat()}\n"
                 f"Screenshot: {screenshot_path.name}\n"
-                f"Details: Playwright verification completed successfully."
+                f"Details: Playwright verification completed successfully.",
+                encoding="utf-8"
             )
         except ImportError:
             # Playwright not installed, skip verification
@@ -1576,7 +1578,8 @@ type: role
                 f"# Visual Verification: {mockup_id}\n"
                 f"Status: FAILED\n"
                 f"Timestamp: {datetime.now().isoformat()}\n"
-                f"Error: {str(e)}"
+                f"Error: {str(e)}",
+                encoding="utf-8"
             )
 
     def _generate_mockup_with_agent(self, description: str) -> str:
@@ -1618,12 +1621,12 @@ type: role
         from ace_lib.stitch import stitch_engine
         components = stitch_engine.extract_components(code)
         for name, content in components.items():
-            (components_dir / f"{name}.tsx").write_text(content)
+            (components_dir / f"{name}.tsx").write_text(content, encoding="utf-8")
 
     def ui_sync(self, url: str):
         """Sync UI code from Google Stitch with visual diffing (PRD-01 / Phase 8.3)."""
         mockup_id = url.split("/")[-1]
-        
+
         api_key = self.get_stitch_key()
 
         from ace_lib.stitch import stitch_engine
@@ -1663,7 +1666,7 @@ type: role
                 f"## Design & Code\n"
                 f"```tsx\n{ui_code}\n```\n"
             )
-            mockup_file.write_text(content)
+            mockup_file.write_text(content, encoding="utf-8")
             
             # Extract components from synced code
             self._extract_stitch_components(mockup_id, ui_code)
@@ -1674,7 +1677,7 @@ type: role
         if not mockup_file.exists():
             return f"// Error: Mockup {mockup_id} not found locally."
 
-        content = mockup_file.read_text()
+        content = mockup_file.read_text(encoding="utf-8")
         # Extract code block from the mockup file
         code_match = re.search(
             r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
@@ -1700,7 +1703,7 @@ type: role
         if not playbook_path.exists():
             return 0
 
-        content = playbook_path.read_text()
+        content = playbook_path.read_text(encoding="utf-8")
         pattern = (
             r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)"
             r"\s*::\s*(.*?) -->"
@@ -1720,7 +1723,7 @@ type: role
 
         new_content = re.sub(pattern, prune_match, content)
         if pruned_count > 0:
-            playbook_path.write_text(new_content)
+            playbook_path.write_text(new_content, encoding="utf-8")
         return pruned_count
 
     # --- Living Specs Management ---
@@ -1731,7 +1734,7 @@ type: role
         spec_files = sorted(list(self.specs_dir.glob("*.yaml")))
         specs = []
         for f in spec_files:
-            with open(f, "r") as m:
+            with open(f, "r", encoding="utf-8") as m:
                 data = yaml.load(m)
                 if data:
                     specs.append(LivingSpec(**data))
@@ -1741,7 +1744,7 @@ type: role
         spec_file = self.specs_dir / f"{spec_id}.yaml"
         if not spec_file.exists():
             return None
-        with open(spec_file, "r") as f:
+        with open(spec_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             return LivingSpec(**data) if data else None
 
@@ -1749,7 +1752,7 @@ type: role
         self.specs_dir.mkdir(parents=True, exist_ok=True)
         spec_file = self.specs_dir / f"{spec.id}.yaml"
         spec.updated_at = datetime.now().isoformat()
-        with open(spec_file, "w") as f:
+        with open(spec_file, "w", encoding="utf-8") as f:
             yaml.dump(spec.model_dump(), f)
         
         # Also generate/update a markdown version for visibility
@@ -1770,7 +1773,7 @@ type: role
         md_content += f"\n## Implementation\n{spec.implementation or 'TBD'}\n"
         md_content += f"\n## Verification\n{spec.verification or 'TBD'}\n"
         
-        md_file.write_text(md_content)
+        md_file.write_text(md_content, encoding="utf-8")
         return spec
 
     def create_spec(self, id: str, title: str, intent: str, constraints: List[str] = None) -> LivingSpec:
@@ -1795,7 +1798,7 @@ type: role
         if not playbook_path.exists():
             return []
 
-        content = playbook_path.read_text()
+        content = playbook_path.read_text(encoding="utf-8")
         pattern = (
             r"<!-- \[(str|mis|dec)-([^\]]+)\]"
             r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
@@ -1817,7 +1820,7 @@ type: role
 
         target_dir.mkdir(parents=True, exist_ok=True)
         export_file = target_dir / f"learnings_{self.base_path.name}_{agent_id}.yaml"
-        with open(export_file, "w") as f:
+        with open(export_file, "w", encoding="utf-8") as f:
             yaml.dump([learning.model_dump() for learning in learnings], f)
         
         return learnings
@@ -1827,7 +1830,7 @@ type: role
         if not source_file.exists():
             return 0
 
-        with open(source_file, "r") as f:
+        with open(source_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             if not data:
                 return 0
@@ -1867,7 +1870,7 @@ type: role
         sub_file = self.ace_dir / "subscriptions.yaml"
         if not sub_file.exists():
             return SubscriptionsConfig()
-        with open(sub_file, "r") as f:
+        with open(sub_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             return SubscriptionsConfig(**data) if data else SubscriptionsConfig()
 
@@ -1875,7 +1878,7 @@ type: role
         self._cache["subscriptions"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sub_file = self.ace_dir / "subscriptions.yaml"
-        with open(sub_file, "w") as f:
+        with open(sub_file, "w", encoding="utf-8") as f:
             yaml.dump(config.model_dump(), f)
 
     def subscribe(self, agent_id: str, path: str):
@@ -1902,6 +1905,81 @@ type: role
                     )
                 )
 
+    # --- Task Decomposition & Delegation ---
+
+    def decompose_task(self, task_description: str, agent_id: Optional[str] = None) -> List[Dict]:
+        """Decompose a complex task into smaller sub-tasks using an LLM."""
+        client = self.get_anthropic_client()
+        if not client:
+            return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
+
+        prompt = (
+            "You are an ACE Task Decomposer. Your goal is to break down a complex coding task "
+            "into a set of smaller, actionable sub-tasks that can be delegated to different agents.\n\n"
+            f"Original Task: {task_description}\n\n"
+            "Format your output as a JSON list of objects, each with 'id', 'description', "
+            "and 'estimated_complexity' (1-10).\n"
+            "Example: [{\"id\": \"task-1\", \"description\": \"Implement auth middleware\", "
+            "\"estimated_complexity\": 5}]"
+        )
+
+        try:
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            import json
+            content = "".join([b.text for b in message.content if hasattr(b, "text")])
+            # Extract JSON from potential markdown blocks
+            json_match = re.search(r"\[.*\]", content, re.DOTALL)
+            if json_match:
+                subtasks = json.loads(json_match.group(0))
+                for st in subtasks:
+                    st["status"] = "pending"
+                return subtasks
+            return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
+        except Exception as e:
+            print(f"Error decomposing task: {e}")
+            return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
+
+    def delegate_tasks(self, subtasks: List[Dict], parent_agent_id: str) -> Dict[str, str]:
+        """Delegate sub-tasks to existing or new sub-agents."""
+        delegations = {}
+        agents_config = self.load_agents()
+        
+        for task in subtasks:
+            # Simple delegation logic: find an agent whose role matches keywords in the description
+            # or assign to a new sub-agent if complexity is high.
+            assigned_agent_id = None
+            desc = task["description"].lower()
+            
+            for agent in agents_config.agents:
+                if agent.role.lower() in desc or any(r.lower() in desc for r in agent.responsibilities):
+                    assigned_agent_id = agent.id
+                    break
+            
+            if not assigned_agent_id:
+                # If no existing agent matches, and complexity is high, propose a new one
+                if task.get("estimated_complexity", 0) > 7:
+                    new_id = f"{parent_agent_id}-sub-{task['id']}"
+                    assigned_agent_id = new_id
+                    # In a real scenario, we'd trigger an MACP proposal here
+                else:
+                    assigned_agent_id = parent_agent_id
+            
+            delegations[task["id"]] = assigned_agent_id
+            
+            # Notify the assigned agent via mail
+            self.send_mail(
+                to_agent=assigned_agent_id,
+                from_agent=parent_agent_id,
+                subject=f"DELEGATED TASK: {task['id']}",
+                body=f"You have been delegated the following sub-task:\n\n{task['description']}"
+            )
+            
+        return delegations
+
     # --- Token Monitoring ---
 
     def log_token_usage(self, usage: TokenUsage):
@@ -1911,13 +1989,13 @@ type: role
         
         usages = []
         if usage_file.exists():
-            with open(usage_file, "r") as f:
+            with open(usage_file, "r", encoding="utf-8") as f:
                 data = yaml.load(f)
                 if data:
                     usages = data
         
         usages.append(usage.model_dump())
-        with open(usage_file, "w") as f:
+        with open(usage_file, "w", encoding="utf-8") as f:
             yaml.dump(usages, f)
 
     def get_token_report(self, agent_id: Optional[str] = None) -> List[TokenUsage]:
@@ -1925,14 +2003,14 @@ type: role
         usage_file = self.ace_dir / "token_usage.yaml"
         if not usage_file.exists():
             return []
-            
-        with open(usage_file, "r") as f:
+
+        with open(usage_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
             if not data:
                 return []
             usages = [TokenUsage(**u) for u in data]
-            
+
         if agent_id:
             usages = [u for u in usages if u.agent_id == agent_id]
-            
+
         return usages
