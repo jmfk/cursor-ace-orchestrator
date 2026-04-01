@@ -3722,3 +3722,20 @@
 {"timestamp": "2026-04-01T23:32:20.518939", "function": "load_agents", "duration_seconds": 6.249756552278996e-07, "args_count": 1, "kwargs_keys": []}
 {"timestamp": "2026-04-01T23:32:20.522333", "function": "load_agents", "duration_seconds": 2.3792032152414322e-05, "args_count": 1, "kwargs_keys": []}
 {"timestamp": "2026-04-01T23:32:20.523604", "function": "load_agents", "duration_seconds": 6.660120561718941e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.094694", "function": "load_agents", "duration_seconds": 8.849997539073229e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.097217", "function": "load_agents", "duration_seconds": 2.4170149117708206e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.102207", "function": "load_ownership", "duration_seconds": 8.062494453042746e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.102943", "function": "load_ownership", "duration_seconds": 1.2500095181167126e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.103645", "function": "load_ownership", "duration_seconds": 5.830079317092896e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.103697", "function": "resolve_owner", "duration_seconds": 6.0375023167580366e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.103740", "function": "load_ownership", "duration_seconds": 5.00003807246685e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.103906", "function": "resolve_owner", "duration_seconds": 0.0001662090071476996, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.104097", "function": "load_ownership", "duration_seconds": 4.589674063026905e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.104350", "function": "resolve_owner", "duration_seconds": 0.0002520830021239817, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.106710", "function": "load_agents", "duration_seconds": 3.0041032005101442e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.108839", "function": "load_ownership", "duration_seconds": 5.679205060005188e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.123518", "function": "load_ownership", "duration_seconds": 1.3750395737588406e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.123641", "function": "resolve_owner", "duration_seconds": 0.0001278749550692737, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.123704", "function": "load_agents", "duration_seconds": 1.0830117389559746e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.123888", "function": "load_config", "duration_seconds": 4.4082989916205406e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:32:48.123996", "function": "build_context", "duration_seconds": 0.0005815830081701279, "args_count": 1, "kwargs_keys": ["path", "task_type"]}

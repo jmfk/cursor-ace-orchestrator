@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 48
+
+### Added
+- **Phase 7: Future Directions**
+  - Agent Subscriptions: Implemented `ace subscribe` for agents to get notified via Agent Mail when specific modules or dependencies change.
+  - Updated `plan.md` to mark task 7.11 as completed and kept the list sorted.
+
 ## [2026-04-01] - RALPH Loop Iteration 47
 
 ### Added

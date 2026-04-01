@@ -49,7 +49,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **6.6 Security Audit SOP**: Implement `ace agent security-audit` to perform security checks on agent-owned modules.
 - [x] **6.7 Agentic Feedback Loop**: Automate success/failure flagging in RALPH loop based on test-output, connecting write-back to CI/CD.
 
-## Phase 7: Future Directions & Optimization (In Progress)
+## Phase 7: Future Directions & Optimization (Completed)
 - [x] **7.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks using a vector database (e.g., ChromaDB or Qdrant).
 - [x] **7.2 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
 - [x] **7.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
@@ -60,4 +60,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **7.8 Token Consumption Modes (L/M/H)**: Refine the impact of Token Modes on debate depth and context composition.
 - [x] **7.9 Google Stitch Visual Verification**: Implement E2E tests (Playwright) to validate that implemented code matches Stitch mockups.
 - [x] **7.10 Living Specs Sync**: Implement `ace spec sync` to ensure `intent.md` and `verification.md` stay aligned with the actual implementation.
-- [ ] **7.11 Agent Subscriptions**: Implement `ace subscribe` for agents to get notified via Agent Mail when specific modules or dependencies change.
+- [x] **7.11 Agent Subscriptions**: Implement `ace subscribe` for agents to get notified via Agent Mail when specific modules or dependencies change.
+
+## Phase 8: Future Directions (Pending)
+- [ ] **8.1 Multi-Agent Consensus Debate (Advanced)**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
