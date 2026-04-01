@@ -632,12 +632,15 @@ class ACEService:
                 # Build prompt for the current turn
                 history_str = "\n".join(debate_history) if debate_history else "No previous turns."
                 
+                # Check for human-in-the-loop escalation
+                
                 if turn == 1:
                     prompt = (
                         f"You are agent {aid} with role {role}.\n"
                         f"Review this proposal: {proposal}\n"
                         "Provide your initial perspective, critique, or support. "
-                        "Focus on architectural impact and project standards."
+                        "Focus on architectural impact and project standards. "
+                        "If you feel this requires human intervention, include the word 'ESCALATE'."
                     )
                 else:
                     prompt = (
@@ -645,7 +648,8 @@ class ACEService:
                         f"Original Proposal: {proposal}\n"
                         f"Debate History:\n{history_str}\n\n"
                         f"This is turn {turn} of {turns}. Review the other agents' perspectives "
-                        "and refine your position. Address their concerns or reinforce your points."
+                        "and refine your position. Address their concerns or reinforce your points. "
+                        "If you feel this requires human intervention, include the word 'ESCALATE'."
                     )
 
                 try:
@@ -661,6 +665,11 @@ class ACEService:
                             if hasattr(block, "text")
                         ]
                     )
+                    
+                    # Detect escalation
+                    if any(kw in perspective.upper() for kw in ["ESCALATE"]):
+                        return f"DEBATE ESCALATED: Agent {aid} requested human intervention.\nPerspective: {perspective}"
+                        
                     turn_perspectives.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
                 except Exception as e:
                     turn_perspectives.append(
@@ -678,7 +687,8 @@ class ACEService:
             "Full Debate History:\n" + "\n".join(debate_history) + "\n\n"
             "Analyze the evolution of the debate, identify common ground, and "
             "provide a final recommendation or consensus decision. "
-            "If no consensus is reached, explain why and suggest next steps."
+            "If no consensus is reached, explain why and suggest next steps. "
+            "If the debate is too complex or conflicting, suggest human escalation."
         )
 
         try:

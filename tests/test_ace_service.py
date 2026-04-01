@@ -330,6 +330,35 @@ def test_multi_turn_debate(service, monkeypatch):
     assert any(m.subject == "DEBATE CONSENSUS REACHED" for m in messages_1)
 
 
+def test_debate_escalation(service, monkeypatch):
+    """Test human-in-the-loop escalation in debate."""
+    from unittest.mock import MagicMock
+
+    # Mock anthropic client
+    mock_client = MagicMock()
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(text="I cannot decide, please ESCALATE to human.")]
+    mock_client.messages.create.return_value = mock_message
+
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Setup agents
+    service.create_agent(id="agent-1", name="Agent 1", role="architect")
+    service.create_agent(id="agent-2", name="Agent 2", role="developer")
+
+    consensus = service.debate(
+        proposal="Use GraphQL",
+        agent_ids=["agent-1", "agent-2"],
+        turns=2
+    )
+
+    assert "DEBATE ESCALATED" in consensus
+    assert "Agent agent-1 requested human intervention" in consensus
+    # Only 1 call because it escalates immediately on the first agent's first turn
+    assert mock_client.messages.create.call_count == 1
+
+
 def test_living_specs_management(service):
     """Test creating, listing, and updating Living Specs."""
     spec = service.create_spec(

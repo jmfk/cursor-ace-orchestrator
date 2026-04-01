@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 30
+
+### Added
+- **Phase 8: Future Directions**
+  - Agentic Feedback Loop: Automated success/failure flagging based on test-output, connecting write-back to CI/CD.
+  - Updated `plan.md` to mark task 8.2 as completed.
+
 ## [2026-04-01] - RALPH Loop Iteration 29
 
 ### Added
