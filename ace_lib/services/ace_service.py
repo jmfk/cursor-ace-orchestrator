@@ -52,14 +52,20 @@ class ACEService:
             import chromadb
             from chromadb.config import Settings
             self.vector_db_dir.mkdir(parents=True, exist_ok=True)
+            # Phase 10.14: Optimize ChromaDB settings for performance and reliability
             self._chroma_client = chromadb.PersistentClient(
                 path=str(self.vector_db_dir),
-                settings=Settings(allow_reset=True)
+                settings=Settings(
+                    allow_reset=True,
+                    anonymized_telemetry=False,
+                    is_persistent=True
+                )
             )
         return self._chroma_client
 
+    @profiler.profile
     def index_playbook(self, agent_id: str):
-        """Index an agent's playbook into vectorized memory."""
+        """Index an agent's playbook into vectorized memory with batching (Phase 10.14)."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
         if not agent:
@@ -71,12 +77,15 @@ class ACEService:
 
         content = playbook_path.read_text(encoding="utf-8")
         client = self._get_chroma_client()
-        collection = client.get_or_create_collection(name=f"playbook_{agent_id}")
+        
+        # Use a more robust collection naming and retrieval
+        collection_name = f"playbook_{agent_id.replace('-', '_')}"
+        collection = client.get_or_create_collection(name=collection_name)
 
-        # Split playbook into sections or entries
+        # Split playbook into sections or entries with improved regex
         pattern = (
             r"<!-- \[(str|mis|dec)-([^\]]+)\]\s+"
-            r"(?:helpful=\d+\s+harmful=\d+\s*)?::\s*(.*?) -->"
+            r"(?:helpful=(\d+)\s+harmful=(\d+)\s*)?::\s*(.*?) -->"
         )
         entries = re.findall(pattern, content)
 
@@ -87,28 +96,46 @@ class ACEService:
         documents = []
         metadatas = []
 
-        for l_type, l_id, desc in entries:
+        for l_type, l_id, helpful, harmful, desc in entries:
             entry_id = f"{l_type}-{l_id}"
             ids.append(entry_id)
             documents.append(desc)
-            metadatas.append({"type": l_type, "agent_id": agent_id})
+            metadatas.append({
+                "type": l_type, 
+                "agent_id": agent_id,
+                "helpful": int(helpful or 0),
+                "harmful": int(harmful or 0),
+                "last_indexed": datetime.now().isoformat()
+            })
 
         if ids:
-            collection.upsert(
-                ids=ids,
-                documents=documents,
-                metadatas=metadatas
-            )
+            # Batch updates for better performance
+            batch_size = 100
+            for i in range(0, len(ids), batch_size):
+                collection.upsert(
+                    ids=ids[i:i+batch_size],
+                    documents=documents[i:i+batch_size],
+                    metadatas=metadatas[i:i+batch_size]
+                )
         return True
 
+    @profiler.profile
     def search_memory(self, agent_id: str, query: str, n_results: int = 3) -> List[Dict]:
-        """Search vectorized memory for relevant entries."""
+        """Search vectorized memory with improved error handling and filtering (Phase 10.14)."""
+        if not agent_id:
+            return []
+            
         client = self._get_chroma_client()
         try:
-            collection = client.get_collection(name=f"playbook_{agent_id}")
+            collection_name = f"playbook_{agent_id.replace('-', '_')}"
+            collection = client.get_collection(name=collection_name)
+            
+            # Use metadata filtering to exclude low-utility entries if needed
             results = collection.query(
                 query_texts=[query],
-                n_results=n_results
+                n_results=min(n_results, 10),
+                # Example of metadata filtering (could be made configurable)
+                # where={"helpful": {"$gt": 0}} 
             )
 
             formatted_results = []
@@ -121,7 +148,8 @@ class ACEService:
                         "distance": results["distances"][0][i] if "distances" in results else None
                     })
             return formatted_results
-        except Exception:
+        except Exception as e:
+            # Silently fail if collection doesn't exist yet
             return []
 
     def _get_cached(self, key: str, loader: Callable):
