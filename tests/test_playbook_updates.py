@@ -93,12 +93,10 @@ def test_update_playbook_new_decision(service):
     assert "<!-- [dec-001] :: Use FastAPI for the backend. -->" in content
 
 
-    # --- Memory Write-back Verification (Phase 6.7) ---
-
-    def test_update_playbook_complex_markdown(service):
-        """Test updating a playbook with complex markdown structures."""
-        playbook_path = service.cursor_rules_dir / "complex.mdc"
-        playbook_path.write_text("""# Complex Playbook
+def test_update_playbook_complex_markdown(service):
+    """Test updating a playbook with complex markdown structures."""
+    playbook_path = service.cursor_rules_dir / "complex.mdc"
+    playbook_path.write_text("""# Complex Playbook
 ---
 description: Test
 globs: ["**/*.py"]
@@ -116,41 +114,87 @@ globs: ["**/*.py"]
 > Some blockquote
 """)
 
-        updates = [
-            {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
-            {"type": "mis", "id": "NEW", "helpful": 0, "harmful": 1, "description": "New pitfall"},
-            {"type": "dec", "id": "NEW", "description": "New decision"}
-        ]
+    updates = [
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
+        {"type": "mis", "id": "NEW", "helpful": 0, "harmful": 1, "description": "New pitfall"},
+        {"type": "dec", "id": "NEW", "description": "New decision"}
+    ]
 
-        service.update_playbook(playbook_path, updates)
-        content = playbook_path.read_text()
+    service.update_playbook(playbook_path, updates)
+    content = playbook_path.read_text()
 
-        # Verify sections and new entries
-        assert "## Strategier & patterns" in content
-        assert "<!-- [str-001] helpful=1 harmful=0 :: New strategy -->" in content
-        assert "- Existing bullet point" in content
+    # Verify sections and new entries
+    assert "## Strategier & patterns" in content
+    assert "<!-- [str-001] helpful=1 harmful=0 :: New strategy -->" in content
+    assert "- Existing bullet point" in content
 
-        assert "## Kända fallgropar" in content
-        assert "<!-- [mis-001] helpful=0 harmful=1 :: New pitfall -->" in content
-        assert "1. Numbered list" in content
+    assert "## Kända fallgropar" in content
+    assert "<!-- [mis-001] helpful=0 harmful=1 :: New pitfall -->" in content
+    assert "1. Numbered list" in content
 
-        assert "## Arkitekturella beslut" in content
-        assert "<!-- [dec-001] :: New decision -->" in content
-        assert "> Some blockquote" in content
-        assert "---" in content # Frontmatter preserved
+    assert "## Arkitekturella beslut" in content
+    assert "<!-- [dec-001] :: New decision -->" in content
+    assert "> Some blockquote" in content
+    assert "---" in content # Frontmatter preserved
 
-    def test_update_playbook_no_existing_sections(service):
-        """Test updating a playbook that has no headers at all."""
-        playbook_path = service.cursor_rules_dir / "empty.mdc"
-        playbook_path.write_text("# Empty Playbook\nJust some text.")
 
-        updates = [
-            {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy 1"}
-        ]
+def test_update_playbook_no_existing_sections(service):
+    """Test updating a playbook that has no headers at all."""
+    playbook_path = service.cursor_rules_dir / "empty.mdc"
+    playbook_path.write_text("# Empty Playbook\nJust some text.")
 
-        service.update_playbook(playbook_path, updates)
-        content = playbook_path.read_text()
+    updates = [
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy 1"}
+    ]
 
-        assert "## Strategier & patterns" in content
-        assert "<!-- [str-001] helpful=1 harmful=0 :: Strategy 1 -->" in content
-        assert "Just some text." in content
+    service.update_playbook(playbook_path, updates)
+    content = playbook_path.read_text()
+
+    assert "## Strategier & patterns" in content
+    assert "<!-- [str-001] helpful=1 harmful=0 :: Strategy 1 -->" in content
+    assert "Just some text." in content
+
+
+def test_update_playbook_mixed_updates(service):
+    """Test a mix of new and existing updates in one call."""
+    playbook_path = service.cursor_rules_dir / "mixed.mdc"
+    playbook_path.write_text("""# Mixed Playbook
+
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=0 :: Existing strategy -->
+
+## Kända fallgropar
+<!-- [mis-001] helpful=0 harmful=1 :: Existing pitfall -->
+""")
+
+    updates = [
+        {"type": "str", "id": "001", "helpful": 1, "harmful": 0, "description": "Existing strategy"},
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
+        {"type": "mis", "id": "001", "helpful": 0, "harmful": 1, "description": "Existing pitfall"},
+        {"type": "dec", "id": "NEW", "description": "New decision"}
+    ]
+
+    service.update_playbook(playbook_path, updates)
+    content = playbook_path.read_text()
+
+    assert "<!-- [str-001] helpful=2 harmful=0 :: Existing strategy -->" in content
+    assert "<!-- [str-002] helpful=1 harmful=0 :: New strategy -->" in content
+    assert "<!-- [mis-001] helpful=0 harmful=2 :: Existing pitfall -->" in content
+    assert "<!-- [dec-001] :: New decision -->" in content
+
+
+def test_update_playbook_duplicate_new_ids(service):
+    """Test that multiple 'NEW' updates of same type get unique IDs."""
+    playbook_path = service.cursor_rules_dir / "dupes.mdc"
+    playbook_path.write_text("# Dupes Playbook\n\n## Strategier & patterns\n")
+
+    updates = [
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy A"},
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "Strategy B"}
+    ]
+
+    service.update_playbook(playbook_path, updates)
+    content = playbook_path.read_text()
+
+    assert "<!-- [str-001] helpful=1 harmful=0 :: Strategy A -->" in content
+    assert "<!-- [str-002] helpful=1 harmful=0 :: Strategy B -->" in content
