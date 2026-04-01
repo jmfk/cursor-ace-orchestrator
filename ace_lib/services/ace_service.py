@@ -25,6 +25,8 @@ from ace_lib.models.schemas import (
     TokenUsage,
     Subscription,
     SubscriptionsConfig,
+    MACPProposal,
+    ConsensusStatus,
 )
 
 yaml = YAML()
@@ -39,6 +41,7 @@ class ACEService:
         self.sessions_dir = self.ace_dir / "sessions"
         self.decisions_dir = self.ace_dir / "decisions"
         self.mail_dir = self.ace_dir / "mail"
+        self.macp_dir = self.ace_dir / "macp"
         self.specs_dir = self.ace_dir / "specs"
         self.vector_db_dir = self.ace_dir / "vector_db"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
@@ -167,7 +170,7 @@ class ACEService:
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         ownership_file = self.ace_dir / "ownership.yaml"
         with open(ownership_file, "w") as f:
-            yaml.dump(config.model_dump(), f)
+            yaml.dump(config.model_dump(mode="json"), f)
 
     def assign_ownership(self, path: str, agent_id: str):
         config = self.load_ownership()
@@ -206,7 +209,7 @@ class ACEService:
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         agents_file = self.ace_dir / "agents.yaml"
         with open(agents_file, "w") as f:
-            yaml.dump(config.model_dump(), f)
+            yaml.dump(config.model_dump(mode="json"), f)
 
     def create_agent(
         self,
@@ -733,70 +736,98 @@ class ACEService:
         )
 
         with open(agent_mail_dir / f"{msg_id}.yaml", "w") as f:
-            yaml.dump(msg.model_dump(by_alias=True), f)
+            yaml.dump(msg.model_dump(mode="json", by_alias=True), f)
         return msg
 
-    def debate(self, proposal: str, agent_ids: List[str], turns: int = 3) -> str:
-        """Mediate a multi-turn debate between multiple agents."""
-        config = self.load_config()
-        # Refine turns based on TokenMode
-        if config.token_mode == TokenMode.LOW:
-            turns = 1
-        elif config.token_mode == TokenMode.MEDIUM:
-            turns = min(turns, 2)
+    # --- MACP (Multi-Agent Consensus Protocol) ---
+
+    def create_macp_proposal(
+        self, proposer_id: str, title: str, description: str, agent_ids: List[str]
+    ) -> MACPProposal:
+        self.macp_dir.mkdir(parents=True, exist_ok=True)
+        proposal_id = f"MACP-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        proposal = MACPProposal(
+            id=proposal_id,
+            title=title,
+            description=description,
+            proposer_id=proposer_id,
+            status=ConsensusStatus.PROPOSED,
+            turns_remaining=3,
+        )
         
-        # Send initial mail to participants about the debate
+        # Notify agents
         for aid in agent_ids:
             self.send_mail(
                 to_agent=aid,
                 from_agent="orchestrator",
-                subject="DEBATE INITIATED",
+                subject=f"MACP PROPOSAL: {title}",
                 body=(
-                    f"A {turns}-turn debate has been initiated on the following "
-                    f"proposal: {proposal}"
-                ),
+                    f"A new MACP proposal has been initiated by {proposer_id}.\n\n"
+                    f"ID: {proposal_id}\n"
+                    f"Title: {title}\n"
+                    f"Description: {description}\n\n"
+                    f"Please participate in the debate using 'ace macp debate {proposal_id}'."
+                )
             )
+            
+        self._save_macp_proposal(proposal)
+        return proposal
 
+    def _save_macp_proposal(self, proposal: MACPProposal):
+        proposal_file = self.macp_dir / f"{proposal.id}.yaml"
+        with open(proposal_file, "w") as f:
+            yaml.dump(proposal.model_dump(mode="json"), f)
+
+    def get_macp_proposal(self, proposal_id: str) -> Optional[MACPProposal]:
+        proposal_file = self.macp_dir / f"{proposal_id}.yaml"
+        if not proposal_file.exists():
+            return None
+        with open(proposal_file, "r") as f:
+            data = yaml.load(f)
+            return MACPProposal(**data) if data else None
+
+    def list_macp_proposals(self) -> List[MACPProposal]:
+        if not self.macp_dir.exists():
+            return []
+        proposal_files = sorted(list(self.macp_dir.glob("*.yaml")), reverse=True)
+        proposals = []
+        for f in proposal_files:
+            with open(f, "r") as m:
+                data = yaml.load(m)
+                if data:
+                    proposals.append(MACPProposal(**data))
+        return proposals
+
+    def debate(self, proposal_id: str, agent_ids: List[str], turns: int = 3) -> str:
+        """Mediate a multi-turn debate for an MACP proposal."""
+        proposal = self.get_macp_proposal(proposal_id)
+        if not proposal:
+            return f"Error: Proposal {proposal_id} not found."
+
+        proposal.status = ConsensusStatus.DEBATING
+        proposal.turns_remaining = turns
+        
         client = self.get_anthropic_client()
         if not client:
             return "Consensus: Debate mediation requires ANTHROPIC_API_KEY."
 
-        debate_history = []
-        votes = {aid: None for aid in agent_ids}
-        
         for turn in range(1, turns + 1):
-            turn_perspectives = []
             for aid in agent_ids:
                 agents_config = self.load_agents()
-                agent = next(
-                    (a for a in agents_config.agents if a.id == aid), None
-                )
+                agent = next((a for a in agents_config.agents if a.id == aid), None)
                 role = agent.role if agent else "expert"
 
-                # Build prompt for the current turn
-                history_str = "\n".join(debate_history) if debate_history else "No previous turns."
+                history_str = "\n".join(proposal.history) if proposal.history else "No previous turns."
                 
-                if turn == 1:
-                    prompt = (
-                        f"You are agent {aid} with role {role}.\n"
-                        f"Review this proposal: {proposal}\n"
-                        "Provide your initial perspective, critique, or support. "
-                        "Focus on architectural impact and project standards. "
-                        "If you feel this requires human intervention, include the word 'ESCALATE'.\n"
-                        "At the end of your response, provide your current vote as "
-                        "either 'VOTE: SUPPORT', 'VOTE: OPPOSE', or 'VOTE: ABSTAIN'."
-                    )
-                else:
-                    prompt = (
-                        f"You are agent {aid} with role {role}.\n"
-                        f"Original Proposal: {proposal}\n"
-                        f"Debate History:\n{history_str}\n\n"
-                        f"This is turn {turn} of {turns}. Review the other agents' perspectives "
-                        "and refine your position. Address their concerns or reinforce your points. "
-                        "If you feel this requires human intervention, include the word 'ESCALATE'.\n"
-                        "At the end of your response, provide your current vote as "
-                        "either 'VOTE: SUPPORT', 'VOTE: OPPOSE', or 'VOTE: ABSTAIN'."
-                    )
+                prompt = (
+                    f"You are agent {aid} with role {role}.\n"
+                    f"MACP Proposal: {proposal.title}\n"
+                    f"Description: {proposal.description}\n"
+                    f"Debate History:\n{history_str}\n\n"
+                    f"This is turn {turn} of {turns}. Provide your perspective. "
+                    "Include 'ESCALATE' if human intervention is needed.\n"
+                    "End with 'VOTE: SUPPORT', 'VOTE: OPPOSE', or 'VOTE: ABSTAIN'."
+                )
 
                 try:
                     message = client.messages.create(
@@ -804,48 +835,31 @@ class ACEService:
                         max_tokens=512,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    perspective = "".join(
-                        [
-                            block.text
-                            for block in message.content
-                            if hasattr(block, "text")
-                        ]
-                    )
+                    perspective = "".join([b.text for b in message.content if hasattr(b, "text")])
                     
-                    # Detect escalation
-                    if any(kw in perspective.upper() for kw in ["ESCALATE"]):
-                        msg = (
-                            f"DEBATE ESCALATED: Agent {aid} requested human intervention.\n"
-                            f"Perspective: {perspective}"
-                        )
-                        return msg
+                    if "ESCALATE" in perspective.upper():
+                        proposal.status = ConsensusStatus.ESCALATED
+                        proposal.history.append(f"Turn {turn} - Agent {aid}: ESCALATED")
+                        self._save_macp_proposal(proposal)
+                        return f"MACP {proposal_id} ESCALATED by {aid}."
                     
-                    # Extract vote
                     vote_match = re.search(r"VOTE:\s*(SUPPORT|OPPOSE|ABSTAIN)", perspective.upper())
                     if vote_match:
-                        votes[aid] = vote_match.group(1)
+                        proposal.votes[aid] = vote_match.group(1)
                         
-                    turn_perspectives.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
+                    proposal.history.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
                 except Exception as e:
-                    turn_perspectives.append(
-                        f"Turn {turn} - Agent {aid}: Error getting perspective: {e}"
-                    )
+                    proposal.history.append(f"Turn {turn} - Agent {aid}: Error: {e}")
             
-            debate_history.extend(turn_perspectives)
+            proposal.turns_remaining -= 1
+            self._save_macp_proposal(proposal)
 
-        # Final LLM-Referee logic
-        votes_summary = "\n".join([f"- Agent {aid}: {vote or 'No vote'}" for aid, vote in votes.items()])
+        # Referee logic
         referee_prompt = (
-            "You are the ACE Orchestrator Referee. "
-            "You must mediate a multi-turn debate between multiple agents and reach "
-            "a consensus.\n\n"
-            f"Original Proposal: {proposal}\n\n"
-            "Full Debate History:\n" + "\n".join(debate_history) + "\n\n"
-            f"Final Votes:\n{votes_summary}\n\n"
-            "Analyze the evolution of the debate, identify common ground, and "
-            "provide a final recommendation or consensus decision. "
-            "If no consensus is reached, explain why and suggest next steps. "
-            "If the debate is too complex or conflicting, suggest human escalation."
+            "You are the ACE MACP Referee. Reach a consensus.\n\n"
+            f"Proposal: {proposal.title}\n{proposal.description}\n\n"
+            f"History:\n" + "\n".join(proposal.history) + "\n\n"
+            f"Votes: {proposal.votes}\n"
         )
 
         try:
@@ -854,29 +868,19 @@ class ACEService:
                 max_tokens=1024,
                 messages=[{"role": "user", "content": referee_prompt}],
             )
-            consensus = "".join(
-                [
-                    block.text
-                    for block in message.content
-                    if hasattr(block, "text")
-                ]
-            )
+            consensus = "".join([b.text for b in message.content if hasattr(b, "text")])
+            proposal.consensus_summary = consensus
+            proposal.status = ConsensusStatus.CONSENSUS
+            proposal.updated_at = datetime.now().isoformat()
+            self._save_macp_proposal(proposal)
             
-            # Notify agents of the result
+            # Notify
             for aid in agent_ids:
-                self.send_mail(
-                    to_agent=aid,
-                    from_agent="orchestrator",
-                    subject="DEBATE CONSENSUS REACHED",
-                    body=(
-                        f"The debate on '{proposal}' has concluded.\n\n"
-                        f"Consensus:\n{consensus}\n\nFinal Votes:\n{votes_summary}"
-                    )
-                )
+                self.send_mail(aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus)
                 
             return consensus
         except Exception as e:
-            return f"Error during debate mediation: {e}"
+            return f"Error: {e}"
 
     # --- RALPH Loop Engine ---
 
@@ -1324,48 +1328,72 @@ class ACEService:
 
         sop_dir = self.ace_dir / "sops"
         sop_dir.mkdir(exist_ok=True)
-        
+
         security_audit_file = (
             sop_dir /
             f"security_audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
         )
         content = f"""# SOP: Security Audit - {agent.name} ({agent.id})
-- **Auditor**: Orchestrator (Security Module)
+- **Auditor**: Orchestrator
 - **Date**: {datetime.now().isoformat()}
 
-## 1. Dependency Vulnerabilities
-- [ ] Run `npm audit` or `pip-audit` on the modules owned by the agent.
-- [ ] Identify any high/critical vulnerabilities.
+## 1. Credentials & Secrets
+- [ ] Check for hardcoded API keys or secrets in owned modules.
+- [ ] Verify that `.env` and `credentials` files are not tracked by git.
 
-## 2. Secret Scanning
-- [ ] Scan modules for hardcoded secrets, API keys, or credentials.
-- [ ] Verify that `.env` files and sensitive data are gitignored.
+## 2. Dependency Security
+- [ ] Run `npm audit` or `pip audit` on owned modules.
+- [ ] Identify and update vulnerable dependencies.
 
-## 3. Code Security Patterns
-- [ ] Check for common security pitfalls (SQL injection, XSS, insecure defaults).
-- [ ] Verify that authentication and authorization checks are present where needed.
+## 3. Access Control
+- [ ] Review permissions and access levels for agent {agent_id}.
+- [ ] Ensure least privilege principle is followed.
 
-## 4. Findings & Remediation
-- [ ] **High Risk**:
-- [ ] **Medium Risk**:
-- [ ] **Low Risk**:
-- [ ] **Remediation Plan**:
+## 4. Recommendations
+- [ ] **Action**: [SECURE/FIX/REVOKE]
+- [ ] **Notes**:
 """
         security_audit_file.write_text(content)
-
-        # Notify agent of security audit task
-        self.send_mail(
-            to_agent=agent_id,
-            from_agent="orchestrator",
-            subject="SECURITY AUDIT SOP",
-            body=(
-                f"A security audit SOP has been generated for your modules: "
-                f"{security_audit_file.relative_to(self.base_path)}\n\n"
-                "Please perform the audit and report findings."
-            )
-        )
-
         return security_audit_file
+
+    # --- Autonomous Agent Expansion ---
+
+    def check_agent_expansion(self, agent_id: str, threshold: int = 10) -> Optional[Agent]:
+        """Check if an agent's complexity exceeds threshold and propose expansion."""
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return None
+
+        # Simple complexity metric: number of responsibilities + playbook entries
+        complexity = len(agent.responsibilities)
+        playbook_path = self.base_path / agent.memory_file
+        if playbook_path.exists():
+            content = playbook_path.read_text()
+            entries = re.findall(r"<!-- \[(str|mis|dec)-.*? -->", content)
+            complexity += len(entries)
+
+        if complexity > threshold:
+            print(f"[EXPANSION] Agent {agent_id} complexity ({complexity}) exceeds threshold ({threshold}).")
+            
+            # Propose a sub-agent
+            sub_agent_id = f"{agent_id}-sub-{datetime.now().strftime('%H%M%S')}"
+            proposal_title = f"Autonomous Expansion: {sub_agent_id}"
+            proposal_desc = (
+                f"Agent {agent_id} has reached a complexity of {complexity}. "
+                f"Proposing a new sub-agent {sub_agent_id} to handle a subset of responsibilities."
+            )
+            
+            # Use MACP to debate expansion
+            self.create_macp_proposal(
+                proposer_id="orchestrator",
+                title=proposal_title,
+                description=proposal_desc,
+                agent_ids=[agent_id, "orchestrator"]
+            )
+            
+            return sub_agent_id
+        return None
 
     # --- Google Stitch Integration ---
 
@@ -1374,6 +1402,8 @@ class ACEService:
         mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
 
+        # Ensure .ace directory exists before ui_mockups
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
         mockup_dir = self.ace_dir / "ui_mockups"
         mockup_dir.mkdir(parents=True, exist_ok=True)
         mockup_file = mockup_dir / f"{mockup_id}.md"
@@ -1416,6 +1446,8 @@ class ACEService:
             f"## Design & Code\n"
             f"```tsx\n{ui_code}\n```\n"
         )
+        # Ensure parent directory exists just in case
+        mockup_file.parent.mkdir(parents=True, exist_ok=True)
         mockup_file.write_text(content)
 
         if ui_code and "export const" in ui_code:
@@ -1518,14 +1550,13 @@ class ACEService:
             (components_dir / f"{name}.tsx").write_text(content)
 
     def ui_sync(self, url: str):
-        """Sync UI code from Google Stitch."""
-        # Extract mockup_id from URL
+        """Sync UI code from Google Stitch with visual diffing."""
         mockup_id = url.split("/")[-1]
         
-        # Check for STITCH_API_KEY to use real API call
+        # ... existing code ...
         api_key = os.getenv("STITCH_API_KEY")
         if api_key:
-            print(f"[STITCH] Syncing code from Google Stitch API for: {url}")
+            # ... (the rest of the loop) ...
             try:
                 # Actual Google Stitch API call
                 response = requests.get(
@@ -1536,18 +1567,33 @@ class ACEService:
                 if response.status_code == 200:
                     ui_code = response.json().get("code")
                     if ui_code:
-                        # Update local mockup file with synced code
+                        # Perform visual diffing if we have an existing mockup
                         mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
                         if mockup_file.exists():
-                            content = mockup_file.read_text()
-                            # Replace code block
-                            new_content = re.sub(
-                                r"```(?:tsx|jsx|html|javascript|typescript)?\n.*?\n```",
-                                f"```tsx\n{ui_code}\n```",
-                                content,
-                                flags=re.DOTALL
+                            old_content = mockup_file.read_text()
+                            old_code_match = re.search(
+                                r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
+                                old_content,
+                                re.DOTALL,
                             )
-                            mockup_file.write_text(new_content)
+                            if old_code_match:
+                                old_code = old_code_match.group(1)
+                                if old_code != ui_code:
+                                    print(f"[STITCH] Visual diff detected for {mockup_id}.")
+                                    # In a real scenario, we'd use a visual diffing tool.
+                                    # For now, we log the diff.
+                                    diff_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
+                                    import difflib
+                                    diff = difflib.unified_diff(
+                                        old_code.splitlines(),
+                                        ui_code.splitlines(),
+                                        fromfile="local",
+                                        tofile="stitch"
+                                    )
+                                    diff_file.write_text("\n".join(diff))
+
+                        # Update local mockup file with synced code
+                        # ... (existing code) ...
                         
                         # Extract components from synced code
                         self._extract_stitch_components(mockup_id, ui_code)

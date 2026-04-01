@@ -311,13 +311,21 @@ def test_multi_turn_debate(service, monkeypatch):
     service.create_agent(id="agent-1", name="Agent 1", role="architect")
     service.create_agent(id="agent-2", name="Agent 2", role="developer")
 
+    # Create MACP proposal
+    proposal = service.create_macp_proposal(
+        proposer_id="agent-1",
+        title="Use GraphQL",
+        description="We should use GraphQL",
+        agent_ids=["agent-1", "agent-2"]
+    )
+
     # Set token mode to HIGH to ensure full turns
     config = service.load_config()
     config.token_mode = TokenMode.HIGH
     service.save_config(config)
 
     consensus = service.debate(
-        proposal="Use GraphQL",
+        proposal_id=proposal.id,
         agent_ids=["agent-1", "agent-2"],
         turns=2
     )
@@ -331,96 +339,110 @@ def test_multi_turn_debate(service, monkeypatch):
     messages_2 = service.list_mail("agent-2")
     assert len(messages_1) > 0
     assert len(messages_2) > 0
-    assert "Final Votes" in messages_1[0].body
+    # The last message should be the consensus notification
+    assert "MACP" in messages_1[0].subject
+    assert "CONSENSUS" in messages_1[0].subject
+
+
+def test_consensus_debate(service, monkeypatch):
+    """Test consensus debate mediation."""
+    from unittest.mock import MagicMock
+    from ace_lib.models.schemas import TokenMode
+
+    # Mock anthropic client
+    mock_client = MagicMock()
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(text="Consensus reached: Use FastAPI")]
+    mock_client.messages.create.return_value = mock_message
+
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Setup agents
+    service.create_agent(id="agent-1", name="Agent 1", role="architect")
+    service.create_agent(id="agent-2", name="Agent 2", role="developer")
+
+    # Create MACP proposal
+    proposal = service.create_macp_proposal(
+        proposer_id="agent-1",
+        title="Use FastAPI",
+        description="We should use FastAPI",
+        agent_ids=["agent-1", "agent-2"]
+    )
+
+    # Set token mode
+    config = service.load_config()
+    config.token_mode = TokenMode.HIGH
+    service.save_config(config)
+
+    consensus = service.debate(
+        proposal_id=proposal.id,
+        agent_ids=["agent-1", "agent-2"],
+        turns=1
+    )
+
+    assert "FastAPI" in consensus
+    # 1 turn * 2 agents + 1 referee call = 3 calls
+    assert mock_client.messages.create.call_count == 3
+
+
+def test_subscriptions_and_notifications(service):
+    """Test agent subscriptions and notifications."""
+    service.create_agent(id="sub-agent", name="Sub Agent", role="developer")
     
-    def test_consensus_debate(self, service, monkeypatch):
-        """Test consensus debate mediation."""
-        from unittest.mock import MagicMock
-        from ace_lib.models.schemas import TokenMode
+    # Subscribe
+    success = service.subscribe("sub-agent", "src/auth")
+    assert success is True
+    
+    # Notify
+    service.notify_subscribers("src/auth/login.py", "Added login logic")
+    
+    # Check mail
+    messages = service.list_mail("sub-agent")
+    assert len(messages) == 1
+    assert "SUBSCRIPTION NOTIFICATION" in messages[0].subject
+    assert "Added login logic" in messages[0].body
 
-        # Mock anthropic client
-        mock_client = MagicMock()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock(text="Consensus reached: Use FastAPI")]
-        mock_client.messages.create.return_value = mock_message
 
-        monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+def test_token_usage_logging(service):
+    """Test logging token usage."""
+    from ace_lib.models.schemas import TokenUsage
+    usage = TokenUsage(
+        agent_id="test-agent",
+        session_id="test-session",
+        prompt_tokens=100,
+        completion_tokens=50,
+        total_tokens=150,
+        cost=0.001
+    )
+    service.log_token_usage(usage)
+    
+    report = service.get_token_report("test-agent")
+    assert len(report) == 1
+    assert report[0].total_tokens == 150
 
-        # Setup agents
-        service.create_agent(id="agent-1", name="Agent 1", role="architect")
-        service.create_agent(id="agent-2", name="Agent 2", role="developer")
 
-        # Set token mode
-        config = service.load_config()
-        config.token_mode = TokenMode.HIGH
-        service.save_config(config)
-
-        consensus = service.debate(
-            proposal="Use FastAPI",
-            agent_ids=["agent-1", "agent-2"],
-            turns=1
-        )
-
-        assert "FastAPI" in consensus
-        # 1 turn * 2 agents + 1 referee call = 3 calls
-        assert mock_client.messages.create.call_count == 3
-
-    def test_subscriptions_and_notifications(self, service):
-        """Test agent subscriptions and notifications."""
-        service.create_agent(id="sub-agent", name="Sub Agent", role="developer")
-        
-        # Subscribe
-        success = service.subscribe("sub-agent", "src/auth")
-        assert success is True
-        
-        # Notify
-        service.notify_subscribers("src/auth/login.py", "Added login logic")
-        
-        # Check mail
-        messages = service.list_mail("sub-agent")
-        assert len(messages) == 1
-        assert "SUBSCRIPTION NOTIFICATION" in messages[0].subject
-        assert "Added login logic" in messages[0].body
-
-    def test_token_usage_logging(self, service):
-        """Test logging token usage."""
-        from ace_lib.models.schemas import TokenUsage
-        usage = TokenUsage(
-            agent_id="test-agent",
-            session_id="test-session",
-            prompt_tokens=100,
-            completion_tokens=50,
-            total_tokens=150,
-            cost=0.001
-        )
-        service.log_token_usage(usage)
-        
-        report = service.get_token_report("test-agent")
-        assert len(report) == 1
-        assert report[0].total_tokens == 150
-
-    def test_vector_memory(self, service, temp_workspace):
-        """Test vectorized memory (ChromaDB)."""
-        # Setup agent and playbook
-        service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-        playbook_path = service.cursor_rules_dir / "developer.mdc"
-        playbook_path.write_text("""# Developer Playbook
+def test_vector_memory(service, temp_workspace):
+    """Test vectorized memory (ChromaDB)."""
+    # Setup agent and playbook
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
 ## Strategier & patterns
 <!-- [str-001] helpful=1 harmful=0 :: Use pytest for testing. -->
 <!-- [str-002] helpful=1 harmful=0 :: Use FastAPI for backend. -->
 """)
-        service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
 
-        # Index
-        success = service.index_playbook("dev-1")
-        assert success is True
+    # Index
+    success = service.index_playbook("dev-1")
+    assert success is True
 
-        # Search
-        results = service.search_memory("dev-1", "testing")
-        assert len(results) > 0
-        assert "pytest" in results[0]["content"]
+    # Search
+    results = service.search_memory("dev-1", "testing")
+    assert len(results) > 0
+    assert "pytest" in results[0]["content"]
 
-        results = service.search_memory("dev-1", "backend")
-        assert len(results) > 0
-        assert "FastAPI" in results[0]["content"]
+    results = service.search_memory("dev-1", "backend")
+    assert len(results) > 0
+    assert "FastAPI" in results[0]["content"]

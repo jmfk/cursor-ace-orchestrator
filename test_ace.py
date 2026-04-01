@@ -539,10 +539,24 @@ def test_debate(temp_ace_dir, monkeypatch):
     )
 
     # Initiate debate
+    # Use MACP propose first
     result = runner.invoke(
         app,
         [
-            "debate", "--proposal", "Use Python", "--agent", "agent-a",
+            "macp", "propose", "--title", "Use Python", "--desc", "Python is good",
+            "--from", "agent-a", "--agent", "agent-a", "--agent", "agent-b"
+        ]
+    )
+    assert result.exit_code == 0
+    import re
+    proposal_id_match = re.search(r"MACP-\d+-\d+", result.stdout)
+    assert proposal_id_match
+    proposal_id = proposal_id_match.group(0)
+
+    result = runner.invoke(
+        app,
+        [
+            "debate", proposal_id, "--agent", "agent-a",
             "--agent", "agent-b", "--turns", "2"
         ]
     )

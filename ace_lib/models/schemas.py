@@ -103,6 +103,28 @@ class TokenUsage(BaseModel):
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class ConsensusStatus(str, Enum):
+    PROPOSED = "proposed"
+    DEBATING = "debating"
+    CONSENSUS = "consensus"
+    STALEMATE = "stalemate"
+    ESCALATED = "escalated"
+
+
+class MACPProposal(BaseModel):
+    id: str
+    title: str
+    description: str
+    proposer_id: str
+    status: ConsensusStatus = ConsensusStatus.PROPOSED
+    votes: Dict[str, str] = Field(default_factory=dict)  # agent_id -> vote
+    turns_remaining: int = 3
+    history: List[str] = Field(default_factory=list)
+    consensus_summary: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
 class Subscription(BaseModel):
     agent_id: str
     path: str

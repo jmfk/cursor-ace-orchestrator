@@ -24,7 +24,10 @@ def client():
         yield c
 
     # Cleanup
-    shutil.rmtree(test_ace_dir)
+    try:
+        shutil.rmtree(test_ace_dir)
+    except FileNotFoundError:
+        pass
     ace_api.main.service = old_service
 
 

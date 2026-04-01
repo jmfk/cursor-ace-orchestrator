@@ -1040,37 +1040,106 @@ def mail_read(agent_id: str, msg_id: str):
 
 @app.command()
 def debate(
-    proposal: str = typer.Option(
-        ..., "--proposal", "-p", help="The proposal to debate"
-    ),
+    proposal_id: Optional[str] = typer.Argument(None, help="The MACP proposal ID to debate"),
     agents: List[str] = typer.Option(
         ..., "--agent", "-a", help="Agents to participate"
     ),
     turns: int = typer.Option(
         3, "--turns", "-t", help="Number of debate turns"
     ),
+    proposal: Optional[str] = typer.Option(
+        None, "--proposal", help="Legacy proposal content (alias for proposal_id)"
+    ),
 ):
-    """Initiate and mediate a multi-turn debate between multiple agents."""
+    """Initiate and mediate a multi-turn debate for an MACP proposal."""
+    if proposal and not proposal_id:
+        proposal_id = proposal
+
+    if not proposal_id:
+        console.print("[red]Error: Missing argument 'PROPOSAL_ID' or option '--proposal'.[/red]")
+        raise typer.Exit(code=1)
+
     console.print(
-        f"🚀 [bold blue]Initiating {turns}-turn debate on proposal:"
-        f"[/bold blue] {proposal}"
+        f"🚀 [bold blue]Initiating {turns}-turn debate on MACP proposal:"
+        f"[/bold blue] {proposal_id}"
     )
     console.print(f"Participants: {', '.join(agents)}")
 
     res = api_call(
         "POST",
-        "/debate",
-        json={"proposal": proposal, "agent_ids": agents, "turns": turns},
+        f"/macp/{proposal_id}/debate",
+        json={"agent_ids": agents, "turns": turns},
     )
     if res:
         consensus = res["consensus"]
     else:
         svc = get_service()
         with console.status("[bold green]Mediating debate..."):
-            consensus = svc.debate(proposal, agents, turns)
+            consensus = svc.debate(proposal_id, agents, turns)
 
     console.print("\n[bold]Consensus / Recommendation:[/bold]")
     console.print(consensus)
+
+
+macp_app = typer.Typer(help="Multi-Agent Consensus Protocol (MACP) commands")
+app.add_typer(macp_app, name="macp")
+
+
+@macp_app.command("propose")
+def macp_propose(
+    title: str = typer.Option(..., "--title", "-t", help="Proposal title"),
+    description: str = typer.Option(..., "--desc", "-d", help="Proposal description"),
+    proposer: str = typer.Option(..., "--from", "-f", help="Proposer agent ID"),
+    agents: List[str] = typer.Option(..., "--agent", "-a", help="Agents to participate"),
+):
+    """Create a new MACP proposal."""
+    svc = get_service()
+    proposal = svc.create_macp_proposal(proposer, title, description, agents)
+    console.print(f"Created MACP Proposal: [green]{proposal.id}[/green]")
+
+
+@macp_app.command("list")
+def macp_list():
+    """List all MACP proposals."""
+    svc = get_service()
+    proposals = svc.list_macp_proposals()
+    if not proposals:
+        console.print("No MACP proposals found.")
+        return
+
+    table = Table(title="MACP Proposals")
+    table.add_column("ID", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Proposer", style="yellow")
+    table.add_column("Status", style="magenta")
+    table.add_column("Turns", style="dim")
+
+    for p in proposals:
+        table.add_row(p.id, p.title, p.proposer_id, p.status.value, str(p.turns_remaining))
+    console.print(table)
+
+
+@macp_app.command("show")
+def macp_show(proposal_id: str = typer.Argument(..., help="Proposal ID")):
+    """Show details of an MACP proposal."""
+    svc = get_service()
+    p = svc.get_macp_proposal(proposal_id)
+    if not p:
+        console.print(f"[red]Proposal {proposal_id} not found.[/red]")
+        return
+
+    console.print(f"\n[bold]MACP Proposal: {p.title} ({p.id})[/bold]")
+    console.print(f"Status: [yellow]{p.status.value}[/yellow]")
+    console.print(f"Proposer: [green]{p.proposer_id}[/green]")
+    console.print(f"\n[bold]Description:[/bold]\n{p.description}")
+    
+    if p.votes:
+        console.print("\n[bold]Votes:[/bold]")
+        for aid, vote in p.votes.items():
+            console.print(f"- {aid}: {vote}")
+            
+    if p.consensus_summary:
+        console.print(f"\n[bold]Consensus Summary:[/bold]\n{p.consensus_summary}")
 
 
 ui_app = typer.Typer(help="UI integration commands")
