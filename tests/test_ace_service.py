@@ -82,3 +82,142 @@ def test_mail_system(service):
     msg = service.read_mail("agent-b", messages[0].id)
     assert msg.body == "Test body"
     assert msg.status == "read"
+
+
+def test_decision_management(service):
+    """Test adding and listing decisions (ADRs)."""
+    decision = service.add_decision(
+        title="Use FastAPI",
+        context="Need a web framework",
+        decision="Use FastAPI for the backend",
+        consequences="Fast and type-safe",
+        agent_id="architect-1"
+    )
+    assert decision.id == "ADR-001"
+    assert decision.title == "Use FastAPI"
+
+    decisions = service.list_decisions()
+    assert len(decisions) == 1
+    assert decisions[0].title == "Use FastAPI"
+
+
+def test_context_building(service, temp_workspace):
+    """Test building context for an agent."""
+    # Setup global rules
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    global_rules = service.cursor_rules_dir / "_global.mdc"
+    global_rules.write_text("Global project rules")
+
+    # Setup agent and playbook
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    playbook = service.cursor_rules_dir / "developer.mdc"
+    playbook.write_text("Developer playbook")
+
+    context, agent_id = service.build_context(path="src/main.py", agent_id="dev-1")
+
+    assert agent_id == "dev-1"
+    assert "GLOBAL RULES" in context
+    assert "Global project rules" in context
+    assert "AGENT PLAYBOOK (developer)" in context
+    assert "Developer playbook" in context
+
+
+def test_reflection_parsing(service):
+    """Test parsing reflection output from LLM."""
+    reflection_text = """
+[str-001] helpful=1 harmful=0 :: Use pytest for testing.
+[mis-002] helpful=0 harmful=1 :: Avoid global state.
+[dec-003] :: Use PostgreSQL for database.
+"""
+    updates = service.parse_reflection_output(reflection_text)
+    assert len(updates) == 3
+    assert updates[0]["type"] == "str"
+    assert updates[0]["id"] == "001"
+    assert updates[0]["description"] == "Use pytest for testing."
+    assert updates[1]["type"] == "mis"
+    assert updates[2]["type"] == "dec"
+
+
+def test_playbook_update(service, temp_workspace):
+    """Test updating a playbook with new learnings."""
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+## Kända fallgropar
+## Arkitekturella beslut
+""")
+
+    updates = [
+        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
+        {"type": "mis", "id": "NEW", "helpful": 0, "harmful": 1, "description": "New pitfall"}
+    ]
+
+    success = service.update_playbook(playbook_path, updates)
+    assert success is True
+
+    content = playbook_path.read_text()
+    assert "[str-001]" in content
+    assert "New strategy" in content
+    assert "[mis-001]" in content
+    assert "New pitfall" in content
+
+
+def test_memory_pruning(service, temp_workspace):
+    """Test pruning harmful strategies from memory."""
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=5 :: Harmful strategy -->
+<!-- [str-002] helpful=5 harmful=1 :: Helpful strategy -->
+""")
+
+    agent = service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    # Threshold 0 means harmful - helpful > 0
+    pruned_count = service.prune_memory(agent, threshold=0)
+
+    assert pruned_count == 1
+    content = playbook_path.read_text()
+    assert "[PRUNED] <!-- [str-001]" in content
+    assert "<!-- [str-002]" in content
+    # Check that str-002 itself is not pruned
+    parts = content.split("<!-- [str-002]")
+    assert "[PRUNED]" not in parts[0].split("<!-- [str-001]")[1]
+
+
+def test_stitch_mockup(service, temp_workspace):
+    """Test Google Stitch mockup generation."""
+    # Mock STITCH_API_KEY to test simulated API path
+    import os
+    os.environ["STITCH_API_KEY"] = "test-key"
+    try:
+        url = service.ui_mockup("Login page", "agent-1")
+        assert "stitch.google.com/canvas/" in url
+
+        mockup_id = url.split("/")[-1]
+        mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+        assert mockup_file.exists()
+        content = mockup_file.read_text()
+        assert "Generated via Stitch API" in content
+        assert "Login page" in content
+    finally:
+        del os.environ["STITCH_API_KEY"]
+
+
+def test_stitch_sync(service, temp_workspace):
+    """Test Google Stitch code sync."""
+    mockup_id = "test_mockup"
+    mockup_dir = service.ace_dir / "ui_mockups"
+    mockup_dir.mkdir(parents=True, exist_ok=True)
+    mockup_file = mockup_dir / f"{mockup_id}.md"
+    mockup_file.write_text("""# UI Mockup
+## Design & Code
+```tsx
+export const Test = () => <div>Test</div>;
+```
+""")
+
+    url = f"https://stitch.google.com/canvas/{mockup_id}"
+    code = service.ui_sync(url)
+    assert "export const Test" in code

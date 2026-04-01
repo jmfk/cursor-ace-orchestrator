@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 16
+
+### Added
+- **Phase 6: Refinement & Missing Features**
+  - SOP Engine Expansion: Implemented the `audit` SOP.
+
 ## [2026-04-01] - RALPH Loop Iteration 15
 
 ### Added
