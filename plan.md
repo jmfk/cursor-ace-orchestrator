@@ -2,17 +2,17 @@
 
 This plan outlines the step-by-step implementation of the Cursor ACE Orchestrator, a Python-based CLI tool designed to provide long-term memory and coordination for coding agents.
 
-## Phase 5: API & Future Readiness
-- [x] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
-- [x] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
-- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
-
 ## Phase 4: RALPH Loop & Multi-Agent Coordination (M4)
-- [ ] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.
+- [x] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.
 - [x] **4.2 Agent Mail System**: Implement the internal messaging system in `.ace/mail/` with `inbox/` and `sent/` per agent.
 - [x] **4.3 Consensus Protocol**: Implement the debate logic where agents exchange proposals via Mail, mediated by an LLM-referee.
 - [ ] **4.4 SOP Engine**: Implement Standard Operating Procedures for `onboarding`, `audit`, and `pr-review`.
 - [x] **4.5 Google Stitch Integration**: Implement `ace ui mockup` and `ace ui sync` to interface with Google Labs design tools.
+
+## Phase 5: API & Future Readiness
+- [x] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
+- [x] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
+- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
 
 ## Phase 3: Memory & Decision Management (M3)
 - [x] **3.1 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.

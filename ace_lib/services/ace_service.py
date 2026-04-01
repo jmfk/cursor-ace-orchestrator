@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
@@ -452,27 +453,48 @@ class ACEService:
             # 1. Context Refresh & Build
             context, resolved_agent_id = self.build_context(path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id)
             
-            # 2. Execute
-            # In a real scenario, this would call 'ace run' or similar logic.
-            # For the native loop, we'll use a simplified execution that logs the attempt.
+            # 2. Execute (using cursor-agent)
             print(f"[RALPH] Executing task: {prompt[:50]}...")
             
-            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            session_file = self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
-            self.sessions_dir.mkdir(parents=True, exist_ok=True)
+            # Write context to a temporary file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+                tmp.write(context)
+                context_file = tmp.name
+
+            # Construct cursor-agent command
+            # We use the prompt + context file
+            agent_cmd = f"cursor-agent --print --model gemini-3-flash --force --trust --context-file {context_file} \"{prompt}\""
+            
+            print(f"[RALPH] Running agent command...")
+            agent_proc = subprocess.run(agent_cmd, shell=True, capture_output=True, text=True)
             
             # 3. Verify (Run tests)
             print(f"[RALPH] Verifying with: {test_cmd}")
             result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
             
+            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_file = self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
+            self.sessions_dir.mkdir(parents=True, exist_ok=True)
+            
             session_content = f"""# Session Loop {session_id} (Iteration {iteration})
 - **Prompt**: `{prompt}`
 - **Test Command**: `{test_cmd}`
 - **Agent ID**: `{resolved_agent_id}`
-- **Exit Code**: {result.returncode}
+- **Agent Exit Code**: {agent_proc.returncode}
+- **Test Exit Code**: {result.returncode}
 - **Timestamp**: {datetime.now().isoformat()}
 
-## Output
+## Agent Output
+### Stdout
+```
+{agent_proc.stdout}
+```
+### Stderr
+```
+{agent_proc.stderr}
+```
+
+## Test Output
 ### Stdout
 ```
 {result.stdout}
@@ -487,10 +509,29 @@ class ACEService:
             if result.returncode == 0:
                 print("[RALPH] ✅ Verification successful!")
                 success = True
+                
+                # Final Reflection on success
+                if os.getenv("ANTHROPIC_API_KEY"):
+                    print("[RALPH] Performing final reflection...")
+                    reflection_text = self.reflect_on_session(agent_proc.stdout + "\n" + result.stdout)
+                    updates = self.parse_reflection_output(reflection_text)
+                    if updates:
+                        playbook_path = self.cursor_rules_dir / "_global.mdc"
+                        if resolved_agent_id:
+                            agents_config = self.load_agents()
+                            agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+                            if agent:
+                                playbook_path = Path(agent.memory_file)
+                        self.update_playbook(playbook_path, updates)
                 break
             else:
                 print(f"[RALPH] ❌ Verification failed (Exit code: {result.returncode})")
-                # 4. Reflect (In a real scenario, we'd pass the error to the agent)
+                # Update prompt for next iteration with failure info
+                prompt = f"Previous attempt failed. Test output:\n{result.stdout}\n{result.stderr}\n\nOriginal task: {prompt}"
+            
+            # Cleanup context file
+            if os.path.exists(context_file):
+                os.remove(context_file)
             
         return success, iteration
 
@@ -559,9 +600,9 @@ class ACEService:
     # --- Google Stitch Integration ---
 
     def ui_mockup(self, description: str, agent_id: str):
-        """Generate a UI mockup (Mocked for now)."""
+        """Generate a UI mockup using Google Stitch (simulated)."""
         # In a real scenario, this would call Google Stitch API
-        # For now, we simulate the process and create a local 'mockup' file
+        # We simulate this by creating a prompt for the agent to design the UI
         mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
         
@@ -569,39 +610,42 @@ class ACEService:
         mockup_dir.mkdir(parents=True, exist_ok=True)
         mockup_file = mockup_dir / f"{mockup_id}.md"
         
+        # Use cursor-agent to generate the "mockup" (which is actually code/design)
+        prompt = f"Design a UI mockup for: {description}. Output the design as a markdown file with Tailwind CSS code."
+        agent_cmd = f"cursor-agent --print --model gemini-3-flash --force --trust \"{prompt}\""
+        result = subprocess.run(agent_cmd, shell=True, capture_output=True, text=True)
+        
         content = f"""# UI Mockup: {description}
 - **Agent**: {agent_id}
 - **URL**: {mockup_url}
 - **Status**: Generated
+- **Timestamp**: {datetime.now().isoformat()}
 
-## Design Notes
-- [ ] Modern, clean UI.
-- [ ] Responsive design.
-- [ ] Consistent with project branding.
+## Design & Code
+{result.stdout}
+
+## Errors (if any)
+{result.stderr}
 """
         mockup_file.write_text(content)
         return mockup_url
 
     def ui_sync(self, url: str):
-        """Sync UI code from Google Stitch (Mocked for now)."""
-        # In a real scenario, this would fetch code from the URL
-        # We'll simulate this by returning a component based on the URL
-        component_name = "SyncedComponent"
-        if "stitch_" in url:
-            mockup_id = url.split("/")[-1]
-            component_name = f"Component_{mockup_id}"
+        """Sync UI code from Google Stitch (simulated)."""
+        # Extract mockup_id from URL
+        mockup_id = url.split("/")[-1]
+        mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+        
+        if not mockup_file.exists():
+            return f"// Error: Mockup {mockup_id} not found."
 
-        return f"""// Synced from {url}
-import React from 'react';
-
-export const {component_name} = () => (
-  <div className="p-4 border rounded shadow">
-    <h2 className="text-xl font-bold">UI Mockup</h2>
-    <p>This component was synced from Google Stitch.</p>
-    <p className="text-sm text-gray-500">Source: {url}</p>
-  </div>
-);
-"""
+        content = mockup_file.read_text()
+        # Extract code block from the mockup file
+        code_match = re.search(r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```", content, re.DOTALL)
+        if code_match:
+            return code_match.group(1)
+        
+        return f"// Error: No code found in mockup {mockup_id}."
 
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 13
+
+### Added
+- **Phase 4: RALPH Loop & Multi-Agent Coordination (M4)**
+  - RALPH Loop Engine: Implemented `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.
+
 ## [2026-04-01] - RALPH Loop Iteration 12
 
 ### Added

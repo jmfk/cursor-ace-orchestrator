@@ -105,13 +105,23 @@ def test_context_building(service):
     assert "Auth playbook content" in context
 
 
-def test_google_stitch(service):
+def test_google_stitch(service, monkeypatch):
+    # Mock subprocess.run for ui_mockup
+    import subprocess
+    from unittest.mock import MagicMock
+    
+    mock_res = MagicMock()
+    mock_res.stdout = "```tsx\nexport const MyComponent = () => <div>Hello</div>;\n```"
+    mock_res.stderr = ""
+    mock_res.returncode = 0
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: mock_res)
+
     url = service.ui_mockup("admin dashboard", "ui-agent")
     assert "stitch.google.com" in url
     
     code = service.ui_sync(url)
-    assert "Synced from" in code
-    assert "UI Mockup" in code
+    assert "export const MyComponent" in code
+    assert "<div>Hello</div>" in code
 
 
 def test_sop_logic(service):
@@ -125,13 +135,31 @@ def test_sop_logic(service):
     assert "SOP: PR Review - PR-123" in review_file.read_text()
 
 
-def test_ralph_loop(service):
-    # Mock a successful test command
+def test_ralph_loop(service, monkeypatch):
+    # Mock subprocess.run for run_loop
+    import subprocess
+    from unittest.mock import MagicMock
+    
+    mock_res = MagicMock()
+    mock_res.stdout = "Test output"
+    mock_res.stderr = ""
+    mock_res.returncode = 0
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: mock_res)
+
+    # Mock build_context to return a fixed context
+    monkeypatch.setattr(service, "build_context", lambda **kwargs: ("Mock context", "test-agent"))
+
     success, iterations = service.run_loop("test task", "exit 0", max_iterations=2)
     assert success is True
     assert iterations == 1
 
-    # Mock a failing test command
+    # Mock failure
+    mock_fail = MagicMock()
+    mock_fail.stdout = "Failure output"
+    mock_fail.stderr = "Error"
+    mock_fail.returncode = 1
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: mock_fail)
+
     success, iterations = service.run_loop("test task", "exit 1", max_iterations=2)
     assert success is False
     assert iterations == 2
