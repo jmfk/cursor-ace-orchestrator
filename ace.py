@@ -448,7 +448,7 @@ def decision_add(
     if res:
         console.print(
             f"Created ADR: "
-            f"[green]{service.decisions_dir / f'{res['id']}.md'}[/green]"
+            f"[green]{service.decisions_dir / (res['id'] + '.md')}[/green]"
         )
     else:
         adr = service.add_decision(

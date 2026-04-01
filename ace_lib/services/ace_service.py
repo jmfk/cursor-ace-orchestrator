@@ -551,7 +551,7 @@ class ACEService:
                 f"--context-file {context_file} \"{prompt}\""
             )
 
-            print(f"[RALPH] Running agent command...")
+            print("[RALPH] Running agent command...")
             agent_proc = subprocess.run(
                 agent_cmd, shell=True, capture_output=True, text=True
             )
@@ -605,7 +605,7 @@ class ACEService:
 
                 # Final Reflection on success
                 if os.getenv("ANTHROPIC_API_KEY"):
-                    print(f"[RALPH] Performing final reflection...")
+                    print("[RALPH] Performing final reflection...")
                     reflection_text = self.reflect_on_session(
                         agent_proc.stdout + "\n" + result.stdout
                     )
@@ -735,15 +735,28 @@ class ACEService:
         # Use cursor-agent to generate the "mockup"
         prompt = (
             f"Design a UI mockup for: {description}. "
-            "Output the design as a markdown file with Tailwind CSS code."
+            "Output the design as a single TSX code block using Tailwind CSS. "
+            "The output should be ONLY the code block."
         )
+        
+        # In a real implementation, we might use a specialized Stitch API
+        # For now, we use the agent to simulate the generation
         agent_cmd = (
             "cursor-agent --print --model gemini-3-flash --force --trust "
             f"\"{prompt}\""
         )
+        
+        print(f"[STITCH] Generating mockup for: {description}")
         result = subprocess.run(
             agent_cmd, shell=True, capture_output=True, text=True
         )
+
+        # Extract the code block to ensure we have clean UI code
+        code_match = re.search(
+            r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
+            result.stdout, re.DOTALL
+        )
+        ui_code = code_match.group(1) if code_match else result.stdout
 
         content = f"""# UI Mockup: {description}
 - **Agent**: {agent_id}
@@ -752,6 +765,11 @@ class ACEService:
 - **Timestamp**: {datetime.now().isoformat()}
 
 ## Design & Code
+```tsx
+{ui_code}
+```
+
+## Raw Output
 {result.stdout}
 
 ## Errors (if any)

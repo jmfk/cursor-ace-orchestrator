@@ -4,6 +4,7 @@ import sys
 import time
 import json
 import hashlib
+import re
 from datetime import datetime
 
 # Configuration
@@ -162,7 +163,7 @@ def main():
     
     if "--help" in sys.argv or "-h" in sys.argv:
         print("RALPH Loop for Cursor ACE Orchestrator")
-        print(f"Usage: python ralph_loop.py [PRD_PATH]")
+        print("Usage: python ralph_loop.py [PRD_PATH]")
         print(f"Default PRD: {DEFAULT_PRD}")
         return
     

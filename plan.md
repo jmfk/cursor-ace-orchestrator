@@ -40,3 +40,13 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
 - [x] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
 - [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
+
+## Phase 6: Refinement & Missing Features (Current Focus)
+- [ ] **6.1 Consensus Protocol Refinement**: Implement the LLM-referee logic for `ace debate` (currently only sends mail).
+- [ ] **6.2 SOP Engine Expansion**: Implement the `audit` SOP (currently only `onboarding` and `pr-review` exist).
+- [ ] **6.3 Google Stitch Real Integration**: Replace simulated Stitch integration with real API calls or more robust local mocks.
+- [ ] **6.4 Test Coverage**: Increase test coverage for `ACEService` and API endpoints (currently only basic tests exist).
+- [ ] **6.5 Documentation Update**: Ensure `README.md` reflects all Phase 4 and 5 features.
+- [ ] **6.6 FastAPI Backend Implementation**: Create the actual FastAPI app and endpoints (currently only the service layer exists).
+- [ ] **6.7 Memory Write-back Verification**: Add tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
+- [ ] **6.8 RALPH Loop Reflection Integration**: Ensure the loop correctly uses reflection to update memory between iterations.
