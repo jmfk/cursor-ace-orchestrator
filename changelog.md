@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 58
+
+### Added
+- **Phase 9: Future Directions**
+  - TDD & Core SOPs: Established the 'tests/' directory, wrote unit tests for ACEService, integrated RALPH loop into 'ace.py', and implemented formal SOPs for onboarding and PR reviews.
+  - Updated `plan.md` to mark task 9.5 as completed and cleaned up duplicate entries.
+
 ## [2026-04-01] - RALPH Loop Iteration 57
 
 ### Added
