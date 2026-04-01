@@ -948,13 +948,13 @@ class ACEService:
 ## 1. Context Acquisition
 - [ ] **Registry**: Read `AGENTS.md` to understand the current agent landscape.
 - [ ] **Decisions**: Read `.ace/decisions/*.md` for recent architectural decisions.
-- [ ] **Global Standards**: Read `_global.mdc` for project-wide standards.
+- [ ] **Global Standards**: Read `.cursor/rules/_global.mdc` for project-wide standards.
 - [ ] **Ownership**: Review `ownership.yaml` for assigned modules.
 
 ## 2. Role-Specific Setup
 - [ ] **Playbook**: Create/Verify `{agent.memory_file}` exists.
-- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns",
-- [ ] **Sections**: "Kända fallgropar", and "Arkitekturella beslut".
+        - [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns",
+        "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
 - [ ] **Audit**: Review existing codebase in assigned modules: {responsibilities}

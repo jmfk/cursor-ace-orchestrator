@@ -842,46 +842,46 @@ def memory_sync():
     console.print("Updated [green]AGENTS.md[/green]")
 
 
-    @app.command()
-    def loop(
-        prompt: str = typer.Argument(..., help="The prompt to solve"),
-        test_cmd: str = typer.Option(
-            ..., "--test", "-t", help="Command to run tests"
-        ),
-        max_iterations: int = typer.Option(
-            10, "--max", "-m", help="Maximum number of iterations"
-        ),
-        path: Optional[str] = typer.Option(
-            None, "--path", "-p", help="Path to the file or module"
-        ),
-        agent_id: Optional[str] = typer.Option(
-            None, "--agent", "-a", help="Explicit agent ID"
-        ),
-    ):
-        """
-        Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
-        """
-        console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
-        console.print(f"Prompt: [italic]{prompt}[/italic]")
-        console.print(f"Test Command: [italic]{test_cmd}[/italic]")
-        console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
+@app.command()
+def loop(
+    prompt: str = typer.Argument(..., help="The prompt to solve"),
+    test_cmd: str = typer.Option(
+        ..., "--test", "-t", help="Command to run tests"
+    ),
+    max_iterations: int = typer.Option(
+        10, "--max", "-m", help="Maximum number of iterations"
+    ),
+    path: Optional[str] = typer.Option(
+        None, "--path", "-p", help="Path to the file or module"
+    ),
+    agent_id: Optional[str] = typer.Option(
+        None, "--agent", "-a", help="Explicit agent ID"
+    ),
+):
+    """
+    Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
+    """
+    console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
+    console.print(f"Prompt: [italic]{prompt}[/italic]")
+    console.print(f"Test Command: [italic]{test_cmd}[/italic]")
+    console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
 
-        svc = get_service()
-        success, iterations = svc.run_loop(
-            prompt, test_cmd, max_iterations, path, agent_id
+    svc = get_service()
+    success, iterations = svc.run_loop(
+        prompt, test_cmd, max_iterations, path, agent_id
+    )
+
+    if success:
+        console.print(
+            f"\n✅ [bold green]RALPH Loop completed successfully in "
+            f"{iterations} iterations![/bold green]"
         )
-
-        if success:
-            console.print(
-                f"\n✅ [bold green]RALPH Loop completed successfully in "
-                f"{iterations} iterations![/bold green]"
-            )
-        else:
-            console.print(
-                f"\n❌ [bold red]RALPH Loop failed after "
-                f"{iterations} iterations.[/bold red]"
-            )
-            raise typer.Exit(code=1)
+    else:
+        console.print(
+            f"\n❌ [bold red]RALPH Loop failed after "
+            f"{iterations} iterations.[/bold red]"
+        )
+        raise typer.Exit(code=1)
 
 
 @app.command()

@@ -18,6 +18,11 @@ STATS_FILE = "ralph_stats.json"
 STATE_HISTORY_FILE = "ralph_state_history.json"
 DEFAULT_PRD = "PRD-01 - Cursor-ace-orchestrator-prd.md"
 STAGNATION_THRESHOLD = 2  # Number of iterations with same state before alert
+MAX_CONSECUTIVE_FAILURES = 3  # Max LLM failures before circuit breaker trips
+
+# Global State
+LLM_CIRCUIT_BREAKER_TRIPPED = False
+CONSECUTIVE_FAILURES = 0
 
 # NOTE: This script is a temporary bootstrapping tool.
 # Once the core ACE Orchestrator is built, this script should be
@@ -72,10 +77,16 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
 
 def run_cursor_agent(prompt: str):
     """Runs cursor-agent in non-interactive mode and tracks usage."""
+    global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES
+
+    if LLM_CIRCUIT_BREAKER_TRIPPED:
+        log_message("🚫 Circuit breaker is TRIPPED. Skipping LLM call.")
+        return None
+
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
 
-    # Corrected command structure based on cursor-agent --help
+    # ... existing cmd setup ...
     cmd = [
         "cursor-agent",
         "--api-key",
@@ -96,12 +107,21 @@ def run_cursor_agent(prompt: str):
         elapsed = time.time() - start_time
 
         if result.returncode != 0:
+            CONSECUTIVE_FAILURES += 1
             log_message(
-                f"❌ Cursor Agent failed with Exit Code {result.returncode}")
+                f"❌ Cursor Agent failed with Exit Code {result.returncode} "
+                f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
+            
+            if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+                LLM_CIRCUIT_BREAKER_TRIPPED = True
+                log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
+
             log_message(f"--- STDOUT ---\n{result.stdout}")
             log_message(f"--- STDERR ---\n{result.stderr}")
             return None
 
+        # Reset failures on success
+        CONSECUTIVE_FAILURES = 0
         # If successful, extract simulated stats
         input_tokens = len(prompt.split()) * 1.3
         output_tokens = len(result.stdout.split()) * 1.3
@@ -110,17 +130,26 @@ def run_cursor_agent(prompt: str):
         return result.stdout
 
     except Exception as e:
+        CONSECUTIVE_FAILURES += 1
         log_message(
-            f"🚨 Unexpected error during subprocess execution: {str(e)}")
+            f"🚨 Unexpected error during subprocess execution: {str(e)} "
+            f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
+        
+        if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+            LLM_CIRCUIT_BREAKER_TRIPPED = True
+            log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
+            
         return None
 
 
 def generate_commit_message(task_name: str):
     """Generate a descriptive commit message using direct Gemini API or cursor-agent."""
+    global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES
+
     # Check for Gemini API key in multiple possible environment variables
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-    # Try to load from .env file if python-dotenv is available (optional)
+    # ... existing key loading ...
     if not api_key:
         try:
             from dotenv import load_dotenv
@@ -151,7 +180,7 @@ def generate_commit_message(task_name: str):
         "Output ONLY the commit message string. No JSON, no markdown, no quotes."
     )
 
-    if api_key:
+    if api_key and not LLM_CIRCUIT_BREAKER_TRIPPED:
         log_message("Generating commit message via direct Gemini API...")
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"gemini-2.5-flash:generateContent?key={api_key}")
@@ -166,23 +195,30 @@ def generate_commit_message(task_name: str):
                 result = response.json()
                 msg = (result['candidates'][0]['content']['parts'][0]['text']
                        .strip())
+                CONSECUTIVE_FAILURES = 0 # Reset on success
                 return msg
             else:
+                CONSECUTIVE_FAILURES += 1
                 log_message(f"⚠️ Direct Gemini API failed (Status "
-                            f"{response.status_code}). Error: {response.text}")
-                log_message("Falling back to cursor-agent.")
+                            f"{response.status_code}). Error: {response.text} "
+                            f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
+                
+                if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+                    LLM_CIRCUIT_BREAKER_TRIPPED = True
+                    log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
+                log_message("Falling back to iteration-based message.")
         except Exception as e:
-            log_message(f"⚠️ Error calling Gemini API: {e}. Falling back to "
-                        f"cursor-agent.")
+            CONSECUTIVE_FAILURES += 1
+            log_message(f"⚠️ Error calling Gemini API: {e}. "
+                        f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
+            if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+                LLM_CIRCUIT_BREAKER_TRIPPED = True
+                log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
+            log_message("Falling back to iteration-based message.")
 
-    # Fallback to cursor-agent
-    log_message("Generating commit message via cursor-agent...")
-    commit_prompt = (
-        f"Based on the task '{task_name}' and the current changes, generate a concise, "
-        "descriptive git commit message (one line). Output ONLY the commit message string. "
-        "DO NOT output any JSON, system metadata, or extra text."
-    )
-    msg = run_cursor_agent(commit_prompt)
+    # Fallback to iteration-based message
+    log_message("Using iteration-based commit message fallback.")
+    return f"RALPH Loop: Task {task_name[:50]}"
 
     # Clean the message
     if msg:
