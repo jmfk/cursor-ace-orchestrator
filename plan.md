@@ -67,4 +67,5 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **9.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
 - [x] **9.4 Multi-Agent Consensus Protocol (MACP) Refinement**: Implement a more robust consensus protocol for larger agent teams.
 - [x] **9.5 TDD & Core SOPs**: Establish the 'tests/' directory, write unit tests for ACEService, integrate RALPH loop into 'ace.py', and implement formal SOPs for onboarding and PR reviews.
-- [ ] **9.6 Google Stitch Integration**: Connect the CLI stubs to actual API or code extraction logic.
+- [x] **9.6 Google Stitch Integration**: Connect the CLI stubs to actual API or code extraction logic.
+- [ ] **9.7 Next Task**: Placeholder for next task.

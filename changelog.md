@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 64
+
+### Added
+- **Phase 9: Future Directions**
+  - Google Stitch Integration: Connected the CLI stubs to actual API and code extraction logic.
+  - Updated `plan.md` to mark task 9.6 as completed and kept the list sorted.
+
 ## [2026-04-02] - RALPH Loop Iteration 63
 
 ### Added
