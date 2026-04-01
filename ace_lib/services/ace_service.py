@@ -803,6 +803,18 @@ class ACEService:
                 agent_cmd, shell=True, capture_output=True, text=True, env=env
             )
 
+            # Log token usage (simulated for now, as cursor-agent doesn't return it yet)
+            input_tokens = len(prompt.split()) * 1.3
+            output_tokens = len(agent_proc.stdout.split()) * 1.3
+            self.log_token_usage(TokenUsage(
+                agent_id=resolved_agent_id or "unknown",
+                session_id=f"loop_{iteration}",
+                prompt_tokens=int(input_tokens),
+                completion_tokens=int(output_tokens),
+                total_tokens=int(input_tokens + output_tokens),
+                cost=(input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40)
+            ))
+
             # 3. Verify (Run tests)
             print(f"[RALPH] Verifying with: {test_cmd}")
             result = subprocess.run(
@@ -920,11 +932,27 @@ class ACEService:
                     )
                     if status.stdout.strip():
                         commit_msg = f"RALPH Loop: {prompt[:50]}"
-                        if reflection_text and reflection_text != "No new learnings.":
-                            # Try to get a better message from reflection if possible
-                            # For now, just use a simple one
-                            pass
-                        
+                        # Try to generate a better commit message using LLM if available
+                        client = self.get_anthropic_client()
+                        if client:
+                            try:
+                                diff = subprocess.run(["git", "diff"], capture_output=True, text=True).stdout
+                                msg_prompt = (
+                                    "Generate a concise, one-line git commit message for the following task: "
+                                    f"{prompt[:100]}\n\n"
+                                    f"Git Diff context:\n{diff[:2000]}\n\n"
+                                    "Output ONLY the commit message string."
+                                )
+                                message = client.messages.create(
+                                    model="claude-3-5-sonnet-20241022",
+                                    max_tokens=100,
+                                    messages=[{"role": "user", "content": msg_prompt}],
+                                )
+                                if isinstance(message.content, list):
+                                    commit_msg = message.content[0].text.strip()
+                            except Exception:
+                                pass
+
                         subprocess.run(["git", "add", "."], check=True)
                         subprocess.run(["git", "commit", "-m", commit_msg], check=True)
                         print(f"[RALPH] Committed: {commit_msg}")

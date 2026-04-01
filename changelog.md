@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 44
+
+### Added
+- **Phase 7: Future Directions**
+  - Security Hardening: Conducted a formal security audit and implemented sandboxing for agent execution.
+  - Updated `plan.md` to mark task 7.5 as completed.
+
 ## [2026-04-01] - RALPH Loop Iteration 43
 
 ### Added
