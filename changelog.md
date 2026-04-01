@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 14
+
+### Added
+- **Phase 4: RALPH Loop & Multi-Agent Coordination (M4)**
+  - SOP Engine: Implemented Standard Operating Procedures for `onboarding`, `audit`, and `pr-review`.
+
 ## [2026-04-01] - RALPH Loop Iteration 13
 
 ### Added
