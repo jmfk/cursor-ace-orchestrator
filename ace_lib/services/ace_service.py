@@ -983,9 +983,9 @@ class ACEService:
 - [ ] **Debt**: Identify initial technical debts and document as `[mis-NEW]` in playbook.
 - [ ] **Strategy**: Propose first strategy improvement as `[str-NEW]`.
 
-#    # 4. Handover & Verification
-    - [ ] **Communication**: Send a "Ready" message to the orchestrator via `ace mail-send`.
-    - [ ] **Consensus**: Participate in the next `ace debate` to demonstrate alignment.
+## 4. Handover & Verification
+- [ ] **Communication**: Send a "Ready" message to the orchestrator via `ace mail-send`.
+- [ ] **Consensus**: Participate in the next `ace debate` to demonstrate alignment.
 
 ## 5. Standard Operating Procedures (SOPs)
 - [ ] **Onboarding**: Follow `ace agent onboard` to initialize role-specific playbooks.
