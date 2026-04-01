@@ -204,7 +204,7 @@ def main():
                 if not commit_msg or len(commit_msg.strip()) < 5:
                     commit_msg = f"RALPH Loop: Implementation iteration {iteration}"
                 else:
-                    commit_msg = commit_msg.strip().split('\n')[0] # Take first line
+                    commit_msg = commit_msg.strip().split('\n')[0]  # Take first line
 
                 subprocess.run(["git", "add", "."], check=True)
                 subprocess.run(["git", "commit", "-m", commit_msg], check=True)

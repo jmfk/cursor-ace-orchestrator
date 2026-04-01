@@ -111,7 +111,6 @@ class PlaybookUpdater:
             post_content = content[next_section:]
 
         # Check if the entry already exists in the section
-        # Use a more robust check that doesn't rely on the comment markers
         entry_id_marker = f"[{entry.type}-{entry.id}]"
         if entry_id_marker in section_content:
             # Update existing entry
@@ -122,12 +121,8 @@ class PlaybookUpdater:
                 new_entry_line = f"<!-- [{entry.type}-{entry.id}] helpful={entry.helpful} harmful={entry.harmful} :: {entry.content} -->"
                 old_entry_pattern = rf"<!-- \[{entry.type}-{entry.id}\] helpful=\d+ harmful=\d+ :: .*? -->"
 
-            # Use a more specific replacement that includes the comment markers
-            # and avoid issues with re.sub and groups if needed.
-            # We'll use a simple string replace if we can find the exact old line.
             match = re.search(old_entry_pattern, section_content)
             if match:
-                # Replace only the first occurrence within the section_content
                 section_content = section_content[: match.start()] + new_entry_line + section_content[match.end() :]
         else:
             # Add new entry
@@ -136,10 +131,6 @@ class PlaybookUpdater:
             else:
                 new_entry_line = f"<!-- [{entry.type}-{entry.id}] helpful={entry.helpful} harmful={entry.harmful} :: {entry.content} -->"
 
-            # Append at the end of section_content
-            if section_content.strip().endswith("-->"):
-                section_content = section_content.rstrip() + f"\n{new_entry_line}\n"
-            else:
-                section_content = section_content.rstrip() + f"\n{new_entry_line}\n"
+            section_content = section_content.rstrip() + f"\n{new_entry_line}\n"
 
         return content[:section_start] + section_content + post_content

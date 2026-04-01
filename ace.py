@@ -85,7 +85,7 @@ def init():
 @app.command()
 def own(path: str, agent: str):
     """Assign ownership of a path to an agent."""
-    res = api_call("POST", "/ownership", params={"path": path, "agent_id": agent})
+    res = api_call("POST", "/ownership", json={"path": path, "agent_id": agent})
     if not res:
         service.assign_ownership(path, agent)
     console.print(f"Assigned [blue]{path}[/blue] to agent [green]{agent}[/green]")
@@ -133,7 +133,7 @@ def agent_create(
     email: Optional[str] = typer.Option(None, "--email", "-e", help="Agent email"),
 ):
     """Create a new agent in the registry."""
-    res = api_call("POST", "/agents", params={"id": id, "name": name, "role": role, "email": email})
+    res = api_call("POST", "/agents", json={"id": id, "name": name, "role": role, "email": email})
     if res:
         console.print(f"Created agent [green]{res['name']}[/green] (ID: {res['id']})")
     else:
@@ -349,7 +349,7 @@ def decision_add(
     res = api_call(
         "POST",
         "/decisions",
-        params={
+        json={
             "title": title,
             "context": context,
             "decision": decision,
@@ -479,36 +479,13 @@ def loop(
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
 
-    iteration = 0
-    while iteration < max_iterations:
-        iteration += 1
-        console.print(f"\n[bold]=== Iteration {iteration}/{max_iterations} ===[/bold]")
+    success, iterations = service.run_loop(prompt, test_cmd, max_iterations, path, agent_id)
 
-        # 1. Build Context
-        context, resolved_agent_id = service.build_context(path, TaskType.IMPLEMENT, agent_id)
-
-        # 2. Execute agent (Mocking cursor-agent call for now, as it's a CLI tool)
-        # In a real scenario, this would call 'ace run' or similar logic
-        console.print("Building next task...")
-        # Since we are an agent, we can't easily call cursor-agent from within ourselves
-        # but we can simulate the execution logic.
-        
-        # 3. Verify (Run tests)
-        console.print(f"Verifying implementation with: [italic]{test_cmd}[/italic]")
-        result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            console.print("✅ [bold green]Verification successful![/bold green]")
-            break
-        else:
-            console.print(f"❌ [bold red]Verification failed (Exit code: {result.returncode})[/bold red]")
-            console.print(result.stdout)
-            console.print(result.stderr)
-            # 4. Reflect (In a real scenario, we'd pass the error to the agent)
-            # For now, we'll just log it and continue
-            
-    if iteration >= max_iterations:
-        console.print(f"Reached maximum iterations ({max_iterations}). Stopping.")
+    if success:
+        console.print(f"\n✅ [bold green]RALPH Loop completed successfully in {iterations} iterations![/bold green]")
+    else:
+        console.print(f"\n❌ [bold red]RALPH Loop failed after {iterations} iterations.[/bold red]")
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -519,7 +496,7 @@ def mail_send(
     body: str = typer.Option(..., "--body", "-b", help="Body"),
 ):
     """Send a message to another agent."""
-    res = api_call("POST", "/mail", params={"to_agent": to, "from_agent": sender, "subject": subject, "body": body})
+    res = api_call("POST", "/mail", json={"to_agent": to, "from_agent": sender, "subject": subject, "body": body})
     if not res:
         service.send_mail(to, sender, subject, body)
     console.print(f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]")

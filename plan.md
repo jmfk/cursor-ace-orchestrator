@@ -5,7 +5,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 ## Phase 5: API & Future Readiness
 - [x] **5.1 FastAPI Architecture**: Refactor core logic into a service layer to support a FastAPI backend for future Web/IDE integration.
 - [x] **5.2 CLI-to-API Bridge**: Ensure all CLI commands call the underlying service layer.
-- [ ] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
+- [x] **5.3 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
 
 ## Phase 4: RALPH Loop & Multi-Agent Coordination (M4)
 - [ ] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Repeat.

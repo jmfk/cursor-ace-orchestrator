@@ -14,6 +14,7 @@ service = ACEService()
 async def list_agents():
     return service.load_agents().agents
 
+
 @app.post("/agents", response_model=Agent)
 async def create_agent(id: str, name: str, role: str, email: Optional[str] = None):
     try:
@@ -21,30 +22,37 @@ async def create_agent(id: str, name: str, role: str, email: Optional[str] = Non
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.get("/ownership", response_model=OwnershipConfig)
 async def get_ownership():
     return service.load_ownership()
 
+
 @app.post("/ownership")
 async def assign_ownership(path: str, agent_id: str):
     return service.assign_ownership(path, agent_id)
+
 
 @app.get("/context")
 async def build_context(path: Optional[str] = None, task_type: TaskType = TaskType.IMPLEMENT, agent_id: Optional[str] = None):
     context, resolved_agent_id = service.build_context(path, task_type, agent_id)
     return {"context": context, "agent_id": resolved_agent_id}
 
+
 @app.get("/decisions", response_model=List[Decision])
 async def list_decisions():
     return service.list_decisions()
+
 
 @app.post("/decisions", response_model=Decision)
 async def add_decision(title: str, context: str, decision: str, consequences: str, status: str = "accepted", agent_id: Optional[str] = None):
     return service.add_decision(title, context, decision, consequences, status, agent_id)
 
+
 @app.get("/config", response_model=Config)
 async def get_config():
     return service.load_config()
+
 
 @app.post("/config/tokens")
 async def set_token_mode(mode: TokenMode):
@@ -53,9 +61,11 @@ async def set_token_mode(mode: TokenMode):
     service.save_config(config)
     return config
 
+
 @app.get("/mail/{agent_id}", response_model=List[MailMessage])
 async def list_mail(agent_id: str):
     return service.list_mail(agent_id)
+
 
 @app.get("/mail/{agent_id}/{msg_id}", response_model=MailMessage)
 async def read_mail(agent_id: str, msg_id: str):
@@ -64,13 +74,16 @@ async def read_mail(agent_id: str, msg_id: str):
         raise HTTPException(status_code=404, detail="Message not found")
     return msg
 
+
 @app.post("/mail", response_model=MailMessage)
 async def send_mail(to_agent: str, from_agent: str, subject: str, body: str):
     return service.send_mail(to_agent, from_agent, subject, body)
 
+
 @app.get("/sessions", response_model=List[Dict])
 async def list_sessions():
     return service.list_sessions()
+
 
 @app.get("/sessions/{session_id}")
 async def get_session(session_id: str):
@@ -78,6 +91,7 @@ async def get_session(session_id: str):
     if not content:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"content": content}
+
 
 @app.post("/sessions/{session_id}/reflect")
 async def reflect_session(session_id: str):
@@ -104,6 +118,7 @@ async def reflect_session(session_id: str):
         service.update_playbook(playbook_path, updates)
         
     return {"reflection": reflection_text, "updates": updates}
+
 
 @app.post("/memory/prune")
 async def prune_memory(agent_id: Optional[str] = None, threshold: int = 0):

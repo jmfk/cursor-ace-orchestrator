@@ -273,20 +273,25 @@ class ACEService:
         content = playbook_path.read_text()
         for update in updates:
             update_id, update_type = update["id"], update["type"]
+            
+            # Pattern to match existing entries with optional helpful/harmful values
             existing_pattern = (
                 rf"<!-- \[{update_type}-{update_id}\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
             )
             match = re.search(existing_pattern, content)
 
             if match:
+                # Update existing entry by accumulating helpful/harmful counts
                 old_h, old_m = int(match.group(1) or 0), int(match.group(2) or 0)
-                new_h, new_m = old_h + update["helpful"], old_m + update["harmful"]
+                new_h, new_m = old_h + update.get("helpful", 0), old_m + update.get("harmful", 0)
+                
                 new_line = f"<!-- [{update_type}-{update_id}]"
                 if update_type != "dec":
                     new_line += f" helpful={new_h} harmful={new_m}"
                 new_line += f" :: {update['description']} -->"
                 content = content.replace(match.group(0), new_line)
             else:
+                # Handle NEW entries by generating a sequential ID
                 if update_id == "NEW":
                     existing_ids = re.findall(rf"\[{update_type}-(\d+)\]", content)
                     next_id = max([int(i) for i in existing_ids] + [0]) + 1
@@ -294,7 +299,7 @@ class ACEService:
 
                 update_str = f"[{update_type}-{update_id}]"
                 if update_type != "dec":
-                    update_str += f" helpful={update['helpful']} harmful={update['harmful']}"
+                    update_str += f" helpful={update.get('helpful', 0)} harmful={update.get('harmful', 0)}"
                 new_line = f"<!-- {update_str} :: {update['description']} -->"
 
                 section_map = {
@@ -304,10 +309,10 @@ class ACEService:
                 }
                 header = section_map.get(update_type)
                 if header and header in content:
-                    parts = content.split(header)
+                    parts = content.split(header, 1)
                     content = parts[0] + header + "\n" + new_line + parts[1]
                 else:
-                    content += f"\n\n{header}\n{new_line}"
+                    content = content.rstrip() + f"\n\n{header}\n{new_line}\n"
 
         playbook_path.write_text(content)
         return True
@@ -447,13 +452,37 @@ class ACEService:
             # 1. Context Refresh & Build
             context, resolved_agent_id = self.build_context(path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id)
             
-            # 2. Execute (Mocking cursor-agent call for now, as it's a CLI tool)
-            # In a real scenario, this would call 'ace run' or similar logic
+            # 2. Execute
+            # In a real scenario, this would call 'ace run' or similar logic.
+            # For the native loop, we'll use a simplified execution that logs the attempt.
             print(f"[RALPH] Executing task: {prompt[:50]}...")
+            
+            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_file = self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
+            self.sessions_dir.mkdir(parents=True, exist_ok=True)
             
             # 3. Verify (Run tests)
             print(f"[RALPH] Verifying with: {test_cmd}")
             result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
+            
+            session_content = f"""# Session Loop {session_id} (Iteration {iteration})
+- **Prompt**: `{prompt}`
+- **Test Command**: `{test_cmd}`
+- **Agent ID**: `{resolved_agent_id}`
+- **Exit Code**: {result.returncode}
+- **Timestamp**: {datetime.now().isoformat()}
+
+## Output
+### Stdout
+```
+{result.stdout}
+```
+### Stderr
+```
+{result.stderr}
+```
+"""
+            session_file.write_text(session_content)
             
             if result.returncode == 0:
                 print("[RALPH] ✅ Verification successful!")
@@ -462,7 +491,6 @@ class ACEService:
             else:
                 print(f"[RALPH] ❌ Verification failed (Exit code: {result.returncode})")
                 # 4. Reflect (In a real scenario, we'd pass the error to the agent)
-                # For now, we'll just log it and continue
             
         return success, iteration
 
@@ -476,38 +504,54 @@ class ACEService:
             raise ValueError(f"Agent {agent_id} not found.")
 
         onboarding_file = self.ace_dir / f"onboarding_{agent_id}.md"
-        content = f"""# Onboarding: {agent.name} ({agent.id})
+        content = f"""# SOP: Agent Onboarding - {agent.name} ({agent.id})
 - **Role**: {agent.role}
 - **Responsibilities**: {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
 - **Memory File**: {agent.memory_file}
 - **Status**: {agent.status}
 
-## Subsystem Status
-- [ ] Review existing codebase in {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
-- [ ] Identify technical debts
-- [ ] Propose initial strategies
+## 1. Context Acquisition
+- [ ] Read `AGENTS.md` to understand the current agent landscape.
+- [ ] Read `.ace/decisions/*.md` for recent architectural decisions.
+- [ ] Read `_global.mdc` for project-wide standards.
 
-## Handover Notes
-No handover notes available.
+## 2. Role-Specific Setup
+- [ ] Create/Verify `{agent.memory_file}` exists.
+- [ ] Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
+
+## 3. Initial Task
+- [ ] Review existing codebase in assigned modules: {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
+- [ ] Identify initial technical debts and document as [mis-NEW] in the playbook.
+- [ ] Propose first strategy improvement as [str-NEW].
+
+## 4. Handover & Verification
+- [ ] Send a "Ready" message to the orchestrator via `ace mail-send`.
 """
         onboarding_file.write_text(content)
         return onboarding_file
 
     def review_pr(self, pr_id: str, agent_id: str):
         """Run PR review SOP for an agent."""
-        # Mocking PR review logic
         review_file = self.ace_dir / f"review_{pr_id}_{agent_id}.md"
-        content = f"""# PR Review: {pr_id}
+        content = f"""# SOP: PR Review - {pr_id}
 - **Reviewer**: {agent_id}
 - **Date**: {datetime.now().isoformat()}
 
-## Findings
-- [ ] Check for deviations from playbook strategies
-- [ ] Identify new pitfalls
-- [ ] Verify architectural decisions
+## 1. Strategy Alignment
+- [ ] Does the PR follow the strategies defined in the reviewer's playbook?
+- [ ] Does the PR adhere to global rules in `_global.mdc`?
 
-## Conclusion
-Pending review.
+## 2. Decision Verification
+- [ ] Does the PR conflict with any recent ADRs in `.ace/decisions/`?
+
+## 3. Learning Extraction
+- [ ] Identify any new successful patterns: [str-NEW]
+- [ ] Identify any new pitfalls or bugs: [mis-NEW]
+- [ ] Identify any architectural choices that should be ADRs: [dec-NEW]
+
+## 4. Conclusion
+- [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
+- [ ] **Comments**: 
 """
         review_file.write_text(content)
         return review_file
@@ -517,14 +561,47 @@ Pending review.
     def ui_mockup(self, description: str, agent_id: str):
         """Generate a UI mockup (Mocked for now)."""
         # In a real scenario, this would call Google Stitch API
+        # For now, we simulate the process and create a local 'mockup' file
         mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
+        
+        mockup_dir = self.ace_dir / "ui_mockups"
+        mockup_dir.mkdir(parents=True, exist_ok=True)
+        mockup_file = mockup_dir / f"{mockup_id}.md"
+        
+        content = f"""# UI Mockup: {description}
+- **Agent**: {agent_id}
+- **URL**: {mockup_url}
+- **Status**: Generated
+
+## Design Notes
+- [ ] Modern, clean UI.
+- [ ] Responsive design.
+- [ ] Consistent with project branding.
+"""
+        mockup_file.write_text(content)
         return mockup_url
 
     def ui_sync(self, url: str):
         """Sync UI code from Google Stitch (Mocked for now)."""
         # In a real scenario, this would fetch code from the URL
-        return f"// Synced from {url}\nexport const Component = () => <div>Synced Component</div>;"
+        # We'll simulate this by returning a component based on the URL
+        component_name = "SyncedComponent"
+        if "stitch_" in url:
+            mockup_id = url.split("/")[-1]
+            component_name = f"Component_{mockup_id}"
+
+        return f"""// Synced from {url}
+import React from 'react';
+
+export const {component_name} = () => (
+  <div className="p-4 border rounded shadow">
+    <h2 className="text-xl font-bold">UI Mockup</h2>
+    <p>This component was synced from Google Stitch.</p>
+    <p className="text-sm text-gray-500">Source: {url}</p>
+  </div>
+);
+"""
 
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
