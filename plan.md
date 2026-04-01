@@ -56,13 +56,15 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **7.4 Profiling & Performance**: Implement `ace_lib/utils/profiler.py` to profile core service methods.
 - [x] **7.5 Update Profiling Log**: Update the profiling log to reflect recent performance optimizations.
 
-## Phase 8: Future Directions (Completed)
-- [x] **8.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks using a vector database (e.g., ChromaDB or Qdrant).
-- [x] **8.2 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
-- [x] **8.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
-- [x] **8.4 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
+## Phase 8: Advanced Memory & Autonomy (Completed)
+- [x] **8.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks using a vector database (ChromaDB).
+- [x] **8.2 Autonomous Agent Expansion**: Implement complexity threshold monitoring and autonomous sub-agent proposal via MACP.
+- [x] **8.3 Google Stitch Advanced Sync**: Bi-directional sync between Stitch and ACE with visual diffing and component extraction.
 
-## Phase 9: Advanced Autonomy (Pending)
-- [x] **9.1 Multi-Agent Consensus Protocol (MACP)**: Implement a more robust consensus protocol for larger agent teams.
-- [x] **9.2 Autonomous Agent Expansion**: Allow agents to autonomously propose new agents for sub-modules if complexity exceeds a threshold.
-- [ ] **9.3 Google Stitch Advanced Sync**: Bi-directional sync between Stitch and ACE with visual diffing.
+## Phase 9: Future Directions (Pending)
+- [x] **9.1 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
+- [x] **9.2 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
+- [x] **9.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
+- [x] **9.4 Multi-Agent Consensus Protocol (MACP) Refinement**: Implement a more robust consensus protocol for larger agent teams.
+- [x] **9.5 TDD & Core SOPs**: Establish the 'tests/' directory, write unit tests for ACEService, integrate RALPH loop into 'ace.py', and implement formal SOPs for onboarding and PR reviews.
+- [x] **9.6 Google Stitch Integration**: Connect the CLI stubs to actual API or code extraction logic.

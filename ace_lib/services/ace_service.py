@@ -1601,10 +1601,8 @@ class ACEService:
         """Sync UI code from Google Stitch with visual diffing."""
         mockup_id = url.split("/")[-1]
         
-        # ... existing code ...
         api_key = os.getenv("STITCH_API_KEY")
         if api_key:
-            # ... (the rest of the loop) ...
             try:
                 # Actual Google Stitch API call
                 response = requests.get(
@@ -1641,7 +1639,15 @@ class ACEService:
                                     diff_file.write_text("\n".join(diff))
 
                         # Update local mockup file with synced code
-                        # ... (existing code) ...
+                        content = (
+                            f"# UI Mockup (Synced): {mockup_id}\n"
+                            f"- **URL**: {url}\n"
+                            f"- **Status**: Synced\n"
+                            f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+                            f"## Design & Code\n"
+                            f"```tsx\n{ui_code}\n```\n"
+                        )
+                        mockup_file.write_text(content)
                         
                         # Extract components from synced code
                         self._extract_stitch_components(mockup_id, ui_code)
