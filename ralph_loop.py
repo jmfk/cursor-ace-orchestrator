@@ -191,10 +191,25 @@ def main():
             # Check if there are changes to commit
             status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
             if status.stdout.strip():
+                # Generate a descriptive commit message using the agent
+                log_message("Generating descriptive commit message...")
+                commit_prompt = (
+                    "Based on the changes made in this iteration, generate a concise, "
+                    "descriptive git commit message (one line). Focus on what was implemented "
+                    "or fixed. Output ONLY the commit message string."
+                )
+                commit_msg = run_cursor_agent(commit_prompt)
+                
+                # Fallback if agent fails to provide a message
+                if not commit_msg or len(commit_msg.strip()) < 5:
+                    commit_msg = f"RALPH Loop: Implementation iteration {iteration}"
+                else:
+                    commit_msg = commit_msg.strip().split('\n')[0] # Take first line
+
                 subprocess.run(["git", "add", "."], check=True)
-                commit_msg = f"RALPH Loop: Implementation iteration {iteration}"
                 subprocess.run(["git", "commit", "-m", commit_msg], check=True)
                 subprocess.run(["git", "push"], check=True)
+                log_message(f"Committed with message: {commit_msg}")
             else:
                 log_message("No changes to commit.")
         except subprocess.CalledProcessError as e:
