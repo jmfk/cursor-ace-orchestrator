@@ -222,6 +222,20 @@ def agent_review(
     )
 
 
+@agent_app.command("audit")
+def agent_audit(
+    agent_id: str = typer.Argument(..., help="Agent ID to audit")
+):
+    """Run audit SOP for an agent."""
+    try:
+        audit_file = service.audit_agent(agent_id)
+        console.print(
+            f"Agent Audit SOP started. File created: [green]{audit_file}[/green]"
+        )
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
 @app.command()
 def config_tokens(
     mode: TokenMode = typer.Option(
@@ -701,13 +715,15 @@ def debate(
         ..., "--agent", "-a", help="Agents to participate"
     ),
 ):
-    """Initiate a debate between multiple agents."""
-    for agent_id in agents:
-        service.send_mail(
-            agent_id, "orchestrator", "DEBATE PROPOSAL",
-            f"Please review and debate the following proposal: {proposal}"
-        )
-    console.print(f"Proposal sent to participants: {', '.join(agents)}")
+    """Initiate and mediate a debate between multiple agents."""
+    console.print(f"🚀 [bold blue]Initiating debate on proposal:[/bold blue] {proposal}")
+    console.print(f"Participants: {', '.join(agents)}")
+    
+    with console.status("[bold green]Mediating debate..."):
+        consensus = service.debate(proposal, agents)
+    
+    console.print("\n[bold]Consensus / Recommendation:[/bold]")
+    console.print(consensus)
 
 
 ui_app = typer.Typer(help="UI integration commands")

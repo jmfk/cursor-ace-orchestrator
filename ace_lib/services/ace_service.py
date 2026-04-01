@@ -513,6 +513,68 @@ class ACEService:
             yaml.dump(msg.model_dump(by_alias=True), f)
         return msg
 
+    def debate(
+        self, proposal: str, agent_ids: List[str]
+    ) -> str:
+        """Mediate a debate between multiple agents."""
+        client = self.get_anthropic_client()
+        
+        # 1. Gather agent perspectives (simulated by having agents "write" to mail)
+        perspectives = []
+        for aid in agent_ids:
+            # In a real scenario, we'd wait for agents to respond to mail.
+            # Here we simulate their input based on their roles.
+            agents_config = self.load_agents()
+            agent = next((a for a in agents_config.agents if a.id == aid), None)
+            role = agent.role if agent else "expert"
+            
+            prompt = (
+                f"You are agent {aid} with role {role}. "
+                f"Review this proposal: {proposal}\n"
+                "Provide a concise critique or support based on your role. "
+                "Focus on architectural impact and project standards."
+            )
+            
+            # Simulate agent response using Claude
+            try:
+                message = client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=512,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                perspective = "".join([
+                    block.text for block in message.content
+                    if hasattr(block, "text")
+                ])
+                perspectives.append(f"Agent {aid} ({role}): {perspective}")
+            except Exception as e:
+                perspectives.append(f"Agent {aid}: Error getting perspective: {e}")
+
+        # 2. LLM-Referee logic
+        referee_prompt = (
+            "You are the ACE Orchestrator Referee. "
+            "You must mediate a debate between multiple agents and reach a consensus.\n\n"
+            f"Original Proposal: {proposal}\n\n"
+            "Agent Perspectives:\n" + "\n".join(perspectives) + "\n\n"
+            "Analyze the perspectives, identify common ground, and provide a final "
+            "recommendation or consensus decision. "
+            "If no consensus is reached, explain why and suggest next steps."
+        )
+        
+        try:
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": referee_prompt}]
+            )
+            consensus = "".join([
+                block.text for block in message.content
+                if hasattr(block, "text")
+            ])
+            return consensus
+        except Exception as e:
+            return f"Error during debate mediation: {e}"
+
     # --- RALPH Loop Engine ---
 
     def run_loop(
@@ -692,6 +754,40 @@ class ACEService:
 """
         onboarding_file.write_text(content)
         return onboarding_file
+
+    def audit_agent(self, agent_id: str):
+        """Run audit SOP for an agent."""
+        agents_config = self.load_agents()
+        agent = next(
+            (a for a in agents_config.agents if a.id == agent_id), None
+        )
+        if not agent:
+            raise ValueError(f"Agent {agent_id} not found.")
+
+        audit_file = self.ace_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+        content = f"""# SOP: Agent Audit - {agent.name} ({agent.id})
+- **Auditor**: Orchestrator
+- **Date**: {datetime.now().isoformat()}
+
+## 1. Memory Health
+- [ ] Check `{agent.memory_file}` for structure and content.
+- [ ] Verify that strategies have helpful/harmful counters.
+- [ ] Identify stale or conflicting strategies.
+
+## 2. Decision Alignment
+- [ ] Review agent's recent contributions against `.ace/decisions/`.
+- [ ] Ensure agent is not repeating previously rejected patterns.
+
+## 3. Performance Review
+- [ ] Analyze session logs for success/failure ratio.
+- [ ] Identify recurring pitfalls [mis-XXX].
+
+## 4. Recommendations
+- [ ] **Action**: [KEEP/PRUNE/RE-ONBOARD]
+- [ ] **Notes**: 
+"""
+        audit_file.write_text(content)
+        return audit_file
 
     def review_pr(self, pr_id: str, agent_id: str):
         """Run PR review SOP for an agent."""

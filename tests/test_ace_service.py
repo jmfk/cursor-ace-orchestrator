@@ -150,6 +150,27 @@ def test_sop_logic(service):
     assert review_file.exists()
     assert "SOP: PR Review - PR-123" in review_file.read_text()
 
+    audit_file = service.audit_agent("auth-agent")
+    assert audit_file.exists()
+    assert "SOP: Agent Audit - Auth Agent" in audit_file.read_text()
+
+
+def test_debate_mediation(service, monkeypatch):
+    from unittest.mock import MagicMock
+    
+    mock_client = MagicMock()
+    mock_msg = MagicMock()
+    mock_msg.content = [MagicMock(text="Perspective/Consensus")]
+    mock_client.messages.create.return_value = mock_msg
+    
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+    service.create_agent(id="a1", name="A1", role="r1")
+    service.create_agent(id="a2", name="A2", role="r2")
+    
+    result = service.debate("Test proposal", ["a1", "a2"])
+    assert "Perspective/Consensus" in result
+    assert mock_client.messages.create.call_count == 3 # 2 agents + 1 referee
+
 
 def test_ralph_loop(service, monkeypatch):
     # Mock subprocess.run for run_loop
