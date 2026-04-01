@@ -5,7 +5,7 @@ import tempfile
 import requests
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Callable
 from ruamel.yaml import YAML
 import anthropic
 from ace_lib.models.schemas import (
@@ -27,6 +27,8 @@ yaml = YAML()
 yaml.preserve_quotes = True
 
 
+from ace_lib.utils.profiler import profiler
+
 class ACEService:
     def __init__(self, base_path: Path = Path(".")):
         self.base_path = base_path
@@ -37,13 +39,23 @@ class ACEService:
         self.mail_dir = self.ace_dir / "mail"
         self.specs_dir = self.ace_dir / "specs"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
+        self._cache = {}
 
-        # Reset any cached data if needed
-        # (Though Pydantic models are usually fresh)
+    def _get_cached(self, key: str, loader: Callable):
+        if key not in self._cache:
+            self._cache[key] = loader()
+        return self._cache[key]
+
+    def clear_cache(self):
+        self._cache.clear()
 
     # --- Config Management ---
 
+    @profiler.profile
     def load_config(self) -> Config:
+        return self._get_cached("config", self._load_config_uncached)
+
+    def _load_config_uncached(self) -> Config:
         config_file = self.ace_dir / "config.yaml"
         if not config_file.exists():
             return Config()
@@ -52,6 +64,7 @@ class ACEService:
             return Config(**data) if data else Config()
 
     def save_config(self, config: Config):
+        self._cache["config"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         config_file = self.ace_dir / "config.yaml"
         with open(config_file, "w") as f:
@@ -59,7 +72,11 @@ class ACEService:
 
     # --- Ownership Management ---
 
+    @profiler.profile
     def load_ownership(self) -> OwnershipConfig:
+        return self._get_cached("ownership", self._load_ownership_uncached)
+
+    def _load_ownership_uncached(self) -> OwnershipConfig:
         ownership_file = self.ace_dir / "ownership.yaml"
         if not ownership_file.exists():
             return OwnershipConfig()
@@ -68,6 +85,7 @@ class ACEService:
             return OwnershipConfig(**data) if data else OwnershipConfig()
 
     def save_ownership(self, config: OwnershipConfig):
+        self._cache["ownership"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         ownership_file = self.ace_dir / "ownership.yaml"
         with open(ownership_file, "w") as f:
@@ -79,6 +97,7 @@ class ACEService:
         self.save_ownership(config)
         return path, agent_id
 
+    @profiler.profile
     def resolve_owner(self, path: str) -> Optional[str]:
         config = self.load_ownership()
         best_match_id = None
@@ -92,7 +111,11 @@ class ACEService:
 
     # --- Agent Management ---
 
+    @profiler.profile
     def load_agents(self) -> AgentsConfig:
+        return self._get_cached("agents", self._load_agents_uncached)
+
+    def _load_agents_uncached(self) -> AgentsConfig:
         agents_file = self.ace_dir / "agents.yaml"
         if not agents_file.exists():
             return AgentsConfig()
@@ -101,6 +124,7 @@ class ACEService:
             return AgentsConfig(**data) if data else AgentsConfig()
 
     def save_agents(self, config: AgentsConfig):
+        self._cache["agents"] = config
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         agents_file = self.ace_dir / "agents.yaml"
         with open(agents_file, "w") as f:
@@ -167,6 +191,7 @@ class ACEService:
         }
         return framing.get(task_type, "")
 
+    @profiler.profile
     def build_context(
         self,
         path: Optional[str] = None,
@@ -392,6 +417,7 @@ class ACEService:
                 )
         return updates
 
+    @profiler.profile
     def update_playbook(self, playbook_path: Path, updates: List[Dict]):
         if not playbook_path.exists():
             return False

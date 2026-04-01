@@ -57,7 +57,7 @@ class ReflectionEngine:
             )
 
         # Find all matches for decisions
-        for match in re.finditer(self.DEC_PATTERN, text):
+        for match in re.finditer(self.DEC_PATTERN, text, re.MULTILINE):
             result.entries.append(
                 ReflectionEntry(
                     id=match.group(1),

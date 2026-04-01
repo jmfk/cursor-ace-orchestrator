@@ -21,7 +21,7 @@ def test_ui_mockup_command(tmp_path, monkeypatch):
     def mock_load_agents():
         return AgentsConfig(version="1", agents=[test_agent])
 
-    monkeypatch.setattr("ace.service.load_agents", mock_load_agents)
+    monkeypatch.setattr("ace.load_agents", mock_load_agents)
     monkeypatch.chdir(tmp_path)
 
     # Run ace ui mockup

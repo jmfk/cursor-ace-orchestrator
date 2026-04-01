@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 32
+
+### Added
+- **Phase 8: Future Directions**
+  - IDE Extension Development: Built a native Cursor/VSCode extension for ACE.
+  - Updated `plan.md` to mark task 8.4 as completed and Phase 8 as Completed.
+  - Added Phase 9: Maintenance & Support to `plan.md`.
+
 ## [2026-04-01] - RALPH Loop Iteration 31
 
 ### Added
