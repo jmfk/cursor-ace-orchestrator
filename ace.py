@@ -1086,10 +1086,6 @@ def ralph(
     Alias for 'ace loop'.
     """
     loop(prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, max_spend, model)
-
-
-
-@app.command()
 def mail_send(
     to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
     sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),

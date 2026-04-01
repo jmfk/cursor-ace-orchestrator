@@ -1189,6 +1189,19 @@ class ACEService:
                 test_cmd, shell=True, capture_output=True, text=True
             )
 
+            # --- Automated Security Audit Integration (Phase 10.18) ---
+            if resolved_agent_id:
+                print(f"[RALPH] Running automated security audit for {resolved_agent_id}...")
+                from ace_lib.agents.security_audit import SecurityAuditService
+                sec_service = SecurityAuditService(self)
+                try:
+                    sec_results = sec_service.run_automated_audit(resolved_agent_id)
+                    if sec_results["summary"]["failed"] > 0:
+                        print(f"[RALPH] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures.")
+                        # We don't necessarily fail the loop, but we log it
+                except Exception as e:
+                    print(f"[RALPH] Security audit error: {e}")
+
             # --- Agentic Feedback Loop (Phase 6.7) ---
             # Automatically flag success/failure based on test-output
             test_passed = (result.returncode == 0)
