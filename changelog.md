@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 11
+
+### Added
+- **Phase 5: API & Future Readiness**
+  - All tasks in Phase 5 are now marked as completed in `plan.md`.
+  - Final verification of CLI-to-API bridge and documentation.
+
 ## [2026-04-01] - RALPH Loop Iteration 10
 
 ### Added

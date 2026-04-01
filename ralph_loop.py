@@ -120,6 +120,20 @@ def main():
         return
     log_message("🚀 Starting RALPH Loop for Cursor ACE Orchestrator...")
 
+    # Step 0: Initial State Analysis & Resumption Logic
+    log_message("Step 0: Analyzing current project state...")
+    plan_content = get_file_content(PLAN_FILE)
+    
+    analysis_prompt = (
+        "Analyze the current codebase and project structure. "
+        f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
+        "1. Identify which PRD-01 features are already implemented (e.g., ace.py, .ace/ structure, context builder, write-back).\n"
+        "2. Identify what is currently missing or partially implemented (e.g., TDD/tests, native ace loop, SOP logic, Google Stitch).\n"
+        "3. Update 'plan.md' to reflect this reality, marking completed tasks as [x] and adding missing ones. "
+        "Ensure the plan is sorted by priority for full PRD-01 implementation."
+    )
+    run_cursor_agent(analysis_prompt)
+    
     iteration = 0
     while iteration < MAX_ITERATIONS:
         iteration += 1
@@ -148,6 +162,11 @@ def main():
         prompt = (
             f"Current plan:\n{plan_content}\n\n"
             "Implement the next (first uncompleted) task from the plan. "
+            "CRITICAL: Focus on implementing the following missing core areas from PRD-01:\n"
+            "1. TDD (Test-Driven Development): Establish the 'tests/' directory and write unit tests for ACEService.\n"
+            "2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py' as a native command.\n"
+            "3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.\n"
+            "4. Google Stitch Integration: Connect the CLI stubs to actual API or code extraction logic.\n\n"
             "Include necessary tests. Ensure the software remains runnable "
             "and testable. Use Python and follow the architecture described "
             "in PRD-01 and ARCHITECTURE.md."
@@ -196,7 +215,18 @@ def main():
         # Check if plan is finished
         plan_content = get_file_content(PLAN_FILE)
         if "[ ]" not in plan_content and "todo" not in plan_content.lower():
-            print("🎉 All tasks in the plan are completed!")
+            log_message("🎉 All tasks in the plan are completed!")
+            
+            # Final Analysis Step
+            log_message("Step 6: Final Implementation Analysis...")
+            analysis_prompt = (
+                "Analyze the current state of implementation relative to PRD-01. "
+                "1. Summarize how much of PRD-01 is implemented (percentage and key features).\n"
+                "2. Identify exactly what is missing to reach 100% completion.\n"
+                "3. Recommend the final set of steps to achieve full implementation.\n"
+                "Output this analysis as a markdown report in 'FINAL_ANALYSIS.md'."
+            )
+            run_cursor_agent(analysis_prompt)
             break
 
     if iteration >= MAX_ITERATIONS:
