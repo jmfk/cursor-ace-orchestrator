@@ -21,6 +21,7 @@ dependencies = [
 
 [project.scripts]
 ace = "ace:app"
+ralph = "ralph_loop:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
