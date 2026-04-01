@@ -1146,6 +1146,18 @@ class ACEService:
                 # Notify subscribers of the change
                 if path:
                     self.notify_subscribers(path, f"RALPH Loop successful for: {prompt}")
+                
+                # Update plan.md if it exists
+                if os.path.exists(plan_file):
+                    print(f"[RALPH] Updating {plan_file}...")
+                    update_plan_prompt = (
+                        f"Update '{plan_file}' and 'changelog.md' based on the successful completion of: {prompt[:100]}"
+                    )
+                    subprocess.run(
+                        f"cursor-agent --print --model gemini-3-flash --force --trust \"{update_plan_prompt}\"",
+                        shell=True, env=env
+                    )
+
                 success = True
                 break
 
@@ -1260,6 +1272,26 @@ class ACEService:
 - [ ] **Security**: Conduct `ace agent security-audit` on owned modules.
 """
         onboarding_file.write_text(content)
+
+        # Ensure memory file exists
+        memory_path = self.base_path / agent.memory_file
+        if not memory_path.exists():
+            memory_path.parent.mkdir(parents=True, exist_ok=True)
+            memory_path.write_text(f"""---
+name: {agent.role}
+type: role
+---
+# {agent.name} Playbook ({agent.role})
+
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=0 :: Initial strategy for {agent.role} -->
+
+## Kända fallgropar
+<!-- [mis-001] helpful=0 harmful=1 :: Initial pitfall for {agent.role} -->
+
+## Arkitekturella beslut
+<!-- [dec-001] :: Initial decision for {agent.role} -->
+""")
 
         # Inject SOP into agent's inbox
         self.send_mail(
@@ -1504,6 +1536,7 @@ class ACEService:
                         api_key = line.split("=", 1)[1].strip()
                         break
 
+        ui_code = None
         if api_key:
             print(f"[STITCH] Calling Google Stitch API for: {description}")
             try:
@@ -1520,19 +1553,12 @@ class ACEService:
                     # If the API returns a direct URL to a canvas, we use it
                     if data.get("url"):
                         mockup_url = data.get("url")
-                    
-                    if not ui_code:
-                        # Fallback if code missing in response
-                        ui_code = self._generate_mockup_with_agent(
-                            description
-                        )
                 else:
                     print(f"[STITCH] API failed ({response.status_code}). Falling back to agent.")
-                    ui_code = self._generate_mockup_with_agent(description)
             except Exception as e:
                 print(f"[STITCH] Error calling API: {e}. Falling back to agent.")
-                ui_code = self._generate_mockup_with_agent(description)
-        else:
+
+        if not ui_code:
             ui_code = self._generate_mockup_with_agent(description)
 
         if not ui_code:

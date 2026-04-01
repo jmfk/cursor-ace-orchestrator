@@ -69,5 +69,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **9.6 Installation & Deployment Test**: Automatiserade tester för `ace install` och deployment-flöden.
 - [x] **9.7 DX/AX Testing**: Validera att agentens reflektioner och write-backs förbättrar framtida DX/AX.
 - [x] **9.8 UI/UX Testing**: Om ACE introducerar UI-komponenter, applicera Playwright/Cypress för E2E-tester.
-- [ ] **9.9 Final Documentation**: Finalize all documentation, including README.md and internal SOPs.
-- [ ] **9.10 1.0 Release**: Prepare for the initial 1.0 release.
+- [x] **9.9 Final Documentation**: Finalize all documentation, including README.md and internal SOPs.
+- [x] **9.10 1.0 Release**: Prepare for the initial 1.0 release.
+- [ ] **9.11 Post-Release Support**: Establish a feedback loop for early adopters.
+- [ ] **9.12 Community Outreach**: Launch the ACE community forum and contribution guidelines.
