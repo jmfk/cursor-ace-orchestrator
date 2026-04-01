@@ -3,12 +3,12 @@
 This plan outlines the step-by-step implementation of the Cursor ACE Orchestrator, a Python-based CLI tool designed to provide long-term memory and coordination for coding agents.
 
 ## Phase 6: Refinement & Missing Features (Current Focus)
-- [ ] **6.5 Documentation Update**: Ensure `README.md` reflects all Phase 4 and 5 features.
 - [ ] **6.6 FastAPI Backend Implementation**: Create the actual FastAPI app and endpoints (currently only the service layer exists).
 - [ ] **6.7 Memory Write-back Verification**: Add tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
 - [ ] **6.8 RALPH Loop Reflection Integration**: Ensure the loop correctly uses reflection to update memory between iterations.
 
 ## Phase 7: Completed Tasks
+- [x] **6.5 Documentation Update**: Ensure `README.md` reflects all Phase 4 and 5 features.
 - [x] **6.1 Consensus Protocol Refinement**: Implement the LLM-referee logic for `ace debate` (currently only sends mail).
 - [x] **6.2 SOP Engine Expansion**: Implement the `audit` SOP (currently only `onboarding` and `pr-review` exist).
 - [x] **6.3 Google Stitch Real Integration**: Replace simulated Stitch integration with real API calls or more robust local mocks.

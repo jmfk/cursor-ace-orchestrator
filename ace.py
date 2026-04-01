@@ -209,14 +209,21 @@ def agent_onboard(
     agent_id: str = typer.Argument(..., help="Agent ID to onboard")
 ):
     """Run onboarding SOP for an agent."""
-    try:
-        onboarding_file = get_service().onboard_agent(agent_id)
+    res = api_call("POST", f"/agents/{agent_id}/onboard")
+    if res:
         console.print(
             f"Onboarding SOP started. File created: "
-            f"[green]{onboarding_file}[/green]"
+            f"[green]{res['onboarding_file']}[/green]"
         )
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
+    else:
+        try:
+            onboarding_file = get_service().onboard_agent(agent_id)
+            console.print(
+                f"Onboarding SOP started. File created: "
+                f"[green]{onboarding_file}[/green]"
+            )
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
 
 
 @agent_app.command("review")
@@ -227,23 +234,36 @@ def agent_review(
     ),
 ):
     """Run PR review SOP for an agent."""
-    review_file = get_service().review_pr(pr_id, agent_id)
-    console.print(
-        f"PR Review SOP started. File created: [green]{review_file}[/green]"
-    )
+    res = api_call("POST", f"/pr/{pr_id}/review", json={"agent_id": agent_id})
+    if res:
+        console.print(
+            f"PR Review SOP started. File created: [green]{res['review_file']}[/green]"
+        )
+    else:
+        review_file = get_service().review_pr(pr_id, agent_id)
+        console.print(
+            f"PR Review SOP started. File created: [green]{review_file}[/green]"
+        )
 
 
 @agent_app.command("audit")
 def agent_audit(agent_id: str = typer.Argument(..., help="Agent ID to audit")):
     """Run audit SOP for an agent."""
-    try:
-        audit_file = get_service().audit_agent(agent_id)
+    res = api_call("POST", f"/agents/{agent_id}/audit")
+    if res:
         console.print(
             f"Agent Audit SOP started. File created: "
-            f"[green]{audit_file}[/green]"
+            f"[green]{res['audit_file']}[/green]"
         )
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
+    else:
+        try:
+            audit_file = get_service().audit_agent(agent_id)
+            console.print(
+                f"Agent Audit SOP started. File created: "
+                f"[green]{audit_file}[/green]"
+            )
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
 
 
 @app.command()
@@ -648,10 +668,24 @@ def loop(
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
 
-    svc = get_service()
-    success, iterations = svc.run_loop(
-        prompt, test_cmd, max_iterations, path, agent_id
+    res = api_call(
+        "POST",
+        "/loop",
+        json={
+            "prompt": prompt,
+            "test_cmd": test_cmd,
+            "max_iterations": max_iterations,
+            "path": path,
+            "agent_id": agent_id,
+        },
     )
+    if res:
+        success, iterations = res["success"], res["iterations"]
+    else:
+        svc = get_service()
+        success, iterations = svc.run_loop(
+            prompt, test_cmd, max_iterations, path, agent_id
+        )
 
     if success:
         console.print(
@@ -763,9 +797,17 @@ def debate(
     )
     console.print(f"Participants: {', '.join(agents)}")
 
-    svc = get_service()
-    with console.status("[bold green]Mediating debate..."):
-        consensus = svc.debate(proposal, agents)
+    res = api_call(
+        "POST",
+        "/debate",
+        json={"proposal": proposal, "agent_ids": agents},
+    )
+    if res:
+        consensus = res["consensus"]
+    else:
+        svc = get_service()
+        with console.status("[bold green]Mediating debate..."):
+            consensus = svc.debate(proposal, agents)
 
     console.print("\n[bold]Consensus / Recommendation:[/bold]")
     console.print(consensus)
@@ -789,7 +831,15 @@ def ui_mockup(
         f"Generating UI mockup for: [bold]{description}[/bold] "
         f"using agent [green]{agent_id}[/green]"
     )
-    url = get_service().ui_mockup(description, agent_id)
+    res = api_call(
+        "POST",
+        "/ui/mockup",
+        json={"description": description, "agent_id": agent_id},
+    )
+    if res:
+        url = res["url"]
+    else:
+        url = get_service().ui_mockup(description, agent_id)
     console.print(f"Mockup generated at: [blue]{url}[/blue]")
 
 
@@ -799,7 +849,11 @@ def ui_sync(
 ):
     """Sync UI code from Google Stitch."""
     console.print(f"Syncing UI code from: [blue]{url}[/blue]")
-    code = get_service().ui_sync(url)
+    res = api_call("GET", "/ui/sync", params={"url": url})
+    if res:
+        code = res["code"]
+    else:
+        code = get_service().ui_sync(url)
     console.print(f"Code synced successfully:\n[dim]{code}[/dim]")
 
 

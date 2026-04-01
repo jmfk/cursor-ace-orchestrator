@@ -37,7 +37,7 @@ def test_list_agents_empty(client):
 def test_create_agent(client):
     response = client.post(
         "/agents",
-        params={
+        json={
             "id": "test-agent",
             "name": "Test Agent",
             "role": "tester",
@@ -52,7 +52,7 @@ def test_create_agent(client):
 
 def test_assign_ownership(client):
     response = client.post(
-        "/ownership", params={"path": "src/test", "agent_id": "test-agent"}
+        "/ownership", json={"path": "src/test", "agent_id": "test-agent"}
     )
     assert response.status_code == 200
 
@@ -67,10 +67,10 @@ def test_get_context(client):
     # Create agent first
     client.post(
         "/agents",
-        params={"id": "test-agent", "name": "Test Agent", "role": "tester"},
+        json={"id": "test-agent", "name": "Test Agent", "role": "tester"},
     )
     client.post(
-        "/ownership", params={"path": "src/test", "agent_id": "test-agent"}
+        "/ownership", json={"path": "src/test", "agent_id": "test-agent"}
     )
 
     response = client.get("/context", params={"path": "src/test"})
@@ -78,3 +78,75 @@ def test_get_context(client):
     data = response.json()
     assert "context" in data
     assert data["agent_id"] == "test-agent"
+
+
+def test_onboard_agent(client):
+    # Create agent first
+    client.post(
+        "/agents",
+        json={"id": "test-agent", "name": "Test Agent", "role": "tester"},
+    )
+    response = client.post("/agents/test-agent/onboard")
+    assert response.status_code == 200
+    assert "onboarding_file" in response.json()
+
+
+def test_audit_agent(client):
+    # Create agent first
+    client.post(
+        "/agents",
+        json={"id": "test-agent", "name": "Test Agent", "role": "tester"},
+    )
+    response = client.post("/agents/test-agent/audit")
+    assert response.status_code == 200
+    assert "audit_file" in response.json()
+
+
+def test_review_pr(client):
+    response = client.post("/pr/PR-1/review", json={"agent_id": "test-agent"})
+    assert response.status_code == 200
+    assert "review_file" in response.json()
+
+
+def test_ui_mockup(client):
+    response = client.post(
+        "/ui/mockup",
+        json={"description": "Login page", "agent_id": "test-agent"}
+    )
+    assert response.status_code == 200
+    assert "url" in response.json()
+
+
+def test_debate(client, monkeypatch):
+    # Mock debate to avoid LLM call
+    import ace_api.main
+    monkeypatch.setattr(
+        ace_api.main.service,
+        "debate",
+        lambda p, a: "Consensus reached"
+    )
+
+    response = client.post(
+        "/debate",
+        json={"proposal": "Use FastAPI", "agent_ids": ["agent-1", "agent-2"]}
+    )
+    assert response.status_code == 200
+    assert response.json()["consensus"] == "Consensus reached"
+
+
+def test_loop(client, monkeypatch):
+    # Mock run_loop to avoid execution
+    import ace_api.main
+    monkeypatch.setattr(
+        ace_api.main.service,
+        "run_loop",
+        lambda p, t, m, path, aid: (True, 1)
+    )
+
+    response = client.post(
+        "/loop",
+        json={"prompt": "Fix bug", "test_cmd": "pytest"}
+    )
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["iterations"] == 1

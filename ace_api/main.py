@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from typing import List, Optional, Dict
 import re
 from pathlib import Path
@@ -18,7 +18,10 @@ async def list_agents():
 
 @app.post("/agents", response_model=Agent)
 async def create_agent(
-    id: str, name: str, role: str, email: Optional[str] = None
+    id: str = Body(...),
+    name: str = Body(...),
+    role: str = Body(...),
+    email: Optional[str] = Body(None)
 ):
     try:
         return service.create_agent(id, name, role, email)
@@ -32,7 +35,10 @@ async def get_ownership():
 
 
 @app.post("/ownership")
-async def assign_ownership(path: str, agent_id: str):
+async def assign_ownership(
+    path: str = Body(...),
+    agent_id: str = Body(...)
+):
     return service.assign_ownership(path, agent_id)
 
 
@@ -55,8 +61,12 @@ async def list_decisions():
 
 @app.post("/decisions", response_model=Decision)
 async def add_decision(
-    title: str, context: str, decision: str, consequences: str,
-    status: str = "accepted", agent_id: Optional[str] = None
+    title: str = Body(...),
+    context: str = Body(...),
+    decision: str = Body(...),
+    consequences: str = Body(...),
+    status: str = Body("accepted"),
+    agent_id: Optional[str] = Body(None)
 ):
     return service.add_decision(
         title, context, decision, consequences, status, agent_id
@@ -69,7 +79,7 @@ async def get_config():
 
 
 @app.post("/config/tokens")
-async def set_token_mode(mode: TokenMode):
+async def set_token_mode(mode: TokenMode = Body(...)):
     config = service.load_config()
     config.token_mode = mode
     service.save_config(config)
@@ -91,9 +101,74 @@ async def read_mail(agent_id: str, msg_id: str):
 
 @app.post("/mail", response_model=MailMessage)
 async def send_mail(
-    to_agent: str, from_agent: str, subject: str, body: str
+    to_agent: str = Body(...),
+    from_agent: str = Body(...),
+    subject: str = Body(...),
+    body: str = Body(...)
 ):
     return service.send_mail(to_agent, from_agent, subject, body)
+
+
+@app.post("/debate")
+async def debate(
+    proposal: str = Body(...),
+    agent_ids: List[str] = Body(...)
+):
+    consensus = service.debate(proposal, agent_ids)
+    return {"consensus": consensus}
+
+
+@app.post("/loop")
+async def run_loop(
+    prompt: str = Body(...),
+    test_cmd: str = Body(...),
+    max_iterations: int = Body(10),
+    path: Optional[str] = Body(None),
+    agent_id: Optional[str] = Body(None)
+):
+    success, iterations = service.run_loop(
+        prompt, test_cmd, max_iterations, path, agent_id
+    )
+    return {"success": success, "iterations": iterations}
+
+
+@app.post("/agents/{agent_id}/onboard")
+async def onboard_agent(agent_id: str):
+    try:
+        onboarding_file = service.onboard_agent(agent_id)
+        return {"onboarding_file": str(onboarding_file)}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/agents/{agent_id}/audit")
+async def audit_agent(agent_id: str):
+    try:
+        audit_file = service.audit_agent(agent_id)
+        return {"audit_file": str(audit_file)}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/pr/{pr_id}/review")
+async def review_pr(pr_id: str, agent_id: str = Body(..., embed=True)):
+    review_file = service.review_pr(pr_id, agent_id)
+    return {"review_file": str(review_file)}
+
+
+@app.post("/ui/mockup")
+async def ui_mockup(
+    description: str = Body(...),
+    agent_id: str = Body(...)
+):
+    url = service.ui_mockup(description, agent_id)
+    return {"url": url}
+
+
+@app.get("/ui/sync")
+async def ui_sync(url: str):
+    code = service.ui_sync(url)
+    return {"code": code}
 
 
 @app.get("/sessions", response_model=List[Dict])
