@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 88
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.16 (Real-time Context Window Monitoring) as completed in `plan.md`.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 87
 
 ### Updated

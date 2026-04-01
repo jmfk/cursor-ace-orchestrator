@@ -1052,6 +1052,44 @@ def loop(
 
 
 @app.command()
+def ralph(
+    prompt: str = typer.Argument(..., help="The prompt to solve"),
+    test_cmd: str = typer.Option(
+        ..., "--test", "-t", help="Command to run tests"
+    ),
+    max_iterations: int = typer.Option(
+        10, "--max", "-m", help="Maximum number of iterations"
+    ),
+    path: Optional[str] = typer.Option(
+        None, "--path", "-p", help="Path to the file or module"
+    ),
+    agent_id: Optional[str] = typer.Option(
+        None, "--agent", "-a", help="Explicit agent ID"
+    ),
+    git_commit: bool = typer.Option(
+        False, "--git-commit", "-g", help="Automatically commit on success"
+    ),
+    prd: Optional[str] = typer.Option(
+        None, "--prd", help="Path to the PRD file"
+    ),
+    plan_file: Optional[str] = typer.Option(
+        None, "--plan", help="Path to the plan file"
+    ),
+    max_spend: float = typer.Option(
+        20.0, "--max-spend", help="Maximum spend in USD"
+    ),
+    model: str = typer.Option(
+        "gemini-3-flash", "--model", help="LLM model to use"
+    ),
+):
+    """
+    Alias for 'ace loop'.
+    """
+    loop(prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, max_spend, model)
+
+
+
+@app.command()
 def mail_send(
     to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
     sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
