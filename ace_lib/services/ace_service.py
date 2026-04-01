@@ -1040,11 +1040,14 @@ class ACEService:
         git_commit: bool = False,
         prd_path: Optional[str] = None,
         plan_file: Optional[str] = None,
+        max_spend: float = 20.0,
+        model: str = "gemini-3-flash",
     ):
         """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 4.1)."""
         iteration = 0
         success = False
         state_history = []
+        total_cost = 0.0
 
         # Use provided PRD and plan file or defaults
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
@@ -1052,8 +1055,12 @@ class ACEService:
 
         # Initial state hash for stagnation detection
         while iteration < max_iterations:
+            if total_cost >= max_spend:
+                print(f"[RALPH] Reached maximum spending limit (${max_spend}). Stopping.")
+                break
+
             iteration += 1
-            print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
+            print(f"\n[RALPH] Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f})")
 
             # 0. Initial State Analysis (if it's the first iteration and we have a plan file)
             if iteration == 1 and os.path.exists(prd_path) and os.path.exists(plan_file):
@@ -1096,7 +1103,7 @@ class ACEService:
                 context_file = tmp.name
 
             agent_cmd = (
-                "cursor-agent --print --model gemini-3-flash --force --trust "
+                f"cursor-agent --print --model {model} --force --trust "
                 f'--context-file {context_file} "{prompt}"'
             )
 
@@ -1108,13 +1115,16 @@ class ACEService:
             # Log token usage (simulated for now, as cursor-agent doesn't return it yet)
             input_tokens = len(prompt.split()) * 1.3
             output_tokens = len(agent_proc.stdout.split()) * 1.3
+            cost = (input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40)
+            total_cost += cost
+            
             self.log_token_usage(TokenUsage(
                 agent_id=resolved_agent_id or "unknown",
                 session_id=f"loop_{iteration}",
                 prompt_tokens=int(input_tokens),
                 completion_tokens=int(output_tokens),
                 total_tokens=int(input_tokens + output_tokens),
-                cost=(input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40)
+                cost=cost
             ))
 
             # 3. Verify (Phase 4.1)
@@ -1276,7 +1286,7 @@ class ACEService:
                         f"Update '{plan_file}' and 'changelog.md' based on the successful completion of: {prompt[:100]}"
                     )
                     subprocess.run(
-                        f"cursor-agent --print --model gemini-3-flash --force --trust \"{update_plan_prompt}\"",
+                        f"cursor-agent --print --model {model} --force --trust \"{update_plan_prompt}\"",
                         shell=True, env=env
                     )
 

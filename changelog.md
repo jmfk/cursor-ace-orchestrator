@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 79
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.4 (Adaptive Context Pruning) as completed in `plan.md`.
+  - Added task 10.5 (Multi-Agent Consensus Protocol (MACP) Refinement) to the plan.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 78
 
 ### Updated

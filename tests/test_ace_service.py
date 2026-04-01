@@ -355,11 +355,22 @@ def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch)
         test_cmd="pytest",
         max_iterations=1,
         agent_id="dev-1",
-        plan_file=str(plan_path)
+        plan_file=str(plan_path),
+        max_spend=10.0,
+        model="test-model"
     )
 
     assert success is True
     assert iterations == 1
+
+
+def test_pr_review_sop_v2(service):
+    """Test generating PR review SOP with security section."""
+    review_file = service.review_pr("PR-456", "reviewer-2")
+    assert review_file.exists()
+    content = review_file.read_text(encoding="utf-8")
+    assert "## 3. Security Check" in content
+    assert "No hardcoded secrets" in content
 
 
 def test_multi_turn_debate(service, monkeypatch):

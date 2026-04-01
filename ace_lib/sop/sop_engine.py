@@ -63,12 +63,17 @@ def generate_pr_review_sop(pr_id: str, agent_id: str) -> str:
 - [ ] **ADR Compliance**: Does PR conflict with any recent ADRs in `.ace/decisions/`?
 - [ ] **Ownership**: Is the code being modified by the correct agent (check `ownership.yaml`)?
 
-## 3. Learning Extraction
+## 3. Security Check
+- [ ] **Secrets**: No hardcoded secrets or API keys.
+- [ ] **Sanitization**: Input data is properly sanitized.
+- [ ] **Dependencies**: No new vulnerable dependencies introduced.
+
+## 4. Learning Extraction
 - [ ] **New Strategies**: Identify any new successful patterns: `[str-NEW] helpful=1 harmful=0 :: <desc>`
 - [ ] **New Pitfalls**: Identify any new pitfalls or bugs: `[mis-NEW] helpful=0 harmful=1 :: <desc>`
 - [ ] **New Decisions**: Identify any architectural choices that should be ADRs: `[dec-NEW] :: <desc>`
 
-## 4. Conclusion
+## 5. Conclusion
 - [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
 - [ ] **Comments**:
 """

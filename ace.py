@@ -948,6 +948,12 @@ def loop(
     plan_file: Optional[str] = typer.Option(
         None, "--plan", help="Path to the plan file"
     ),
+    max_spend: float = typer.Option(
+        20.0, "--max-spend", help="Maximum spend in USD"
+    ),
+    model: str = typer.Option(
+        "gemini-3-flash", "--model", help="LLM model to use"
+    ),
 ):
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
@@ -956,6 +962,7 @@ def loop(
     console.print(f"Prompt: [italic]{prompt}[/italic]")
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
+    console.print(f"Max Spend: [bold]${max_spend}[/bold]")
 
     svc = get_service()
     
@@ -991,7 +998,16 @@ def loop(
     # Use the service to run the loop
     with console.status("[bold green]Running RALPH Loop..."):
         success, iterations = svc.run_loop(
-            prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file
+            prompt=prompt,
+            test_cmd=test_cmd,
+            max_iterations=max_iterations,
+            path=path,
+            agent_id=agent_id,
+            git_commit=git_commit,
+            prd_path=prd,
+            plan_file=plan_file,
+            max_spend=max_spend,
+            model=model
         )
 
     if success:

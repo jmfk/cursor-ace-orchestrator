@@ -11,6 +11,8 @@ def generate_mockup(description: str, agent_id: str, api_key: Optional[str] = No
 
     if api_key:
         try:
+            # PRD-01 / Phase 8.3: Bi-directional sync with visual diffing
+            # We use the Stitch API to generate the mockup and get the code
             response = requests.post(
                 "https://api.stitch.google.com/v1/mockup",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -22,6 +24,9 @@ def generate_mockup(description: str, agent_id: str, api_key: Optional[str] = No
                 ui_code = data.get("code")
                 if data.get("url"):
                     mockup_url = data.get("url")
+            else:
+                # Fallback to agent generation if API fails but key is present
+                pass
         except Exception:
             pass
 
