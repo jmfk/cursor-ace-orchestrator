@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 73
+
+### Updated
+- **Phase 9: Final Polish & Deployment**
+  - Marked task 9.11 (Post-Release Support) as completed in `plan.md`.
+  - Re-sorted Phase 9 tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 72
 
 ### Updated

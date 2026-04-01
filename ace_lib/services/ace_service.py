@@ -9,6 +9,16 @@ from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Callable
 from ruamel.yaml import YAML
 import anthropic
+from ace_lib.sop.sop_engine import (
+    generate_onboarding_sop,
+    generate_pr_review_sop,
+    generate_audit_sop,
+)
+from ace_lib.stitch.stitch_engine import (
+    generate_mockup,
+    sync_mockup,
+    extract_components,
+)
 from ace_lib.utils.profiler import profiler
 from ace_lib.models.schemas import (
     Config,
@@ -1232,45 +1242,14 @@ class ACEService:
         sop_dir.mkdir(exist_ok=True)
         
         onboarding_file = sop_dir / f"onboarding_{agent_id}.md"
-        responsibilities = (
-            ", ".join(agent.responsibilities)
-            if agent.responsibilities
-            else "None"
+        content = generate_onboarding_sop(
+            agent_id=agent.id,
+            name=agent.name,
+            role=agent.role,
+            responsibilities=agent.responsibilities,
+            memory_file=agent.memory_file,
+            status=agent.status
         )
-        # Formal SOP for Agent Onboarding (PRD-01 / Phase 9.5)
-        content = f"""# SOP: Agent Onboarding - {agent.name} ({agent.id})
-- **Role**: {agent.role}
-- **Responsibilities**: {responsibilities}
-- **Memory File**: {agent.memory_file}
-- **Status**: {agent.status}
-- **Date**: {datetime.now().isoformat()}
-
-## 1. Context Acquisition
-- [ ] **Registry**: Read `AGENTS.md` to understand the current agent landscape.
-- [ ] **Decisions**: Read `.ace/decisions/*.md` for recent architectural decisions.
-- [ ] **Global Standards**: Read `.cursor/rules/_global.mdc` for project-wide standards.
-- [ ] **Ownership**: Review `ownership.yaml` for assigned modules.
-
-## 2. Role-Specific Setup
-- [ ] **Playbook**: Create/Verify `{agent.memory_file}` exists.
-- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns",
-      "Kända fallgropar", and "Arkitekturella beslut".
-
-## 3. Initial Task
-- [ ] **Audit**: Review existing codebase in assigned modules: {responsibilities}
-- [ ] **Debt**: Identify initial technical debts and document as `[mis-NEW]` in playbook.
-- [ ] **Strategy**: Propose first strategy improvement as `[str-NEW]`.
-
-## 4. Handover & Verification
-- [ ] **Communication**: Send a "Ready" message to the orchestrator via `ace mail-send`.
-- [ ] **Consensus**: Participate in the next `ace debate` to demonstrate alignment.
-
-## 5. Standard Operating Procedures (SOPs)
-- [ ] **Onboarding**: Follow `ace agent onboard` to initialize role-specific playbooks.
-- [ ] **PR Review**: Use `ace agent review` for systematic code reviews.
-- [ ] **Audit**: Participate in regular `ace agent audit` sessions.
-- [ ] **Security**: Conduct `ace agent security-audit` on owned modules.
-"""
         onboarding_file.write_text(content)
 
         # Ensure memory file exists
@@ -1314,31 +1293,7 @@ type: role
         sop_dir.mkdir(exist_ok=True)
         
         review_file = sop_dir / f"review_{pr_id}_{agent_id}.md"
-        
-        # Formal SOP for PR Reviews (PRD-01 / Phase 9.5)
-        content = f"""# SOP: PR Review - {pr_id}
-- **Reviewer**: {agent_id}
-- **Date**: {datetime.now().isoformat()}
-
-## 1. Strategy Alignment
-- [ ] **Core Principles**: Does the PR follow TypeScript Strict Mode and TDD?
-- [ ] **DRY/YAGNI**: Is the code concise and reusable without over-engineering?
-- [ ] **Playbook Matching**: Does the PR follow strategies defined in reviewer's playbook?
-- [ ] **Global Rules**: Does the PR adhere to global rules in `_global.mdc`?
-
-## 2. Decision Verification
-- [ ] **ADR Compliance**: Does PR conflict with any recent ADRs in `.ace/decisions/`?
-- [ ] **Ownership**: Is the code being modified by the correct agent (check `ownership.yaml`)?
-
-## 3. Learning Extraction
-- [ ] **New Strategies**: Identify any new successful patterns: `[str-NEW] helpful=1 harmful=0 :: <desc>`
-- [ ] **New Pitfalls**: Identify any new pitfalls or bugs: `[mis-NEW] helpful=0 harmful=1 :: <desc>`
-- [ ] **New Decisions**: Identify any architectural choices that should be ADRs: `[dec-NEW] :: <desc>`
-
-## 4. Conclusion
-- [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
-- [ ] **Comments**:
-"""
+        content = generate_pr_review_sop(pr_id, agent_id)
         review_file.write_text(content)
 
         # Notify agent of PR review task
@@ -1368,30 +1323,7 @@ type: role
         sop_dir.mkdir(exist_ok=True)
         
         audit_file = sop_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
-        
-        # Formal SOP for Agent Audits (PRD-01 / Phase 9.5)
-        content = f"""# SOP: Agent Audit - {agent.name} ({agent.id})
-- **Auditor**: Orchestrator
-- **Date**: {datetime.now().isoformat()}
-
-## 1. Playbook Quality
-- [ ] **Completeness**: Does the playbook have all required sections?
-- [ ] **Utility**: Are the strategies actionable and relevant?
-- [ ] **Pruning**: Has the playbook been pruned of stale or harmful entries?
-
-## 2. Performance & Alignment
-- [ ] **Success Rate**: Review recent session logs for success/failure ratio.
-- [ ] **Decision Alignment**: Does the agent's work align with recent ADRs?
-- [ ] **Communication**: Is the agent using the mail system and MACP correctly?
-
-## 3. Knowledge Extraction
-- [ ] **New Learnings**: Are new strategies being identified and documented?
-- [ ] **Shared Knowledge**: Is the agent contributing to shared-learnings?
-
-## 4. Conclusion
-- [ ] **Status**: [PASSED/REQUIRES_IMPROVEMENT/RE-ONBOARDING]
-- [ ] **Notes**:
-"""
+        content = generate_audit_sop(agent_id, agent.name)
         audit_file.write_text(content)
 
         # Notify agent of audit
@@ -1516,15 +1448,6 @@ type: role
 
     def ui_mockup(self, description: str, agent_id: str):
         """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
-        mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
-
-        # Ensure .ace directory exists before ui_mockups
-        self.ace_dir.mkdir(parents=True, exist_ok=True)
-        mockup_dir = self.ace_dir / "ui_mockups"
-        mockup_dir.mkdir(parents=True, exist_ok=True)
-        mockup_file = mockup_dir / f"{mockup_id}.md"
-
         # Check for STITCH_API_KEY to use real API call (PRD-01 / Phase 9.6)
         api_key = os.getenv("STITCH_API_KEY")
         if not api_key:
@@ -1536,27 +1459,14 @@ type: role
                         api_key = line.split("=", 1)[1].strip()
                         break
 
-        ui_code = None
-        if api_key:
-            print(f"[STITCH] Calling Google Stitch API for: {description}")
-            try:
-                # Actual Google Stitch API call (PRD-01 / Phase 4.5)
-                response = requests.post(
-                    "https://api.stitch.google.com/v1/mockup",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    json={"description": description, "agent_id": agent_id},
-                    timeout=30
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    ui_code = data.get("code")
-                    # If the API returns a direct URL to a canvas, we use it
-                    if data.get("url"):
-                        mockup_url = data.get("url")
-                else:
-                    print(f"[STITCH] API failed ({response.status_code}). Falling back to agent.")
-            except Exception as e:
-                print(f"[STITCH] Error calling API: {e}. Falling back to agent.")
+        mockup_url, ui_code = generate_mockup(description, agent_id, api_key)
+        mockup_id = mockup_url.split("/")[-1]
+
+        # Ensure .ace directory exists before ui_mockups
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
+        mockup_dir = self.ace_dir / "ui_mockups"
+        mockup_dir.mkdir(parents=True, exist_ok=True)
+        mockup_file = mockup_dir / f"{mockup_id}.md"
 
         if not ui_code:
             ui_code = self._generate_mockup_with_agent(description)
@@ -1577,13 +1487,22 @@ type: role
         mockup_file.parent.mkdir(parents=True, exist_ok=True)
         mockup_file.write_text(content)
 
-        if ui_code and "export const" in ui_code:
-            self._extract_stitch_components(mockup_id, ui_code)
+        if ui_code:
+            components = extract_components(ui_code)
+            if components:
+                self._save_stitch_components(mockup_id, components)
 
         # Run visual verification if Playwright is available (PRD-01 / Phase 7.2)
         self._verify_stitch_mockup(mockup_id, ui_code)
 
         return mockup_url
+
+    def _save_stitch_components(self, mockup_id: str, components: Dict[str, str]):
+        """Save extracted components to disk."""
+        components_dir = self.ace_dir / "ui_mockups" / "components" / mockup_id
+        components_dir.mkdir(parents=True, exist_ok=True)
+        for name, content in components.items():
+            (components_dir / f"{name}.tsx").write_text(content)
 
     def _verify_stitch_mockup(self, mockup_id: str, code: str):
         """Perform visual verification of the mockup using Playwright (PRD-01 / Phase 7.2)."""
@@ -1666,14 +1585,8 @@ type: role
         components_dir = self.ace_dir / "ui_mockups" / "components" / mockup_id
         components_dir.mkdir(parents=True, exist_ok=True)
 
-        # Simple extraction of exported constants
-        component_matches = re.finditer(
-            r"export const (\w+) =.*?=>.*?;",
-            code,
-            re.DOTALL
-        )
-        for match in component_matches:
-            name, content = match.group(1), match.group(0)
+        components = extract_components(code)
+        for name, content in components.items():
             (components_dir / f"{name}.tsx").write_text(content)
 
     def ui_sync(self, url: str):
@@ -1690,60 +1603,47 @@ type: role
                         api_key = line.split("=", 1)[1].strip()
                         break
 
-        if api_key:
-            try:
-                # Actual Google Stitch API call (PRD-01 / Phase 4.5)
-                response = requests.get(
-                    f"https://api.stitch.google.com/v1/mockup/{mockup_id}",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=30
+        ui_code = sync_mockup(url, api_key)
+        if ui_code:
+            # Perform visual diffing if we have an existing mockup (PRD-01 / Phase 8.3)
+            mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+            if mockup_file.exists():
+                old_content = mockup_file.read_text()
+                old_code_match = re.search(
+                    r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
+                    old_content,
+                    re.DOTALL,
                 )
-                if response.status_code == 200:
-                    ui_code = response.json().get("code")
-                    if ui_code:
-                        # Perform visual diffing if we have an existing mockup (PRD-01 / Phase 8.3)
-                        mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
-                        if mockup_file.exists():
-                            old_content = mockup_file.read_text()
-                            old_code_match = re.search(
-                                r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
-                                old_content,
-                                re.DOTALL,
-                            )
-                            if old_code_match:
-                                old_code = old_code_match.group(1)
-                                if old_code != ui_code:
-                                    print(f"[STITCH] Visual diff detected for {mockup_id}.")
-                                    # In a real scenario, we'd use a visual diffing tool.
-                                    # For now, we log the diff.
-                                    diff_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
-                                    import difflib
-                                    diff = difflib.unified_diff(
-                                        old_code.splitlines(),
-                                        ui_code.splitlines(),
-                                        fromfile="local",
-                                        tofile="stitch"
-                                    )
-                                    diff_file.write_text("\n".join(diff))
-
-                        # Update local mockup file with synced code
-                        content = (
-                            f"# UI Mockup (Synced): {mockup_id}\n"
-                            f"- **URL**: {url}\n"
-                            f"- **Status**: Synced\n"
-                            f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
-                            f"## Design & Code\n"
-                            f"```tsx\n{ui_code}\n```\n"
+                if old_code_match:
+                    old_code = old_code_match.group(1)
+                    if old_code != ui_code:
+                        print(f"[STITCH] Visual diff detected for {mockup_id}.")
+                        # In a real scenario, we'd use a visual diffing tool.
+                        # For now, we log the diff.
+                        diff_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
+                        import difflib
+                        diff = difflib.unified_diff(
+                            old_code.splitlines(),
+                            ui_code.splitlines(),
+                            fromfile="local",
+                            tofile="stitch"
                         )
-                        mockup_file.write_text(content)
-                        
-                        # Extract components from synced code
-                        self._extract_stitch_components(mockup_id, ui_code)
-                        return ui_code
-                else:
-                    print(f"[STITCH] API failed ({response.status_code}). Falling back to local.")
-            except Exception as e:
-                print(f"[STITCH] Error calling API: {e}. Falling back to local.")
+                        diff_file.write_text("\n".join(diff))
+
+            # Update local mockup file with synced code
+            content = (
+                f"# UI Mockup (Synced): {mockup_id}\n"
+                f"- **URL**: {url}\n"
+                f"- **Status**: Synced\n"
+                f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+                f"## Design & Code\n"
+                f"```tsx\n{ui_code}\n```\n"
+            )
+            mockup_file.write_text(content)
+            
+            # Extract components from synced code
+            self._extract_stitch_components(mockup_id, ui_code)
+            return ui_code
 
         mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
 

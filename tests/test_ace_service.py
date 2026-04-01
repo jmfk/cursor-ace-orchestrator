@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from ace_lib.services.ace_service import ACEService
 
 
@@ -54,6 +55,11 @@ def test_onboarding_sop(service):
     content = onboarding_file.read_text()
     assert "SOP: Agent Onboarding - Developer 1 (dev-1)" in content
     assert "## 1. Context Acquisition" in content
+    
+    # Check if memory file was created
+    memory_file = service.base_path / ".cursor/rules/developer.mdc"
+    assert memory_file.exists()
+    assert "# Developer 1 Playbook (developer)" in memory_file.read_text()
 
 
 def test_pr_review_sop(service):
@@ -63,6 +69,15 @@ def test_pr_review_sop(service):
     content = review_file.read_text()
     assert "SOP: PR Review - PR-123" in content
     assert "**Reviewer**: reviewer-1" in content
+
+
+def test_audit_sop(service):
+    """Test generating audit SOP."""
+    service.create_agent(id="dev-1", name="Developer 1", role="developer")
+    audit_file = service.audit_agent("dev-1")
+    assert audit_file.exists()
+    content = audit_file.read_text()
+    assert "SOP: Agent Audit - Developer 1 (dev-1)" in content
 
 
 def test_mail_system(service):
@@ -200,20 +215,26 @@ def test_memory_pruning(service, temp_workspace):
 def test_stitch_mockup(service, temp_workspace, monkeypatch):
     """Test Google Stitch mockup generation."""
     import os
-    import requests
+    from ace_lib.stitch import stitch_engine
     from unittest.mock import MagicMock
 
-    # Mock requests.post
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_json = {"code": "// Generated via Stitch API\nexport const Mockup = () => <div>Mockup</div>;"}
-    mock_response.json.return_value = mock_json
-    monkeypatch.setattr(requests, "post", lambda *args, **kwargs: mock_response)
+    # Mock generate_mockup
+    mock_url = "https://stitch.google.com/canvas/test_mockup"
+    mock_code = "// Generated via Stitch API\nexport const Mockup = () => <div>Mockup</div>;"
+    monkeypatch.setattr(stitch_engine, "generate_mockup", lambda *args, **kwargs: (mock_url, mock_code))
+    
+    # Mock extract_components to avoid real regex
+    monkeypatch.setattr(stitch_engine, "extract_components", lambda *args, **kwargs: {"Mockup": "export const Mockup = () => <div>Mockup</div>;"})
 
-    os.environ["STITCH_API_KEY"] = "test-key"
+    # Mock credentials file
+    cred_file = temp_workspace / ".ace" / "credentials"
+    cred_file.parent.mkdir(parents=True, exist_ok=True)
+    cred_file.write_text("STITCH_API_KEY=test-key")
+    monkeypatch.setattr(Path, "home", lambda: temp_workspace)
+
     try:
         url = service.ui_mockup("Login page", "agent-1")
-        assert "stitch.google.com/canvas/" in url
+        assert url == mock_url
 
         mockup_id = url.split("/")[-1]
         mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
@@ -221,26 +242,51 @@ def test_stitch_mockup(service, temp_workspace, monkeypatch):
         content = mockup_file.read_text()
         assert "// Generated via Stitch API" in content
         assert "Login page" in content
+        
+        # Check component extraction
+        comp_file = service.ace_dir / "ui_mockups" / "components" / mockup_id / "Mockup.tsx"
+        assert comp_file.exists()
     finally:
-        del os.environ["STITCH_API_KEY"]
+        pass
 
 
-def test_stitch_sync(service, temp_workspace):
+def test_stitch_sync(service, temp_workspace, monkeypatch):
     """Test Google Stitch code sync."""
+    from ace_lib.stitch import stitch_engine
+    import os
+    
     mockup_id = "test_mockup"
     mockup_dir = service.ace_dir / "ui_mockups"
     mockup_dir.mkdir(parents=True, exist_ok=True)
     mockup_file = mockup_dir / f"{mockup_id}.md"
-    mockup_file.write_text("""# UI Mockup
+    mockup_file.write_text(f"""# UI Mockup
 ## Design & Code
 ```tsx
-export const Test = () => <div>Test</div>;
+export const Test = () => <div>Old Test</div>;
 ```
 """)
 
+    new_code = "export const Test = () => <div>New Test</div>;"
+    monkeypatch.setattr(stitch_engine, "sync_mockup", lambda *args, **kwargs: new_code)
+    monkeypatch.setattr(stitch_engine, "extract_components", lambda *args, **kwargs: {"Test": new_code})
+
+    # Mock credentials file
+    cred_file = temp_workspace / ".ace" / "credentials"
+    cred_file.parent.mkdir(parents=True, exist_ok=True)
+    cred_file.write_text("STITCH_API_KEY=test-key")
+    monkeypatch.setattr(Path, "home", lambda: temp_workspace)
+
     url = f"https://stitch.google.com/canvas/{mockup_id}"
     code = service.ui_sync(url)
-    assert "export const Test" in code
+    assert code == new_code
+    
+    # Check if file was updated
+    content = mockup_file.read_text()
+    assert "New Test" in content
+    
+    # Check diff file
+    diff_file = mockup_dir / f"{mockup_id}_diff.txt"
+    assert diff_file.exists()
 
 
 def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch):
@@ -282,11 +328,19 @@ def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch)
 
     service.create_agent(id="dev-1", name="Dev 1", role="developer")
 
+    # Mock update_plan_prompt call
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    # Create dummy plan.md
+    plan_path = temp_workspace / "plan.md"
+    plan_path.write_text("# Plan")
+
     success, iterations = service.run_loop(
         prompt="Fix bug",
         test_cmd="pytest",
         max_iterations=1,
-        agent_id="dev-1"
+        agent_id="dev-1",
+        plan_file=str(plan_path)
     )
 
     assert success is True

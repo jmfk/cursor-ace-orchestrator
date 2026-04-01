@@ -988,7 +988,7 @@ def loop(
     # Use the service to run the loop
     with console.status("[bold green]Running RALPH Loop..."):
         success, iterations = svc.run_loop(
-            prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file
+            prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, console=console
         )
 
     if success:
