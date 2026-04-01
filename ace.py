@@ -857,6 +857,9 @@ def loop(
     agent_id: Optional[str] = typer.Option(
         None, "--agent", "-a", help="Explicit agent ID"
     ),
+    git_commit: bool = typer.Option(
+        False, "--git-commit", "-g", help="Automatically commit on success"
+    ),
 ):
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
@@ -868,7 +871,7 @@ def loop(
 
     svc = get_service()
     success, iterations = svc.run_loop(
-        prompt, test_cmd, max_iterations, path, agent_id
+        prompt, test_cmd, max_iterations, path, agent_id, git_commit
     )
 
     if success:

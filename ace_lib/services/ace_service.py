@@ -756,6 +756,7 @@ class ACEService:
         max_iterations: int = 10,
         path: Optional[str] = None,
         agent_id: Optional[str] = None,
+        git_commit: bool = False,
     ):
         """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect."""
         iteration = 0
@@ -842,6 +843,7 @@ class ACEService:
             session_file.write_text(session_content)
 
             # 4. Reflection (Intermediate or Final)
+            reflection_text = ""
             if self.get_anthropic_client():
                 print(
                     f"[RALPH] Performing reflection for "
@@ -908,6 +910,26 @@ class ACEService:
                         f"{result.stdout}\n{result.stderr}\n\n"
                         f"Original task: {prompt}"
                     )
+
+            # 5. Git Commit (Optional)
+            if git_commit and test_passed:
+                print("[RALPH] Committing changes...")
+                try:
+                    status = subprocess.run(
+                        ["git", "status", "--porcelain"], capture_output=True, text=True
+                    )
+                    if status.stdout.strip():
+                        commit_msg = f"RALPH Loop: {prompt[:50]}"
+                        if reflection_text and reflection_text != "No new learnings.":
+                            # Try to get a better message from reflection if possible
+                            # For now, just use a simple one
+                            pass
+                        
+                        subprocess.run(["git", "add", "."], check=True)
+                        subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+                        print(f"[RALPH] Committed: {commit_msg}")
+                except Exception as e:
+                    print(f"[RALPH] Git commit failed: {e}")
 
             if test_passed:
                 print("[RALPH] ✅ Verification successful!")
@@ -1170,7 +1192,7 @@ class ACEService:
         """Use cursor-agent to generate the mockup code."""
         prompt = (
             f"Design a UI mockup for: {description}. "
-            "Output the design as a single TSX code block using "
+            "Output the design as a TSX code block using "
             "Tailwind CSS. "
             "The output should be ONLY the code block."
         )
@@ -1211,13 +1233,6 @@ class ACEService:
         for match in component_matches:
             name, content = match.group(1), match.group(0)
             (components_dir / f"{name}.tsx").write_text(content)
-
-    def _simulate_stitch_api(self, description: str) -> str:
-        """Simulate a real Stitch API call for testing."""
-        return (
-            f"export const Mockup = () => "
-            f"<div className='p-4'>Mockup for {description}</div>;"
-        )
 
     def ui_sync(self, url: str):
         """Sync UI code from Google Stitch."""

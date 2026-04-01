@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 39
+
+### Added
+- **Phase 7: Future Directions**
+  - IDE Extension Integration: Built a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
+  - Updated `plan.md` to mark task 7.2 as completed.
+
 ## [2026-04-01] - RALPH Loop Iteration 38
 
 ### Added
