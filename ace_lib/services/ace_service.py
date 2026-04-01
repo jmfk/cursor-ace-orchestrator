@@ -1455,8 +1455,8 @@ type: role
         # Check for STITCH_API_KEY to use real API call (PRD-01 / Phase 9.6)
         api_key = self.get_stitch_key()
 
-        from ace_lib.stitch import stitch_engine
-        mockup_url, ui_code = stitch_engine.generate_mockup(description, agent_id, api_key)
+        from ace_lib.stitch.stitch_engine import generate_mockup, extract_components
+        mockup_url, ui_code = generate_mockup(description, agent_id, api_key)
         mockup_id = mockup_url.split("/")[-1]
 
         # Ensure .ace directory exists before ui_mockups

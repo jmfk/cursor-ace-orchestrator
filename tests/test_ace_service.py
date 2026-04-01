@@ -217,17 +217,34 @@ def test_memory_pruning(service, temp_workspace):
 
         # Mock generate_mockup
         mock_url = "https://stitch.google.com/canvas/test_mockup"
-        mock_code = "// Generated via Stitch API\nexport const Mockup = () => <div>Mockup</div>;"
-        monkeypatch.setattr(stitch_engine, "generate_mockup", lambda *args, **kwargs: (mock_url, mock_code))
+        mock_code = (
+            "// Generated via Stitch API\n"
+            "export const Mockup = () => <div>Mockup</div>;"
+        )
+        monkeypatch.setattr(
+            stitch_engine,
+            "generate_mockup",
+            lambda *args, **kwargs: (mock_url, mock_code)
+        )
 
         # Mock extract_components to avoid real regex
-        monkeypatch.setattr(stitch_engine, "extract_components", lambda *args, **kwargs: {"Mockup": "export const Mockup = () => <div>Mockup</div>;"})
+        monkeypatch.setattr(
+            stitch_engine,
+            "extract_components",
+            lambda *args, **kwargs: {
+                "Mockup": "export const Mockup = () => <div>Mockup</div>;"
+            }
+        )
 
         # Mock get_stitch_key
         monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
 
         # Mock _generate_mockup_with_agent to avoid subprocess call
-        monkeypatch.setattr(service, "_generate_mockup_with_agent", lambda desc: mock_code)
+        monkeypatch.setattr(
+            service,
+            "_generate_mockup_with_agent",
+            lambda desc: mock_code
+        )
 
         url = service.ui_mockup("Login page", "agent-1")
         assert url == mock_url
@@ -260,8 +277,16 @@ def test_memory_pruning(service, temp_workspace):
     """)
 
         new_code = "export const Test = () => <div>New Test</div>;"
-        monkeypatch.setattr(stitch_engine, "sync_mockup", lambda *args, **kwargs: new_code)
-        monkeypatch.setattr(stitch_engine, "extract_components", lambda *args, **kwargs: {"Test": new_code})
+        monkeypatch.setattr(
+            stitch_engine,
+            "sync_mockup",
+            lambda *args, **kwargs: new_code
+        )
+        monkeypatch.setattr(
+            stitch_engine,
+            "extract_components",
+            lambda *args, **kwargs: {"Test": new_code}
+        )
 
         # Mock get_stitch_key
         monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")

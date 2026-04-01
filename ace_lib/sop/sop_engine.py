@@ -1,7 +1,14 @@
 from datetime import datetime
 from typing import List
 
-def generate_onboarding_sop(agent_id: str, name: str, role: str, responsibilities: List[str], memory_file: str, status: str) -> str:
+def generate_onboarding_sop(
+    agent_id: str,
+    name: str,
+    role: str,
+    responsibilities: List[str],
+    memory_file: str,
+    status: str
+) -> str:
     """Generate a formal onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
     resp_str = ", ".join(responsibilities) if responsibilities else "None"
     return f"""# SOP: Agent Onboarding - {name} ({agent_id})
