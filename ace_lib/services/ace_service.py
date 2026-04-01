@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Callable
 from ruamel.yaml import YAML
 import anthropic
+from ace_lib.utils.profiler import profiler
 from ace_lib.models.schemas import (
     Config,
     Decision,
@@ -26,8 +27,6 @@ from ace_lib.models.schemas import (
 yaml = YAML()
 yaml.preserve_quotes = True
 
-
-from ace_lib.utils.profiler import profiler
 
 class ACEService:
     def __init__(self, base_path: Path = Path(".")):
@@ -1050,6 +1049,57 @@ class ACEService:
         )
 
         return review_file
+
+    def security_audit(self, agent_id: str):
+        """Run security audit SOP for an agent."""
+        agents_config = self.load_agents()
+        agent = next(
+            (a for a in agents_config.agents if a.id == agent_id), None
+        )
+        if not agent:
+            raise ValueError(f"Agent {agent_id} not found.")
+
+        security_audit_file = (
+            self.ace_dir /
+            f"security_audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+        )
+        content = f"""# SOP: Security Audit - {agent.name} ({agent.id})
+- **Auditor**: Orchestrator (Security Module)
+- **Date**: {datetime.now().isoformat()}
+
+## 1. Dependency Vulnerabilities
+- [ ] Run `npm audit` or `pip-audit` on the modules owned by the agent.
+- [ ] Identify any high/critical vulnerabilities.
+
+## 2. Secret Scanning
+- [ ] Scan modules for hardcoded secrets, API keys, or credentials.
+- [ ] Verify that `.env` files and sensitive data are gitignored.
+
+## 3. Code Security Patterns
+- [ ] Check for common security pitfalls (SQL injection, XSS, insecure defaults).
+- [ ] Verify that authentication and authorization checks are present where needed.
+
+## 4. Findings & Remediation
+- [ ] **High Risk**:
+- [ ] **Medium Risk**:
+- [ ] **Low Risk**:
+- [ ] **Remediation Plan**:
+"""
+        security_audit_file.write_text(content)
+
+        # Notify agent of security audit task
+        self.send_mail(
+            to_agent=agent_id,
+            from_agent="orchestrator",
+            subject="SECURITY AUDIT SOP",
+            body=(
+                f"A security audit SOP has been generated for your modules: "
+                f"{security_audit_file.name}\n\n"
+                "Please perform the audit and report findings."
+            )
+        )
+
+        return security_audit_file
 
     # --- Google Stitch Integration ---
 

@@ -417,6 +417,18 @@ def test_cross_project_learning(service, temp_workspace):
     assert "[X-PROJ from" in playbook_path_arch.read_text()
 
 
+def test_security_audit_sop(service):
+    """Test generating security audit SOP."""
+    service.create_agent(id="dev-1", name="Developer 1", role="developer")
+    security_audit_file = service.security_audit("dev-1")
+
+    assert security_audit_file.exists()
+    content = security_audit_file.read_text()
+    assert "SOP: Security Audit - Developer 1 (dev-1)" in content
+    assert "## 1. Dependency Vulnerabilities" in content
+    assert "## 2. Secret Scanning" in content
+
+
 def test_token_monitoring(service):
     """Test logging and reporting token usage."""
     from ace_lib.models.schemas import TokenUsage

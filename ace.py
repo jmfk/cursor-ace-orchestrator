@@ -441,6 +441,28 @@ def agent_audit(agent_id: str = typer.Argument(..., help="Agent ID to audit")):
             console.print(f"[red]Error: {e}[/red]")
 
 
+@agent_app.command("security-audit")
+def agent_security_audit(
+    agent_id: str = typer.Argument(..., help="Agent ID to perform security audit")
+):
+    """Run security audit SOP for an agent."""
+    res = api_call("POST", f"/agents/{agent_id}/security-audit")
+    if res:
+        console.print(
+            f"Security Audit SOP started. File created: "
+            f"[green]{res['security_audit_file']}[/green]"
+        )
+    else:
+        try:
+            security_audit_file = get_service().security_audit(agent_id)
+            console.print(
+                f"Security Audit SOP started. File created: "
+                f"[green]{security_audit_file}[/green]"
+            )
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+
+
 @app.command()
 def config_tokens(
     mode: TokenMode = typer.Option(

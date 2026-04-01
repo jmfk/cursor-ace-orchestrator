@@ -2,7 +2,7 @@ import time
 import functools
 import json
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable
 from datetime import datetime
 
 class Profiler:
