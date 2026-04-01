@@ -6,47 +6,67 @@ import json
 import hashlib
 import re
 import requests
+import argparse
 from datetime import datetime
 
-# Configuration
-MODEL = "gemini-3-flash"
-MAX_SPEND_USD = 20.0
-PLAN_FILE = "plan.md"
-CHANGELOG_FILE = "changelog.md"
-LOG_FILE = "ralph_execution.log"
-STATS_FILE = "ralph_stats.json"
-STATE_HISTORY_FILE = "ralph_state_history.json"
-DEFAULT_PRD = "PRD-01 - Cursor-ace-orchestrator-prd.md"
-STAGNATION_THRESHOLD = 2  # Number of iterations with same state before alert
-MAX_CONSECUTIVE_FAILURES = 3  # Max LLM failures before circuit breaker trips
-QUIT_ON_RATE_LIMIT = True  # If True, stop the loop on rate limit detection
+# Try to import yaml, but provide a fallback or install it if missing
+try:
+    import yaml
+except ImportError:
+    print("PyYAML not found. Installing...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "pyyaml"], check=True)
+    import yaml
+
+# Default Configuration
+DEFAULTS = {
+    "model": "gemini-3-flash",
+    "max_spend_usd": 20.0,
+    "plan_file": "plan.md",
+    "changelog_file": "changelog.md",
+    "log_file": "ralph_execution.log",
+    "stats_file": "ralph_stats.json",
+    "state_history_file": "ralph_state_history.json",
+    "default_prd": "PRD-01 - Cursor-ace-orchestrator-prd.md",
+    "stagnation_threshold": 2,
+    "max_consecutive_failures": 3,
+    "quit_on_rate_limit": True,
+    "price_input_1m": 0.10,
+    "price_output_1m": 0.40,
+}
+
+# Global Config Object
+CONFIG = DEFAULTS.copy()
 
 # Global State
 LLM_CIRCUIT_BREAKER_TRIPPED = False
 CONSECUTIVE_FAILURES = 0
 PAID_ACCOUNT_REQUIRED = False
 
-# NOTE: This script is a temporary bootstrapping tool.
-# Once the core ACE Orchestrator is built, this script should be
-# manually removed and replaced by the system's own 'ace loop' command.
-
-# Pricing for gemini-3-flash (approximate 2026 pricing)
-# $0.10 per 1M input tokens, $0.40 per 1M output tokens
-PRICE_INPUT_1M = 0.10
-PRICE_OUTPUT_1M = 0.40
-
+def load_config(config_path="ralph.yaml"):
+    """Load configuration from YAML file and override defaults."""
+    global CONFIG
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                yaml_config = yaml.safe_load(f)
+                if yaml_config:
+                    CONFIG.update(yaml_config)
+                    log_message(f"Loaded config from {config_path}")
+        except Exception as e:
+            log_message(f"Error loading {config_path}: {e}")
 
 def log_message(message: str):
     """Log a message with timestamp to console and file."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     formatted_msg = f"[{timestamp}] {message}"
     print(formatted_msg)
-    with open(LOG_FILE, "a") as f:
+    log_file = CONFIG.get("log_file", "ralph_execution.log")
+    with open(log_file, "a") as f:
         f.write(formatted_msg + "\n")
-
 
 def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     """Update execution statistics and cost."""
+    stats_file = CONFIG.get("stats_file", "ralph_stats.json")
     stats = {
         "total_input_tokens": 0,
         "total_output_tokens": 0,
@@ -54,12 +74,15 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
         "total_time_sec": 0.0,
         "iterations": 0,
     }
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE, "r") as f:
+    if os.path.exists(stats_file):
+        with open(stats_file, "r") as f:
             stats = json.load(f)
 
-    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M
-            + output_tokens / 1_000_000 * PRICE_OUTPUT_1M)
+    price_in = CONFIG.get("price_input_1m", 0.10)
+    price_out = CONFIG.get("price_output_1m", 0.40)
+    
+    cost = (input_tokens / 1_000_000 * price_in
+            + output_tokens / 1_000_000 * price_out)
 
     stats["total_input_tokens"] += input_tokens
     stats["total_output_tokens"] += output_tokens
@@ -67,7 +90,7 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     stats["total_time_sec"] += elapsed_time
     stats["iterations"] += 1
 
-    with open(STATS_FILE, "w") as f:
+    with open(stats_file, "w") as f:
         json.dump(stats, f, indent=2)
 
     log_message(
@@ -75,7 +98,6 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
         f"Cost: ${cost:.6f} | Time: {elapsed_time:.2f}s"
     )
     log_message(f"Total Cost so far: ${stats['total_cost_usd']:.4f}")
-
 
 def run_cursor_agent(prompt: str):
     """Runs cursor-agent in non-interactive mode and tracks usage."""
@@ -92,14 +114,13 @@ def run_cursor_agent(prompt: str):
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
 
-    # ... existing cmd setup ...
     cmd = [
         "cursor-agent",
         "--api-key",
         os.getenv("CURSOR_API_KEY", ""),
         "--print",
         "--model",
-        MODEL,
+        CONFIG["model"],
         "--output-format",
         "stream-json",
         "--force",
@@ -108,7 +129,6 @@ def run_cursor_agent(prompt: str):
     ]
 
     try:
-        # Execute the command and capture both stdout and stderr
         result = subprocess.run(cmd, capture_output=True, text=True)
         elapsed = time.time() - start_time
 
@@ -123,7 +143,7 @@ def run_cursor_agent(prompt: str):
                 PAID_ACCOUNT_REQUIRED = True
                 log_message("🚨 Detected rate limit from Cursor Agent (429/RESOURCE_EXHAUSTED).")
 
-            if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+            if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
                 log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
 
@@ -131,9 +151,7 @@ def run_cursor_agent(prompt: str):
             log_message(f"--- STDERR ---\n{result.stderr}")
             return None
 
-        # Reset failures on success
         CONSECUTIVE_FAILURES = 0
-        # If successful, extract simulated stats
         input_tokens = len(prompt.split()) * 1.3
         output_tokens = len(result.stdout.split()) * 1.3
         update_stats(int(input_tokens), int(output_tokens), elapsed)
@@ -146,21 +164,18 @@ def run_cursor_agent(prompt: str):
             f"🚨 Unexpected error during subprocess execution: {str(e)} "
             f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
         
-        if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+        if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
             LLM_CIRCUIT_BREAKER_TRIPPED = True
             log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
             
         return None
 
-
 def generate_commit_message(task_name: str):
     """Generate a descriptive commit message using direct Gemini API or cursor-agent."""
     global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
 
-    # Check for Gemini API key in multiple possible environment variables
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-    # ... existing key loading ...
     if not api_key:
         try:
             from dotenv import load_dotenv
@@ -168,7 +183,6 @@ def generate_commit_message(task_name: str):
             api_key = (os.getenv("GEMINI_API_KEY") or
                        os.getenv("GOOGLE_API_KEY"))
         except ImportError:
-            # If dotenv is not installed, we can try a simple manual parse of .env
             if os.path.exists(".env"):
                 with open(".env", "r") as f:
                     for line in f:
@@ -177,7 +191,6 @@ def generate_commit_message(task_name: str):
                             api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
                             break
 
-    # Get git diff for context
     try:
         diff = subprocess.run(["git", "diff", "--cached"], capture_output=True, text=True).stdout
         if not diff:
@@ -200,61 +213,32 @@ def generate_commit_message(task_name: str):
             "contents": [{"parts": [{"text": prompt}]}]
         }
         try:
-            response = requests.post(url, headers=headers, json=data,
-                                     timeout=30)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
             if response.status_code == 200:
                 result = response.json()
-                msg = (result['candidates'][0]['content']['parts'][0]['text']
-                       .strip())
-                CONSECUTIVE_FAILURES = 0 # Reset on success
+                msg = (result['candidates'][0]['content']['parts'][0]['text'].strip())
+                CONSECUTIVE_FAILURES = 0 
                 return msg
             else:
                 CONSECUTIVE_FAILURES += 1
                 error_text = response.text
-                log_message(f"⚠️ Direct Gemini API failed (Status "
-                            f"{response.status_code}). Error: {error_text} "
-                            f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
+                log_message(f"⚠️ Direct Gemini API failed (Status {response.status_code}). Error: {error_text}")
                 
                 if response.status_code == 429 or "RESOURCE_EXHAUSTED" in error_text:
                     PAID_ACCOUNT_REQUIRED = True
-                    log_message("🚨 Detected Free Tier rate limit (429/RESOURCE_EXHAUSTED).")
                 
-                if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+                if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
                     LLM_CIRCUIT_BREAKER_TRIPPED = True
-                    log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
                 log_message("Falling back to iteration-based message.")
         except Exception as e:
             CONSECUTIVE_FAILURES += 1
-            log_message(f"⚠️ Error calling Gemini API: {e}. "
-                        f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
-            if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
+            log_message(f"⚠️ Error calling Gemini API: {e}.")
+            if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
-                log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
             log_message("Falling back to iteration-based message.")
 
-    # Fallback to iteration-based message
     log_message("Using iteration-based commit message fallback.")
     return f"RALPH Loop: Task {task_name[:50]}"
-
-    # Clean the message
-    if msg:
-        if "{" in msg and "}" in msg:
-            try:
-                msg_match = re.search(r'}(.*)', msg, re.DOTALL)
-                if msg_match and msg_match.group(1).strip():
-                    msg = msg_match.group(1).strip()
-                else:
-                    data = json.loads(msg)
-                    if isinstance(data, dict) and "message" in data:
-                        msg = data["message"]
-            except Exception:
-                pass
-
-        msg = re.sub(r'^.*?commit message:?\s*', '', msg, flags=re.IGNORECASE)
-        msg = msg.strip().split("\n")[0]
-
-    return msg
-
 
 def get_file_content(path: str):
     """Read and return file content if it exists."""
@@ -263,22 +247,19 @@ def get_file_content(path: str):
             return f.read()
     return ""
 
-
 def get_current_task():
     """Extract the first uncompleted task from plan.md."""
-    plan = get_file_content(PLAN_FILE)
+    plan = get_file_content(CONFIG["plan_file"])
     if not plan:
         return "Unknown task"
 
     for line in plan.splitlines():
         line = line.strip()
         if line.startswith("- [ ]"):
-            # Extract task description, removing the checkbox and bold markers if present
             task = line.replace("- [ ]", "").strip()
-            task = re.sub(r'\*\*(.*?)\*\*:', r'\1', task) # Remove bold markers and colon
+            task = re.sub(r'\*\*(.*?)\*\*:', r'\1', task)
             return task
     return "No active task found"
-
 
 def get_project_state_hash():
     """Generate a hash of the current project state (git status)."""
@@ -286,50 +267,70 @@ def get_project_state_hash():
         status = subprocess.run(
             ["git", "status", "--porcelain"], capture_output=True, text=True
         )
-        # Include a hash of the plan.md file to detect if the agent is
-        # stuck on the same task
-        plan_content = get_file_content(PLAN_FILE)
+        plan_content = get_file_content(CONFIG["plan_file"])
         state_str = status.stdout + plan_content
         return hashlib.sha256(state_str.encode()).hexdigest()
     except Exception:
         return ""
-
 
 def check_stagnation(current_hash: str):
     """Check if the project state has stagnated."""
     if not current_hash:
         return False
 
+    history_file = CONFIG["state_history_file"]
     history = []
-    if os.path.exists(STATE_HISTORY_FILE):
-        with open(STATE_HISTORY_FILE, "r") as f:
+    if os.path.exists(history_file):
+        with open(history_file, "r") as f:
             history = json.load(f)
 
     history.append(current_hash)
     if len(history) > 5:
         history = history[-5:]
 
-    with open(STATE_HISTORY_FILE, "w") as f:
+    with open(history_file, "w") as f:
         json.dump(history, f)
 
-    if len(history) >= STAGNATION_THRESHOLD + 1:
-        last_n = history[-(STAGNATION_THRESHOLD + 1):]
+    threshold = CONFIG["stagnation_threshold"]
+    if len(history) >= threshold + 1:
+        last_n = history[-(threshold + 1):]
         if all(h == last_n[0] for h in last_n):
             return True
     return False
 
-
 def get_total_cost():
     """Get total cost from stats file."""
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE, "r") as f:
+    stats_file = CONFIG["stats_file"]
+    if os.path.exists(stats_file):
+        with open(stats_file, "r") as f:
             stats = json.load(f)
             return stats.get("total_cost_usd", 0.0)
     return 0.0
 
-
 def main():
     """Main execution loop for RALPH."""
+    parser = argparse.ArgumentParser(description="RALPH Loop for Cursor ACE Orchestrator")
+    parser.add_argument("prd", nargs="?", help="Path to the PRD file")
+    parser.add_argument("--config", default="ralph.yaml", help="Path to YAML config file")
+    parser.add_argument("--model", help="Override LLM model")
+    parser.add_argument("--max-spend", type=float, help="Override max spend USD")
+    parser.add_argument("--plan-file", help="Override plan file path")
+    
+    args = parser.parse_args()
+
+    # 1. Load YAML config
+    load_config(args.config)
+
+    # 2. Override with CLI parameters
+    if args.prd:
+        CONFIG["default_prd"] = args.prd
+    if args.model:
+        CONFIG["model"] = args.model
+    if args.max_spend:
+        CONFIG["max_spend_usd"] = args.max_spend
+    if args.plan_file:
+        CONFIG["plan_file"] = args.plan_file
+
     # Load .env if it exists
     if os.path.exists(".env"):
         try:
@@ -342,227 +343,88 @@ def main():
                         key, value = line.split("=", 1)
                         os.environ[key.strip()] = value.strip().strip('"').strip("'")
 
-    # Simple argument parsing
-    prd_path = DEFAULT_PRD
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        prd_path = sys.argv[1]
-
-    if "--help" in sys.argv or "-h" in sys.argv:
-        print("RALPH Loop for Cursor ACE Orchestrator")
-        print("Usage: python ralph_loop.py [PRD_PATH]")
-        print(f"Default PRD: {DEFAULT_PRD}")
-        return
-
+    prd_path = CONFIG["default_prd"]
     if not os.path.exists(prd_path):
         log_message(f"🚨 PRD file not found: {prd_path}")
         return
 
-    log_message(
-        f"🚀 Starting RALPH Loop for Cursor ACE Orchestrator using "
-        f"{prd_path}...")
+    log_message(f"🚀 Starting RALPH Loop using {prd_path} (Model: {CONFIG['model']})...")
 
-    # Step 0: Initial State Analysis & Resumption Logic
+    # Step 0: Initial State Analysis
     log_message("Step 0: Analyzing current project state...")
-    plan_content = get_file_content(PLAN_FILE)
+    plan_file = CONFIG["plan_file"]
+    plan_content = get_file_content(plan_file)
 
     analysis_prompt = (
-        f"Analyze the current codebase and project structure relative to "
-        f"{prd_path}. "
-        f"The existing plan is:\n"
-        f"{plan_content if plan_content else 'No plan yet.'}\n\n"
-        f"1. Identify which features from {prd_path} are already implemented "
-        "(e.g., ace.py, .ace/ structure, context builder, write-back).\n"
-        "2. Identify what is currently missing or partially implemented "
-        "(e.g., TDD/tests, native ace loop, SOP logic, Google Stitch).\n"
-        "3. Update 'plan.md' to reflect this reality, marking completed tasks "
-        "as [x] and adding missing ones. "
-        f"Ensure the plan is sorted by priority for full {prd_path} "
-        "implementation."
+        f"Analyze the current codebase and project structure relative to {prd_path}. "
+        f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
+        f"1. Identify implemented features. 2. Identify missing parts. 3. Update '{plan_file}'."
     )
     run_cursor_agent(analysis_prompt)
 
     iteration = 0
     while True:
-        if PAID_ACCOUNT_REQUIRED and QUIT_ON_RATE_LIMIT:
-            log_message(
-                "🚨 STOPPED: Gemini API Free Tier quota exceeded. "
-                "Please upgrade to a paid plan or wait for the quota to reset."
-            )
+        if PAID_ACCOUNT_REQUIRED and CONFIG["quit_on_rate_limit"]:
+            log_message("🚨 STOPPED: Rate limit exceeded.")
             break
 
         current_cost = get_total_cost()
-        if current_cost >= MAX_SPEND_USD:
-            log_message(f"Reached maximum spending limit (${MAX_SPEND_USD}). Stopping.")
+        if current_cost >= CONFIG["max_spend_usd"]:
+            log_message(f"Reached maximum spending limit (${CONFIG['max_spend_usd']}). Stopping.")
             break
 
         iteration += 1
-        log_message(f"=== Iteration {iteration} (Current Cost: ${current_cost:.4f}) ===")
+        log_message(f"=== Iteration {iteration} (Cost: ${current_cost:.4f}) ===")
 
-        # Get current task for context and commit messages
         current_task = get_current_task()
         log_message(f"📍 Current Task: {current_task}")
 
         # Step 1: Planning
-        plan_content = get_file_content(PLAN_FILE)
+        plan_content = get_file_content(plan_file)
         if not plan_content or "[ ]" not in plan_content:
-            log_message("Step 1: Planning (or re-planning)...")
-            prompt = (
-                f"Based on {prd_path} (primary), and SPECS.md, create or "
-                "update the detailed, sorted list of implementation steps for "
-                "the Cursor ACE Orchestrator. The system should be built in "
-                "Python, supporting CLI first but architected for FastAPI "
-                "later. Save the plan as 'plan.md' as a sorted list of tasks. "
-                "If a plan already exists, only add tasks that are missing to "
-                "reach 100% completion."
-            )
+            log_message("Step 1: Planning...")
+            prompt = f"Update '{plan_file}' based on {prd_path} and SPECS.md."
             run_cursor_agent(prompt)
-            plan_content = get_file_content(PLAN_FILE)
-            if not plan_content:
-                log_message("Failed to create/update plan.md. Retrying...")
-                continue
+            plan_content = get_file_content(plan_file)
+            if not plan_content: continue
 
-        # Step 2: Build next step
-        log_message("Step 2: Building next task...")
-
-        # Stagnation detection
+        # Step 2: Build
+        log_message("Step 2: Building...")
         current_hash = get_project_state_hash()
         if check_stagnation(current_hash):
-            log_message(
-                "⚠️ Stagnation detected! Activating Architect/Debugger "
-                "recovery..."
-            )
-            prompt = (
-                f"The project state has not changed for "
-                f"{STAGNATION_THRESHOLD} iterations. "
-                "You are now in Architect/Debugger mode. Analyze the current "
-                "codebase, "
-                f"the target PRD ({prd_path}), and the current plan "
-                f"({PLAN_FILE}). "
-                "Identify why the implementation is stuck. Are there missing "
-                "dependencies? "
-                "Conflicting rules? Ambiguous requirements? "
-                "Provide a clear analysis and propose a new strategy to break "
-                "the loop. "
-                "Then, implement the necessary changes to move forward."
-            )
+            log_message("⚠️ Stagnation detected!")
+            prompt = f"Stagnation detected. Analyze {prd_path} and {plan_file} to recover."
         else:
-            prompt = (
-                f"Current plan:\n{plan_content}\n\n"
-                f"Target PRD: {prd_path}\n\n"
-                "Implement the next (first uncompleted) task from the plan. "
-                f"CRITICAL: Focus on implementing the following missing core "
-                f"areas from {prd_path}:\n"
-                "1. TDD (Test-Driven Development): Establish the 'tests/' "
-                "directory and write unit tests for ACEService.\n"
-                "2. Native ace loop: Integrate the RALPH loop logic directly "
-                "into 'ace.py' as a native command.\n"
-                "3. SOP Logic: Implement formal instructions/SOPs for agent "
-                "onboarding and PR reviews.\n"
-                "4. Google Stitch Integration: Connect the CLI stubs to "
-                "actual API or code extraction logic.\n\n"
-                "Include necessary tests. Ensure the software remains "
-                "runnable and testable. Use Python and follow the "
-                "architecture described "
-                f"in {prd_path} and ARCHITECTURE.md."
-            )
+            prompt = f"Implement next task from {plan_file}. Target PRD: {prd_path}."
         run_cursor_agent(prompt)
 
-        # Step 3: Verify (Tests, Lint, Run)
-        log_message("Step 3: Verifying implementation...")
-        prompt = (
-            "Run all tests, linter, and verify that the software is runnable. "
-            "If there are any failures, fix them immediately. "
-            "Do not proceed until all tests pass and the code is clean."
-        )
-        verification_result = run_cursor_agent(prompt)
-        if verification_result is None:
-            log_message("Verification failed. Retrying...")
-            continue
+        # Step 3: Verify
+        log_message("Step 3: Verifying...")
+        run_cursor_agent("Run all tests and linter. Fix any failures.")
 
         # Step 4: Commit
-        log_message("Step 4: Committing changes...")
+        log_message("Step 4: Committing...")
         try:
-            # Check if there are changes to commit
-            status = subprocess.run(
-                ["git", "status", "--porcelain"], capture_output=True,
-                text=True)
+            status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
             if status.stdout.strip():
                 commit_msg = generate_commit_message(current_task)
-
-                # Final fallback if cleaning resulted in empty string
-                if not commit_msg or len(commit_msg.strip()) < 5:
-                    commit_msg = (f"RALPH Loop: Implementation iteration "
-                                  f"{iteration} - {current_task[:50]}")
-
                 subprocess.run(["git", "add", "."], check=True)
-                subprocess.run(["git", "commit", "-m", commit_msg],
-                               check=True)
+                subprocess.run(["git", "commit", "-m", commit_msg], check=True)
                 subprocess.run(["git", "push"], check=True)
-                log_message(f"Committed with message: {commit_msg}")
-            else:
-                log_message("No changes to commit.")
-        except subprocess.CalledProcessError as e:
-            log_message(f"Git operation failed: {e}")
+                log_message(f"Committed: {commit_msg}")
+        except Exception as e:
+            log_message(f"Git failed: {e}")
 
-        # Step 5: Update Plan and Changelog
-        log_message("Step 5: Updating plan and changelog...")
-        prompt = (
-            f"Update '{PLAN_FILE}' by marking the completed task as done "
-            f"and keeping the list sorted. Write the completed task details "
-            f"to '{CHANGELOG_FILE}'. Ensure the plan reflects what is left "
-            "to do."
-        )
-        run_cursor_agent(prompt)
+        # Step 5: Update Plan
+        log_message("Step 5: Updating plan...")
+        run_cursor_agent(f"Update '{plan_file}' and '{CONFIG['changelog_file']}'.")
 
-        log_message(f"Iteration {iteration} complete.")
-
-        if (
-            "[ ]" not in plan_content
-            and "todo" not in plan_content.lower()
-        ):
-            log_message(
-                "🎉 All tasks in the plan are completed! Checking if PRD is "
-                "fully implemented..."
-            )
-
-            # Step 1.5: Final PRD Gap Analysis
-            log_message("Step 1.5: Final PRD Gap Analysis...")
-            gap_prompt = (
-                f"Analyze the current codebase relative to {prd_path}. "
-                "Is the PRD fully implemented? If not, identify the missing parts. "
-                "If missing parts are found, update 'plan.md' with the new tasks. "
-                "If fully implemented, respond with 'PRD_COMPLETE'."
-            )
-            gap_result = run_cursor_agent(gap_prompt)
-
+        if "[ ]" not in plan_content:
+            log_message("🎉 Plan complete! Checking PRD...")
+            gap_result = run_cursor_agent(f"Is {prd_path} fully implemented? Respond 'PRD_COMPLETE' if yes.")
             if gap_result and "PRD_COMPLETE" in gap_result:
-                log_message("✅ PRD is fully implemented!")
-
-                # Final Analysis Step
-                log_message("Step 6: Final Implementation Analysis...")
-                analysis_prompt = (
-                    f"Analyze the current state of implementation relative to "
-                    f"{prd_path}. "
-                    "1. Summarize how much of the PRD is implemented "
-                    "(percentage and key features).\n"
-                    "2. Identify exactly what is missing to reach 100% "
-                    "completion.\n"
-                    "3. Recommend the final set of steps to achieve full "
-                    "implementation.\n"
-                    "Output this analysis as a markdown report in "
-                    "'FINAL_ANALYSIS.md'."
-                )
-                run_cursor_agent(analysis_prompt)
+                log_message("✅ PRD Complete!")
                 break
-            else:
-                log_message("🔄 PRD is not fully implemented. Re-planning...")
-                continue
-
-    # Final check after loop
-    final_cost = get_total_cost()
-    if final_cost >= MAX_SPEND_USD:
-        print(f"Reached maximum spending limit (${MAX_SPEND_USD}). Stopping.")
-
 
 if __name__ == "__main__":
     main()

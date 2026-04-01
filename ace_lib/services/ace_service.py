@@ -536,9 +536,7 @@ class ACEService:
                 break
 
         for update in updates:
-            # ... existing update logic ...
             update_id, update_type = update["id"], update["type"]
-            # ... (the rest of the loop) ...
             existing_pattern = (
                 rf"<!-- \[{update_type}-{update_id}\]"
                 r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
@@ -1462,7 +1460,7 @@ class ACEService:
         mockup_dir.mkdir(parents=True, exist_ok=True)
         mockup_file = mockup_dir / f"{mockup_id}.md"
 
-        # Check for STITCH_API_KEY to use real API call
+        # Check for STITCH_API_KEY to use real API call (PRD-01 / Phase 9.6)
         api_key = os.getenv("STITCH_API_KEY")
         if not api_key:
             # Fallback to ~/.ace/credentials
@@ -1484,7 +1482,12 @@ class ACEService:
                     timeout=30
                 )
                 if response.status_code == 200:
-                    ui_code = response.json().get("code")
+                    data = response.json()
+                    ui_code = data.get("code")
+                    # If the API returns a direct URL to a canvas, we use it
+                    if data.get("url"):
+                        mockup_url = data.get("url")
+                    
                     if not ui_code:
                         # Fallback if code missing in response
                         ui_code = self._generate_mockup_with_agent(description)
@@ -1613,7 +1616,7 @@ class ACEService:
             (components_dir / f"{name}.tsx").write_text(content)
 
     def ui_sync(self, url: str):
-        """Sync UI code from Google Stitch with visual diffing."""
+        """Sync UI code from Google Stitch with visual diffing (PRD-01 / Phase 9.6)."""
         mockup_id = url.split("/")[-1]
         
         api_key = os.getenv("STITCH_API_KEY")

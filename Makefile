@@ -29,8 +29,8 @@ install-exe: build-exe
 	@echo "Successfully installed 'ace' command."
 
 build-ralph-exe:
-	pip install pyinstaller
-	pyinstaller --onefile --name ralph ralph_loop.py
+	pip install pyinstaller pyyaml
+	pyinstaller --onefile --name ralph ralph_loop.py --hidden-import yaml
 
 install-ralph-exe: build-ralph-exe
 	@echo "Installing 'ralph' binary to /usr/local/bin..."
