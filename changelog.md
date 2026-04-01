@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 19
+
+### Added
+- **Phase 6: Refinement & Missing Features**
+  - Consensus Protocol Refinement: Implemented the LLM-referee logic for `ace debate`.
+  - SOP Engine Expansion: Implemented the `audit` SOP.
+  - Google Stitch Real Integration: Replaced simulated Stitch integration with real API calls.
+  - Test Coverage: Increased test coverage for `ACEService` and API endpoints.
+
 ## [2026-04-01] - RALPH Loop Iteration 18
 
 ### Added

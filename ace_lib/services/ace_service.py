@@ -760,11 +760,20 @@ class ACEService:
                     self.update_playbook(playbook_path, updates)
                     print(f"[RALPH] Updated playbook: {playbook_path.name}")
 
-            if result.returncode == 0:
-                print("[RALPH] ✅ Verification successful!")
-                success = True
-                break
-            else:
+                # Update prompt with reflection insights if it failed
+                if result.returncode != 0 and reflection_text != "No new learnings.":
+                    prompt = (
+                        f"Previous attempt failed. Reflection insights:\n"
+                        f"{reflection_text}\n\n"
+                        f"Original task: {prompt}"
+                    )
+                elif result.returncode != 0:
+                    prompt = (
+                        f"Previous attempt failed. Test output:\n"
+                        f"{result.stdout}\n{result.stderr}\n\n"
+                        f"Original task: {prompt}"
+                    )
+            elif result.returncode != 0:
                 print(
                     f"[RALPH] ❌ Verification failed "
                     f"(Exit code: {result.returncode})"
@@ -775,6 +784,11 @@ class ACEService:
                     f"{result.stdout}\n{result.stderr}\n\n"
                     f"Original task: {prompt}"
                 )
+
+            if result.returncode == 0:
+                print("[RALPH] ✅ Verification successful!")
+                success = True
+                break
 
             # Cleanup context file
             if os.path.exists(context_file):
