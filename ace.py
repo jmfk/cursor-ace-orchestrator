@@ -797,6 +797,7 @@ def memory_prune(
 def memory_sync():
     """Keep AGENTS.md in sync with the Agent Registry and recent Decisions."""
     svc = get_service()
+    svc.sync_shared_learnings()
     agents_config = svc.load_agents()
     content = ["# ACE Agents Registry", "", "## Active Agents"]
     if not agents_config.agents:

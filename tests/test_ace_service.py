@@ -296,6 +296,7 @@ def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch)
 def test_multi_turn_debate(service, monkeypatch):
     """Test multi-turn debate mediation."""
     from unittest.mock import MagicMock
+    from ace_lib.models.schemas import TokenMode
 
     # Mock anthropic client
     mock_client = MagicMock()
@@ -309,6 +310,11 @@ def test_multi_turn_debate(service, monkeypatch):
     # Setup agents
     service.create_agent(id="agent-1", name="Agent 1", role="architect")
     service.create_agent(id="agent-2", name="Agent 2", role="developer")
+
+    # Set token mode to HIGH to ensure full turns
+    config = service.load_config()
+    config.token_mode = TokenMode.HIGH
+    service.save_config(config)
 
     consensus = service.debate(
         proposal="Use GraphQL",
