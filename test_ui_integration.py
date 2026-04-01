@@ -47,6 +47,17 @@ def test_ui_sync_command(tmp_path, monkeypatch):
     ace_dir = tmp_path / ".ace"
     ace_dir.mkdir()
 
+    # Mock load_agents to return a test agent
+    test_agent = Agent(
+        id="ui-agent-01", name="Vogue", role="ui-agent",
+        email="vogue@ace.local", memory_file=".cursor/rules/ui.mdc",
+        status="active"
+    )
+
+    def mock_load_agents():
+        return AgentsConfig(version="1", agents=[test_agent])
+
+    monkeypatch.setattr("ace.load_agents", mock_load_agents)
     monkeypatch.chdir(tmp_path)
 
     # Run ace ui sync
