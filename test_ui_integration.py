@@ -36,6 +36,12 @@ def test_ui_mockup_command(tmp_path, monkeypatch):
         ],
     )
 
+    print(f"DEBUG: exit_code={result.exit_code}")
+    print(f"DEBUG: stdout={result.stdout}")
+    if result.exception:
+        import traceback
+        traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+
     assert result.exit_code == 0
     assert "Generating UI mockup" in result.stdout
     assert "Create a login page" in result.stdout
