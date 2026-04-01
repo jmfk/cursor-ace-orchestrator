@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 22
+
+### Added
+- **Phase 6: Refinement & Missing Features**
+  - FastAPI Backend Implementation: Created the actual FastAPI app and endpoints.
+  - Updated `plan.md` to reflect completion of task 6.6.
+
 ## [2026-04-01] - RALPH Loop Iteration 21
 
 ### Added
