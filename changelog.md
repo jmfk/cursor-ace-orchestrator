@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 74
+
+### Updated
+- **Phase 9: Final Polish & Deployment**
+  - Marked task 9.12 (Community Outreach) as completed in `plan.md`.
+  - Added task 9.13 (Future Roadmap) to the plan.
+  - Re-sorted Phase 9 tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 73
 
 ### Updated

@@ -3,22 +3,11 @@ import re
 import subprocess
 import hashlib
 import tempfile
-import requests
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Callable
 from ruamel.yaml import YAML
 import anthropic
-from ace_lib.sop.sop_engine import (
-    generate_onboarding_sop,
-    generate_pr_review_sop,
-    generate_audit_sop,
-)
-from ace_lib.stitch.stitch_engine import (
-    generate_mockup,
-    sync_mockup,
-    extract_components,
-)
 from ace_lib.utils.profiler import profiler
 from ace_lib.models.schemas import (
     Config,
@@ -460,6 +449,18 @@ class ACEService:
             if cred_file.exists():
                 for line in cred_file.read_text().splitlines():
                     if line.startswith("CURSOR_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+        return api_key
+
+    def get_stitch_key(self):
+        api_key = os.getenv("STITCH_API_KEY")
+        if not api_key:
+            # Fallback to ~/.ace/credentials
+            cred_file = Path.home() / ".ace" / "credentials"
+            if cred_file.exists():
+                for line in cred_file.read_text().splitlines():
+                    if line.startswith("STITCH_API_KEY="):
                         api_key = line.split("=", 1)[1].strip()
                         break
         return api_key
@@ -1242,7 +1243,8 @@ class ACEService:
         sop_dir.mkdir(exist_ok=True)
         
         onboarding_file = sop_dir / f"onboarding_{agent_id}.md"
-        content = generate_onboarding_sop(
+        from ace_lib.sop import sop_engine
+        content = sop_engine.generate_onboarding_sop(
             agent_id=agent.id,
             name=agent.name,
             role=agent.role,
@@ -1293,7 +1295,8 @@ type: role
         sop_dir.mkdir(exist_ok=True)
         
         review_file = sop_dir / f"review_{pr_id}_{agent_id}.md"
-        content = generate_pr_review_sop(pr_id, agent_id)
+        from ace_lib.sop import sop_engine
+        content = sop_engine.generate_pr_review_sop(pr_id, agent_id)
         review_file.write_text(content)
 
         # Notify agent of PR review task
@@ -1323,7 +1326,8 @@ type: role
         sop_dir.mkdir(exist_ok=True)
         
         audit_file = sop_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
-        content = generate_audit_sop(agent_id, agent.name)
+        from ace_lib.sop import sop_engine
+        content = sop_engine.generate_audit_sop(agent_id, agent.name)
         audit_file.write_text(content)
 
         # Notify agent of audit
@@ -1449,17 +1453,10 @@ type: role
     def ui_mockup(self, description: str, agent_id: str):
         """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
         # Check for STITCH_API_KEY to use real API call (PRD-01 / Phase 9.6)
-        api_key = os.getenv("STITCH_API_KEY")
-        if not api_key:
-            # Fallback to ~/.ace/credentials
-            cred_file = Path.home() / ".ace" / "credentials"
-            if cred_file.exists():
-                for line in cred_file.read_text().splitlines():
-                    if line.startswith("STITCH_API_KEY="):
-                        api_key = line.split("=", 1)[1].strip()
-                        break
+        api_key = self.get_stitch_key()
 
-        mockup_url, ui_code = generate_mockup(description, agent_id, api_key)
+        from ace_lib.stitch import stitch_engine
+        mockup_url, ui_code = stitch_engine.generate_mockup(description, agent_id, api_key)
         mockup_id = mockup_url.split("/")[-1]
 
         # Ensure .ace directory exists before ui_mockups
@@ -1585,7 +1582,8 @@ type: role
         components_dir = self.ace_dir / "ui_mockups" / "components" / mockup_id
         components_dir.mkdir(parents=True, exist_ok=True)
 
-        components = extract_components(code)
+        from ace_lib.stitch import stitch_engine
+        components = stitch_engine.extract_components(code)
         for name, content in components.items():
             (components_dir / f"{name}.tsx").write_text(content)
 
@@ -1593,17 +1591,10 @@ type: role
         """Sync UI code from Google Stitch with visual diffing (PRD-01 / Phase 8.3)."""
         mockup_id = url.split("/")[-1]
         
-        api_key = os.getenv("STITCH_API_KEY")
-        if not api_key:
-            # Fallback to ~/.ace/credentials
-            cred_file = Path.home() / ".ace" / "credentials"
-            if cred_file.exists():
-                for line in cred_file.read_text().splitlines():
-                    if line.startswith("STITCH_API_KEY="):
-                        api_key = line.split("=", 1)[1].strip()
-                        break
+        api_key = self.get_stitch_key()
 
-        ui_code = sync_mockup(url, api_key)
+        from ace_lib.stitch import stitch_engine
+        ui_code = stitch_engine.sync_mockup(url, api_key)
         if ui_code:
             # Perform visual diffing if we have an existing mockup (PRD-01 / Phase 8.3)
             mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"

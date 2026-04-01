@@ -1,9 +1,9 @@
 import re
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
-def generate_mockup(description: str, agent_id: str, api_key: Optional[str] = None) -> str:
+def generate_mockup(description: str, agent_id: str, api_key: Optional[str] = None) -> Tuple[str, str]:
     """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
     mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
