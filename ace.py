@@ -47,6 +47,106 @@ def update_playbook(playbook_path: Path, updates: List[Dict]):
     return get_service().update_playbook(playbook_path, updates)
 
 
+# --- Meta Mode Enhancements ---
+
+meta_app = typer.Typer(help="Meta-mode commands for ACE working on itself")
+app.add_typer(meta_app, name="meta")
+
+
+@meta_app.command("self-audit")
+def meta_self_audit():
+    """ACE performs a self-audit of its own codebase and memory."""
+    console.print("🚀 [bold blue]Starting ACE Self-Audit[/bold blue]")
+    svc = get_service()
+    agents_config = svc.load_agents()
+    
+    for agent in agents_config.agents:
+        console.print(f"Auditing agent: [green]{agent.id}[/green]")
+        audit_file = svc.audit_agent(agent.id)
+        console.print(f"  Audit SOP generated: [dim]{audit_file}[/dim]")
+        
+        # Run a specialized self-reflection on the agent's memory
+        playbook_path = svc.base_path / agent.memory_file
+        if playbook_path.exists():
+            content = playbook_path.read_text()
+            console.print(f"  Analyzing playbook: [dim]{playbook_path.name}[/dim]")
+            # Here we could call an LLM to analyze the playbook for consistency
+            # For now, we just report the size and count of strategies
+            strategies = re.findall(r"\[str-\d+\]", content)
+            pitfalls = re.findall(r"\[mis-\d+\]", content)
+            decisions = re.findall(r"\[dec-\d+\]", content)
+            console.print(f"    Strategies: {len(strategies)}")
+            console.print(f"    Pitfalls: {len(pitfalls)}")
+            console.print(f"    Decisions: {len(decisions)}")
+
+    console.print("\n[bold green]Self-Audit complete.[/bold green]")
+
+
+@meta_app.command("cross-project-export")
+def meta_export(
+    agent_id: str = typer.Argument(..., help="Agent ID to export learnings from"),
+    target_dir: str = typer.Option(".ace-meta/cross-project", "--target", "-t")
+):
+    """Export learnings for cross-project sharing."""
+    svc = get_service()
+    target_path = Path(target_dir)
+    learnings = svc.export_learnings(agent_id, target_path)
+    console.print(f"Exported [bold]{len(learnings)}[/bold] learnings to [blue]{target_path}[/blue]")
+
+
+@meta_app.command("cross-project-import")
+def meta_import(
+    source_file: str = typer.Argument(..., help="Path to the exported learnings YAML"),
+    agent_id: str = typer.Argument(..., help="Agent ID to import learnings into")
+):
+    """Import learnings from another project."""
+    svc = get_service()
+    count = svc.import_learnings(Path(source_file), agent_id)
+    console.print(f"Imported [bold]{count}[/bold] learnings into agent [green]{agent_id}[/green]")
+
+
+@app.command()
+def token_stats(
+    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Filter by agent ID")
+):
+    """Track and report token usage per agent/session."""
+    svc = get_service()
+    usages = svc.get_token_report(agent_id)
+    
+    if not usages:
+        console.print("No token usage data found.")
+        return
+        
+    table = Table(title="Token Consumption Monitoring")
+    table.add_column("Agent", style="green")
+    table.add_column("Session", style="cyan")
+    table.add_column("Prompt", style="yellow")
+    table.add_column("Completion", style="yellow")
+    table.add_column("Total", style="bold yellow")
+    table.add_column("Cost ($)", style="magenta")
+    table.add_column("Timestamp", style="dim")
+    
+    total_tokens = 0
+    total_cost = 0.0
+    
+    for u in usages:
+        table.add_row(
+            u.agent_id,
+            u.session_id[:8],
+            str(u.prompt_tokens),
+            str(u.completion_tokens),
+            str(u.total_tokens),
+            f"{u.cost:.4f}",
+            u.timestamp
+        )
+        total_tokens += u.total_tokens
+        total_cost += u.cost
+        
+    console.print(table)
+    console.print(f"\n[bold]Grand Total Tokens:[/bold] {total_tokens}")
+    console.print(f"[bold]Grand Total Cost:[/bold] ${total_cost:.4f}")
+
+
 # --- CLI-to-API Bridge ---
 API_BASE_URL = os.getenv("ACE_API_URL", "http://localhost:8000")
 
@@ -739,7 +839,7 @@ def loop(
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
     """
-    console.print(f"🚀 [bold blue]Starting RALPH Loop[/bold blue]")
+    console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
     console.print(f"Prompt: [italic]{prompt}[/italic]")
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
@@ -989,7 +1089,7 @@ def spec_show(id: str = typer.Argument(..., help="Spec ID")):
     console.print(f"Status: [yellow]{spec.status}[/yellow]")
     console.print(f"Updated: [dim]{spec.updated_at}[/dim]")
     console.print(f"\n[bold]Intent:[/bold]\n{spec.intent}")
-    console.print(f"\n[bold]Constraints:[/bold]")
+    console.print("\n[bold]Constraints:[/bold]")
     for c in spec.constraints:
         console.print(f"- {c}")
     

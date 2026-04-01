@@ -349,3 +349,57 @@ def test_living_specs_management(service):
     md_file = service.specs_dir / "auth-v2.md"
     assert md_file.exists()
     assert "# Living Spec: Auth V2 Implementation" in md_file.read_text()
+
+
+def test_cross_project_learning(service, temp_workspace):
+    """Test exporting and importing learnings."""
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=5 harmful=0 :: Test strategy -->
+""")
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    
+    export_dir = temp_workspace / "exports"
+    learnings = service.export_learnings("dev-1", export_dir)
+    
+    assert len(learnings) == 1
+    assert learnings[0].description == "Test strategy"
+    assert (export_dir / f"learnings_{temp_workspace.name}_dev-1.yaml").exists()
+    
+    # Import into another agent
+    service.create_agent(id="dev-2", name="Dev 2", role="developer")
+    # Let's use a different role to have a different file
+    service.create_agent(id="arch-1", name="Arch 1", role="architect")
+    playbook_path_arch = service.cursor_rules_dir / "architect.mdc"
+    playbook_path_arch.write_text("# Architect Playbook\n## Strategier & patterns\n")
+    
+    import_count = service.import_learnings(export_dir / f"learnings_{temp_workspace.name}_dev-1.yaml", "arch-1")
+    assert import_count == 1
+    assert "[X-PROJ from" in playbook_path_arch.read_text()
+
+
+def test_token_monitoring(service):
+    """Test logging and reporting token usage."""
+    from ace_lib.models.schemas import TokenUsage
+    usage = TokenUsage(
+        agent_id="dev-1",
+        session_id="sess-1",
+        prompt_tokens=100,
+        completion_tokens=50,
+        total_tokens=150,
+        cost=0.002
+    )
+    service.log_token_usage(usage)
+    
+    report = service.get_token_report()
+    assert len(report) == 1
+    assert report[0].agent_id == "dev-1"
+    assert report[0].total_tokens == 150
+    
+    report_filtered = service.get_token_report(agent_id="dev-1")
+    assert len(report_filtered) == 1
+    
+    report_empty = service.get_token_report(agent_id="non-existent")
+    assert len(report_empty) == 0

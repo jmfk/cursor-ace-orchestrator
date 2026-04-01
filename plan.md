@@ -50,9 +50,9 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **6.7 Test Coverage Expansion**: Increase test coverage for `ACEService` and API endpoints beyond basic tests.
 - [x] **6.8 Production Readiness**: Add logging and error handling middleware for FastAPI.
 
-## Phase 7: Final Polish & Maintenance (Pending)
-- [ ] **7.1 Living Specs Implementation**: Fully automate the creation and update of `.ace/specs/` (intent, constraints, implementation, verification) via `ace spec` commands.
-- [ ] **7.2 Cross-Project Learning**: Implement logic to aggregate anonymized learnings in `.ace-meta/cross-project/`.
-- [ ] **7.3 Meta Mode Enhancements**: Refine `.ace-meta/` usage when ACE works on itself.
-- [ ] **7.4 Token Consumption Monitoring**: Add a command to track and report token usage per agent/session.
-- [ ] **7.5 IDE Extension Integration**: Prepare manifest and basic bridge for a Cursor/VSCode extension.
+## Phase 7: Final Polish & Maintenance (In Progress)
+- [x] **7.1 Living Specs Implementation**: Fully automate the creation and update of `.ace/specs/` (intent, constraints, implementation, verification) via `ace spec` commands.
+- [x] **7.2 Cross-Project Learning**: Implement logic to aggregate anonymized learnings in `.ace-meta/cross-project/`.
+- [x] **7.3 Meta Mode Enhancements**: Refine `.ace-meta/` usage when ACE works on itself.
+- [x] **7.4 Token Consumption Monitoring**: Add a command to track and report token usage per agent/session.
+- [x] **7.5 IDE Extension Integration**: Prepare manifest and basic bridge for a Cursor/VSCode extension.

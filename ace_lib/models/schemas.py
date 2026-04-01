@@ -82,6 +82,27 @@ class LivingSpec(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class CrossProjectLearning(BaseModel):
+    source_project: str
+    target_project: str
+    strategy_id: str
+    type: str  # str, mis, dec
+    description: str
+    helpful: int = 0
+    harmful: int = 0
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class TokenUsage(BaseModel):
+    agent_id: str
+    session_id: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost: float = 0.0
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
 class MailMessage(BaseModel):
     id: str
     from_agent: str = Field(..., alias="from")

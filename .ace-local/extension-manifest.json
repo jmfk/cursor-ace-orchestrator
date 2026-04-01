@@ -1,0 +1,49 @@
+{
+  "name": "cursor-ace-bridge",
+  "displayName": "Cursor ACE Bridge",
+  "description": "Bridge between Cursor and ACE Orchestrator",
+  "version": "0.1.0",
+  "publisher": "ace",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ace.init",
+        "title": "ACE: Initialize Project"
+      },
+      {
+        "command": "ace.run",
+        "title": "ACE: Run Task"
+      },
+      {
+        "command": "ace.showStats",
+        "title": "ACE: Show Token Stats"
+      }
+    ],
+    "configuration": {
+      "title": "ACE Orchestrator",
+      "properties": {
+        "ace.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the ACE API"
+        },
+        "ace.tokenMode": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "low",
+          "description": "Context depth for agent calls"
+        }
+      }
+    }
+  }
+}

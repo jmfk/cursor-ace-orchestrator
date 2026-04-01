@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 27
+
+### Added
+- **Phase 7: Final Polish & Maintenance**
+  - Living Specs Implementation: Fully automated the creation and update of `.ace/specs/` (intent, constraints, implementation, verification) via `ace spec` commands.
+  - Updated `plan.md` to reflect completion of task 7.1.
+
 ## [2026-04-01] - RALPH Loop Iteration 26
 
 ### Added

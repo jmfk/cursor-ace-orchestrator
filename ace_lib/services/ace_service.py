@@ -19,6 +19,8 @@ from ace_lib.models.schemas import (
     TaskType,
     MailMessage,
     LivingSpec,
+    CrossProjectLearning,
+    TokenUsage,
 )
 
 yaml = YAML()
@@ -1221,3 +1223,113 @@ class ACEService:
             constraints=constraints or []
         )
         return self.save_spec(spec)
+
+    # --- Cross-Project Learning ---
+
+    def export_learnings(self, agent_id: str, target_dir: Path):
+        """Export anonymized learnings from an agent's playbook."""
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return []
+
+        playbook_path = self.base_path / agent.memory_file
+        if not playbook_path.exists():
+            return []
+
+        content = playbook_path.read_text()
+        pattern = (
+            r"<!-- \[(str|mis|dec)-([^\]]+)\]"
+            r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
+        )
+        
+        learnings = []
+        for match in re.finditer(pattern, content):
+            l_type, l_id, helpful, harmful, desc = match.groups()
+            learning = CrossProjectLearning(
+                source_project=self.base_path.name,
+                target_project="global",
+                strategy_id=f"{l_type}-{l_id}",
+                type=l_type,
+                description=desc,
+                helpful=int(helpful or 0),
+                harmful=int(harmful or 0)
+            )
+            learnings.append(learning)
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+        export_file = target_dir / f"learnings_{self.base_path.name}_{agent_id}.yaml"
+        with open(export_file, "w") as f:
+            yaml.dump([learning.model_dump() for learning in learnings], f)
+        
+        return learnings
+
+    def import_learnings(self, source_file: Path, agent_id: str):
+        """Import learnings from another project into an agent's playbook."""
+        if not source_file.exists():
+            return 0
+
+        with open(source_file, "r") as f:
+            data = yaml.load(f)
+            if not data:
+                return 0
+            learnings = [CrossProjectLearning(**learning) for learning in data]
+
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return 0
+
+        playbook_path = self.base_path / agent.memory_file
+        if not playbook_path.exists():
+            return 0
+
+        updates = []
+        for learning in learnings:
+            updates.append({
+                "type": learning.type,
+                "id": "NEW",
+                "helpful": learning.helpful,
+                "harmful": learning.harmful,
+                "description": f"[X-PROJ from {learning.source_project}] {learning.description}"
+            })
+
+        if updates:
+            self.update_playbook(playbook_path, updates)
+        
+        return len(updates)
+
+    # --- Token Monitoring ---
+
+    def log_token_usage(self, usage: TokenUsage):
+        """Log token usage for a session."""
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
+        usage_file = self.ace_dir / "token_usage.yaml"
+        
+        usages = []
+        if usage_file.exists():
+            with open(usage_file, "r") as f:
+                data = yaml.load(f)
+                if data:
+                    usages = data
+        
+        usages.append(usage.model_dump())
+        with open(usage_file, "w") as f:
+            yaml.dump(usages, f)
+
+    def get_token_report(self, agent_id: Optional[str] = None) -> List[TokenUsage]:
+        """Get token usage report."""
+        usage_file = self.ace_dir / "token_usage.yaml"
+        if not usage_file.exists():
+            return []
+            
+        with open(usage_file, "r") as f:
+            data = yaml.load(f)
+            if not data:
+                return []
+            usages = [TokenUsage(**u) for u in data]
+            
+        if agent_id:
+            usages = [u for u in usages if u.agent_id == agent_id]
+            
+        return usages
