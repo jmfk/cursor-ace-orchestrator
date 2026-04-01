@@ -693,7 +693,11 @@ class ACEService:
                     
                     # Detect escalation
                     if any(kw in perspective.upper() for kw in ["ESCALATE"]):
-                        return f"DEBATE ESCALATED: Agent {aid} requested human intervention.\nPerspective: {perspective}"
+                        msg = (
+                            f"DEBATE ESCALATED: Agent {aid} requested human intervention.\n"
+                            f"Perspective: {perspective}"
+                        )
+                        return msg
                         
                     turn_perspectives.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
                 except Exception as e:
@@ -949,7 +953,8 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] **Playbook**: Create/Verify `{agent.memory_file}` exists.
-- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
+- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns",
+- [ ] **Sections**: "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
 - [ ] **Audit**: Review existing codebase in assigned modules: {responsibilities}
@@ -1134,8 +1139,8 @@ class ACEService:
                 if response.status_code == 200:
                     ui_code = response.json().get("code")
                     if not ui_code:
-                         # Fallback if code missing in response
-                         ui_code = self._generate_mockup_with_agent(description)
+                        # Fallback if code missing in response
+                        ui_code = self._generate_mockup_with_agent(description)
                 else:
                     print(f"[STITCH] API failed ({response.status_code}). Falling back to agent.")
                     ui_code = self._generate_mockup_with_agent(description)
