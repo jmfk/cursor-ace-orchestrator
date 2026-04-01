@@ -101,7 +101,7 @@ class ACEService:
             ids.append(entry_id)
             documents.append(desc)
             metadatas.append({
-                "type": l_type, 
+                "type": l_type,
                 "agent_id": agent_id,
                 "helpful": int(helpful or 0),
                 "harmful": int(harmful or 0),
@@ -127,6 +127,7 @@ class ACEService:
             
         client = self._get_chroma_client()
         try:
+            # We use a more robust collection naming and retrieval
             collection_name = f"playbook_{agent_id.replace('-', '_')}"
             collection = client.get_collection(name=collection_name)
             
@@ -148,7 +149,7 @@ class ACEService:
                         "distance": results["distances"][0][i] if "distances" in results else None
                     })
             return formatted_results
-        except Exception as e:
+        except Exception:
             # Silently fail if collection doesn't exist yet
             return []
 
@@ -2199,10 +2200,27 @@ type: role
                     )
                 )
 
+    def get_profiler_logs(self) -> List[Dict]:
+        """Read profiler logs from the JSONL file."""
+        import json
+        log_file = Path(".ace/profiling.jsonl")
+        if not log_file.exists():
+            return []
+        
+        logs = []
+        with open(log_file, "r") as f:
+            for line in f:
+                try:
+                    logs.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return logs
+
     # --- Task Decomposition & Delegation ---
 
     def decompose_task(self, task_description: str, agent_id: Optional[str] = None) -> List[Dict]:
         """Decompose a complex task into smaller sub-tasks using an LLM."""
+        import json
         client = self.get_anthropic_client()
         if not client:
             return [{"id": "subtask-1", "description": task_description, "status": "pending"}]
@@ -2223,7 +2241,6 @@ type: role
                 max_tokens=1024,
                 messages=[{"role": "user", "content": prompt}],
             )
-            import json
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
             # Extract JSON from potential markdown blocks
             json_match = re.search(r"\[.*\]", content, re.DOTALL)

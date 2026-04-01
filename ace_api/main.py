@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Body, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from typing import List, Optional, Dict
 import logging
 import time
@@ -19,6 +20,10 @@ logger = logging.getLogger("ace-api")
 
 app = FastAPI(title="ACE Orchestrator API")
 service = ACEService()
+
+# Setup templates
+templates = Jinja2Templates(directory="ace_api/templates")
+
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -272,6 +277,16 @@ async def prune_memory(agent_id: Optional[str] = None, threshold: int = 0):
 @app.get("/subscriptions", response_model=SubscriptionsConfig)
 async def get_subscriptions():
     return service.load_subscriptions()
+
+
+@app.get("/profiler", response_class=HTMLResponse)
+async def profiler_dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+@app.get("/profiler/data")
+async def profiler_data():
+    return service.get_profiler_logs()
 
 
 @app.post("/subscriptions")

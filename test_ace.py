@@ -279,14 +279,14 @@ def test_update_playbook(tmp_path):
 
     # Add new
     update_playbook(playbook, updates[:1])
-    content = playbook.read_text()
+    content = playbook.read_text(encoding="utf-8")
     assert "[str-001] helpful=1 harmful=0 :: New strategy" in content
 
     # Update existing (simulated by adding it first then updating)
-    playbook.write_text(content + "\n<!-- [dec-001] :: Existing decision -->")
+    playbook.write_text(content + "\n<!-- [dec-001] :: Existing decision -->", encoding="utf-8")
     updates[1]["description"] = "Updated decision"
     update_playbook(playbook, updates[1:])
-    content = playbook.read_text()
+    content = playbook.read_text(encoding="utf-8")
     assert "Updated decision" in content
     assert "Existing decision" not in content
 
@@ -386,7 +386,7 @@ def test_memory_prune(temp_ace_dir, monkeypatch):
     assert "Pruning memory for agent: test-01" in result.stdout
 
     # Verify file content
-    content = playbook_path.read_text()
+    content = playbook_path.read_text(encoding="utf-8")
     assert "<!-- [PRUNED] <!-- [str-001] helpful=1 harmful=5 :: Bad strategy --> -->" in content
     assert "<!-- [str-002] helpful=5 harmful=1 :: Good strategy -->" in content
 
@@ -431,7 +431,7 @@ def test_memory_sync(temp_ace_dir, monkeypatch):
     # Verify AGENTS.md content
     agents_md = Path("AGENTS.md")
     assert agents_md.exists()
-    content = agents_md.read_text()
+    content = agents_md.read_text(encoding="utf-8")
     assert "# ACE Agents Registry" in content
     assert "### Auth Agent (`auth-01`)" in content
     assert "## Recent Architectural Decisions" in content

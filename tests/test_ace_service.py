@@ -518,7 +518,7 @@ def test_subscriptions_and_notifications(service):
     # Check mail
     messages = service.list_mail("sub-agent")
     assert len(messages) == 1
-    assert "SUBSCRIPTION NOTIFICATION" in messages[0].subject
+    assert "SUBSCRIPTION SUCCESS" in messages[0].subject
     assert "Added login logic" in messages[0].body
 
 

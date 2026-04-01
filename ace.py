@@ -64,14 +64,13 @@ def meta_self_audit():
         console.print(f"Auditing agent: [green]{agent.id}[/green]")
         audit_file = svc.audit_agent(agent.id)
         console.print(f"  Audit SOP generated: [dim]{audit_file}[/dim]")
-        
+
         # Run a specialized self-reflection on the agent's memory
         playbook_path = svc.base_path / agent.memory_file
         if playbook_path.exists():
             content = playbook_path.read_text(encoding="utf-8")
             console.print(f"  Analyzing playbook: [dim]{playbook_path.name}[/dim]")
             # Here we could call an LLM to analyze the playbook for consistency
-            # For now, we just report the size and count of strategies
             strategies = re.findall(r"\[str-\d+\]", content)
             pitfalls = re.findall(r"\[mis-\d+\]", content)
             decisions = re.findall(r"\[dec-\d+\]", content)
@@ -83,7 +82,6 @@ def meta_self_audit():
         console.print("  Metadata:")
         for name, value in agent.model_dump().items():
             console.print(f"    {name}: {value}")
-
     console.print("\n[bold green]Self-Audit complete.[/bold green]")
 
 
@@ -121,7 +119,7 @@ def token_stats(
     if not usages:
         console.print("No token usage data found.")
         return
-        
+
     table = Table(title="Token Consumption Monitoring")
     table.add_column("Agent", style="green")
     table.add_column("Session", style="cyan")
@@ -146,10 +144,19 @@ def token_stats(
         )
         total_tokens += u.total_tokens
         total_cost += u.cost
-        
+
     console.print(table)
     console.print(f"\n[bold]Grand Total Tokens:[/bold] {total_tokens}")
     console.print(f"[bold]Grand Total Cost:[/bold] ${total_cost:.4f}")
+
+
+@app.command()
+def profiler_dashboard():
+    """Launch the performance profiling dashboard."""
+    import webbrowser
+    url = f"{API_BASE_URL}/profiler"
+    console.print(f"Launching Performance Profiling Dashboard at: [blue]{url}[/blue]")
+    webbrowser.open(url)
 
 
 # --- CLI-to-API Bridge ---
@@ -183,7 +190,7 @@ def init():
     google_key = os.getenv("GOOGLE_API_KEY")
 
     if not google_key and cred_file.exists():
-        for line in cred_file.read_text().splitlines():
+        for line in cred_file.read_text(encoding="utf-8").splitlines():
             if line.startswith("GOOGLE_API_KEY="):
                 google_key = line.split("=", 1)[1].strip()
                 break
@@ -199,11 +206,11 @@ def init():
             lines = []
             if cred_file.exists():
                 lines = [
-                    line for line in cred_file.read_text().splitlines()
+                    line for line in cred_file.read_text(encoding="utf-8").splitlines()
                     if not line.startswith("GOOGLE_API_KEY=")
                 ]
             lines.append(f"GOOGLE_API_KEY={google_key}")
-            cred_file.write_text("\n".join(lines) + "\n")
+            cred_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
             os.chmod(cred_file, 0o600)
             console.print(
                 f"Saved GOOGLE_API_KEY to [green]{cred_file}[/green]"
@@ -212,7 +219,7 @@ def init():
     # Check for CURSOR_API_KEY
     cursor_key = os.getenv("CURSOR_API_KEY")
     if not cursor_key and cred_file.exists():
-        for line in cred_file.read_text().splitlines():
+        for line in cred_file.read_text(encoding="utf-8").splitlines():
             if line.startswith("CURSOR_API_KEY="):
                 cursor_key = line.split("=", 1)[1].strip()
                 break
@@ -1271,7 +1278,7 @@ def macp_show(proposal_id: str = typer.Argument(..., help="Proposal ID")):
         console.print("\n[bold]Votes:[/bold]")
         for aid, vote in p.votes.items():
             console.print(f"- {aid}: {vote}")
-            
+
     if p.consensus_summary:
         console.print(f"\n[bold]Consensus Summary:[/bold]\n{p.consensus_summary}")
 
@@ -1304,7 +1311,7 @@ def ui_mockup(
         f"Generating UI mockup for: [bold]{description}[/bold] "
         f"using agent [green]{agent_id}[/green]"
     )
-    
+
     # Check for STITCH_API_KEY
     cred_file = Path.home() / ".ace" / "credentials"
     stitch_key = os.getenv("STITCH_API_KEY")
@@ -1415,7 +1422,6 @@ def spec_show(id: str = typer.Argument(..., help="Spec ID")):
             f"\n[bold]Verification:[/bold]\n{spec.verification}"
         )
 
-
 @spec_app.command("update")
 def spec_update(
     id: str = typer.Argument(..., help="Spec ID"),
@@ -1489,7 +1495,7 @@ def task_delegate(
     """Decompose a complex task and delegate sub-tasks to agents."""
     svc = get_service()
     console.print(f"🚀 [bold blue]Decomposing task:[/bold blue] {task_description}")
-    
+
     with console.status("[bold green]Analyzing and decomposing..."):
         subtasks = svc.decompose_task(task_description, agent_id)
     
@@ -1501,16 +1507,16 @@ def task_delegate(
     table.add_column("ID", style="cyan")
     table.add_column("Description", style="green")
     table.add_column("Complexity", style="yellow")
-    
+
     for st in subtasks:
         table.add_row(st["id"], st["description"], str(st.get("estimated_complexity", "N/A")))
-    
+
     console.print(table)
-    
+
     if typer.confirm("Do you want to delegate these tasks?"):
         with console.status("[bold green]Delegating tasks..."):
             delegations = svc.delegate_tasks(subtasks, agent_id)
-        
+
         console.print("\n[bold]Delegations:[/bold]")
         for tid, aid in delegations.items():
             console.print(f"- Task [cyan]{tid}[/cyan] -> Agent [green]{aid}[/green]")
