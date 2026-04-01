@@ -384,7 +384,10 @@ def main():
     iteration = 0
     while True:
         if PAID_ACCOUNT_REQUIRED and QUIT_ON_RATE_LIMIT:
-            log_message("🚨 STOPPED: Gemini API Free Tier quota exceeded. Please upgrade to a paid plan or wait for the quota to reset.")
+            log_message(
+                "🚨 STOPPED: Gemini API Free Tier quota exceeded. "
+                "Please upgrade to a paid plan or wait for the quota to reset."
+            )
             break
 
         current_cost = get_total_cost()
