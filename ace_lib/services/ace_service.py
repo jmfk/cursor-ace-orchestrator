@@ -217,6 +217,7 @@ class ACEService:
         role: str,
         email: Optional[str] = None,
         responsibilities: Optional[List[str]] = None,
+        parent_id: Optional[str] = None,
     ) -> Agent:
         config = self.load_agents()
         if any(a.id == id for a in config.agents):
@@ -234,10 +235,42 @@ class ACEService:
             memory_file=memory_file,
             status="active",
             responsibilities=responsibilities or [],
+            parent_id=parent_id,
         )
+        
+        if parent_id:
+            parent = next((a for a in config.agents if a.id == parent_id), None)
+            if parent:
+                if id not in parent.sub_agent_ids:
+                    parent.sub_agent_ids.append(id)
+            else:
+                raise ValueError(f"Parent agent {parent_id} not found.")
+
         config.agents.append(new_agent)
         self.save_agents(config)
         return new_agent
+
+    def get_agent_hierarchy(self, agent_id: str) -> Dict:
+        """Get the hierarchy for an agent (parent and children)."""
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return {}
+
+        hierarchy = {
+            "id": agent.id,
+            "name": agent.name,
+            "role": agent.role,
+            "parent": agent.parent_id,
+            "children": []
+        }
+
+        for sub_id in agent.sub_agent_ids:
+            child_hierarchy = self.get_agent_hierarchy(sub_id)
+            if child_hierarchy:
+                hierarchy["children"].append(child_hierarchy)
+
+        return hierarchy
 
     # --- Context & Execution ---
 

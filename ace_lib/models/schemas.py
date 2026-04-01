@@ -47,6 +47,8 @@ class Agent(BaseModel):
     responsibilities: List[str] = Field(default_factory=list)
     memory_file: str
     status: str = "active"
+    parent_id: Optional[str] = None
+    sub_agent_ids: List[str] = Field(default_factory=list)
 
 
 class AgentsConfig(BaseModel):
