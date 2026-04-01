@@ -58,7 +58,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **7.5 IDE Extension Integration**: Prepare manifest and basic bridge for a Cursor/VSCode extension.
 
 ## Phase 8: Future Directions (Pending)
-- [ ] **8.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks.
+- [x] **8.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks.
 - [ ] **8.2 Agentic Feedback Loop**: Automate success/failure flagging based on test-output, connecting write-back to CI/CD.
 - [ ] **8.3 Advanced Multi-Agent Consensus**: Support more complex debate formats and human-in-the-loop escalation.
 - [ ] **8.4 IDE Extension Development**: Build a native Cursor/VSCode extension for ACE.

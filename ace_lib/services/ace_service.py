@@ -2,7 +2,6 @@ import os
 import re
 import subprocess
 import tempfile
-import hashlib
 import requests
 from pathlib import Path
 from datetime import datetime
@@ -724,29 +723,9 @@ class ACEService:
         success = False
 
         # Initial state hash for stagnation detection
-        history = []
-
         while iteration < max_iterations:
             iteration += 1
             print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
-
-            # Stagnation detection (simplified for now)
-            state_str = f"{prompt}_{path}_{agent_id}"
-            current_hash = hashlib.sha256(
-                state_str.encode()
-            ).hexdigest()
-            history.append(current_hash)
-            if len(history) > 3 and all(
-                h == history[-1] for h in history[-3:]
-            ):
-                print(
-                    "[RALPH] ⚠️ Stagnation detected! Attempting recovery..."
-                )
-                prompt = (
-                    f"RECOVERY MODE: The previous approach is stuck. "
-                    "Try a different strategy.\n"
-                    f"Original task: {prompt}"
-                )
 
             # 1. Context Refresh & Build
             context, resolved_agent_id = self.build_context(
@@ -790,6 +769,12 @@ class ACEService:
                 test_cmd, shell=True, capture_output=True, text=True
             )
 
+            # --- Agentic Feedback Loop (8.2) ---
+            # Automatically flag success/failure based on test-output
+            test_passed = (result.returncode == 0)
+            feedback_status = "SUCCESS" if test_passed else "FAILURE"
+            print(f"[RALPH] Test result: {feedback_status}")
+
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             session_file = (
                 self.sessions_dir
@@ -804,6 +789,7 @@ class ACEService:
                 f"- **Agent ID**: `{resolved_agent_id}`\n"
                 f"- **Agent Exit Code**: {agent_proc.returncode}\n"
                 f"- **Test Exit Code**: {result.returncode}\n"
+                f"- **Feedback Status**: {feedback_status}\n"
             )
             session_content += (
                 f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
@@ -822,12 +808,24 @@ class ACEService:
                     f"[RALPH] Performing reflection for "
                     f"iteration {iteration}..."
                 )
-                # Reflect on current iteration output
-                reflection_text = self.reflect_on_session(
-                    agent_proc.stdout + "\n" + result.stdout
+                # Reflect on current iteration output, including test success/failure
+                reflection_input = (
+                    f"TASK STATUS: {feedback_status}\n"
+                    f"AGENT OUTPUT:\n{agent_proc.stdout}\n"
+                    f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
                 )
+                reflection_text = self.reflect_on_session(reflection_input)
                 updates = self.parse_reflection_output(reflection_text)
+                
+                # If test failed, ensure we increment harmful for the strategy used
+                # and if it passed, increment helpful.
                 if updates:
+                    for update in updates:
+                        if test_passed:
+                            update["helpful"] = max(update.get("helpful", 0), 1)
+                        else:
+                            update["harmful"] = max(update.get("harmful", 0), 1)
+
                     playbook_path = self.cursor_rules_dir / "_global.mdc"
                     if resolved_agent_id:
                         agents_config = self.load_agents()
@@ -847,32 +845,32 @@ class ACEService:
                     print(f"[RALPH] Updated playbook: {playbook_path.name}")
 
                 # Update prompt with reflection insights if it failed
-                if result.returncode != 0 and reflection_text != "No new learnings.":
+                if not test_passed and reflection_text != "No new learnings.":
                     prompt = (
-                        f"Previous attempt failed. Reflection insights:\n"
+                        f"Previous attempt failed (Status: {feedback_status}). Reflection insights:\n"
                         f"{reflection_text}\n\n"
                         f"Original task: {prompt}"
                     )
-                elif result.returncode != 0:
+                elif not test_passed:
                     prompt = (
-                        f"Previous attempt failed. Test output:\n"
+                        f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
                         f"{result.stdout}\n{result.stderr}\n\n"
                         f"Original task: {prompt}"
                     )
             else:
-                if result.returncode != 0:
+                if not test_passed:
                     print(
                         f"[RALPH] ❌ Verification failed "
                         f"(Exit code: {result.returncode})"
                     )
                     # Update prompt for next iteration with failure info
                     prompt = (
-                        f"Previous attempt failed. Test output:\n"
+                        f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
                         f"{result.stdout}\n{result.stderr}\n\n"
                         f"Original task: {prompt}"
                     )
 
-            if result.returncode == 0:
+            if test_passed:
                 print("[RALPH] ✅ Verification successful!")
                 success = True
                 break
