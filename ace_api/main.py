@@ -1,5 +1,8 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
+from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict
+import logging
+import time
 import re
 from pathlib import Path
 from ace_lib.services.ace_service import ACEService
@@ -7,8 +10,35 @@ from ace_lib.models.schemas import (
     Agent, Decision, TokenMode, TaskType, Config, OwnershipConfig, MailMessage
 )
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("ace-api")
+
 app = FastAPI(title="ACE Orchestrator API")
 service = ACEService()
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = (time.time() - start_time) * 1000
+    logger.info(
+        f"{request.method} {request.url.path} - "
+        f"Status: {response.status_code} - "
+        f"Time: {process_time:.2f}ms"
+    )
+    return response
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "message": str(exc)},
+    )
 
 
 @app.get("/agents", response_model=List[Agent])
@@ -113,9 +143,10 @@ async def send_mail(
 @app.post("/debate")
 async def debate(
     proposal: str = Body(...),
-    agent_ids: List[str] = Body(...)
+    agent_ids: List[str] = Body(...),
+    turns: int = Body(3)
 ):
-    consensus = service.debate(proposal, agent_ids)
+    consensus = service.debate(proposal, agent_ids, turns)
     return {"consensus": consensus}
 
 

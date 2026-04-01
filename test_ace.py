@@ -487,7 +487,7 @@ def test_mail_system(temp_ace_dir, monkeypatch):
     # Read mail
     import re
 
-    msg_id_match = re.search(r"(\d+_\d+_\d+)", result.stdout)
+    msg_id_match = re.search(r"(\d+_\d+_\d+_[^ \n]+)", result.stdout)
     if msg_id_match:
         msg_id = msg_id_match.group(1)
         result = runner.invoke(app, ["mail-read", "agent-b", msg_id])
@@ -507,7 +507,7 @@ def test_debate(temp_ace_dir, monkeypatch):
     monkeypatch.setattr(ace, "api_call", lambda *args, **kwargs: None)
 
     # Mock debate mediation to avoid API call
-    def mocked_debate(proposal, agent_ids):
+    def mocked_debate(proposal, agent_ids, turns=3):
         # Call the original debate logic but it will fail at client creation
         # So we just manually do what debate does before failing
         for aid in agent_ids:
@@ -543,7 +543,7 @@ def test_debate(temp_ace_dir, monkeypatch):
         app,
         [
             "debate", "--proposal", "Use Python", "--agent", "agent-a",
-            "--agent", "agent-b"
+            "--agent", "agent-b", "--turns", "2"
         ]
     )
     assert result.exit_code == 0

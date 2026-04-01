@@ -282,3 +282,41 @@ def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch)
 
     assert success is True
     assert iterations == 1
+
+
+def test_multi_turn_debate(service, monkeypatch):
+    """Test multi-turn debate mediation."""
+    from unittest.mock import MagicMock
+
+    # Mock anthropic client
+    mock_client = MagicMock()
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(text="Perspective or Consensus")]
+    mock_client.messages.create.return_value = mock_message
+
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Setup agents
+    service.create_agent(id="agent-1", name="Agent 1", role="architect")
+    service.create_agent(id="agent-2", name="Agent 2", role="developer")
+
+    consensus = service.debate(
+        proposal="Use GraphQL",
+        agent_ids=["agent-1", "agent-2"],
+        turns=2
+    )
+
+    assert consensus == "Perspective or Consensus"
+    # 2 turns * 2 agents + 1 referee call = 5 calls
+    assert mock_client.messages.create.call_count == 5
+
+    # Check that mail was sent to both agents
+    messages_1 = service.list_mail("agent-1")
+    messages_2 = service.list_mail("agent-2")
+    
+    # Each agent should have: 1 initial debate mail + 1 consensus mail = 2
+    assert len(messages_1) == 2
+    assert len(messages_2) == 2
+    assert any(m.subject == "DEBATE INITIATED" for m in messages_1)
+    assert any(m.subject == "DEBATE CONSENSUS REACHED" for m in messages_1)

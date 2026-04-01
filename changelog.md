@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 25
+
+### Added
+- **Phase 6: Refinement & Missing Features**
+  - Memory Write-back Verification: Added tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
+  - Updated `plan.md` to move completed task 6.1 to Phase 7 and reflect the current project state.
+
 ## [2026-04-01] - RALPH Loop Iteration 24
 
 ### Added

@@ -580,7 +580,7 @@ class ACEService:
         agent_mail_dir = self.mail_dir / to_agent
         agent_mail_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         msg_id = f"{timestamp}_{from_agent}"
         msg = MailMessage(
             id=msg_id,
@@ -593,16 +593,16 @@ class ACEService:
             yaml.dump(msg.model_dump(by_alias=True), f)
         return msg
 
-    def debate(self, proposal: str, agent_ids: List[str]) -> str:
-        """Mediate a debate between multiple agents."""
-        # Send mail to participants about the debate
+    def debate(self, proposal: str, agent_ids: List[str], turns: int = 3) -> str:
+        """Mediate a multi-turn debate between multiple agents."""
+        # Send initial mail to participants about the debate
         for aid in agent_ids:
             self.send_mail(
                 to_agent=aid,
                 from_agent="orchestrator",
-                subject="DEBATE PROPOSAL",
+                subject="DEBATE INITIATED",
                 body=(
-                    f"A debate has been initiated on the following "
+                    f"A {turns}-turn debate has been initiated on the following "
                     f"proposal: {proposal}"
                 ),
             )
@@ -611,52 +611,65 @@ class ACEService:
         if not client:
             return "Consensus: Debate mediation requires ANTHROPIC_API_KEY."
 
-        # 1. Gather agent perspectives (simulated via mail)
-        perspectives = []
-        for aid in agent_ids:
-            # In a real scenario, we'd wait for agents to respond to mail.
-            # Here we simulate their input based on their roles.
-            agents_config = self.load_agents()
-            agent = next(
-                (a for a in agents_config.agents if a.id == aid), None
-            )
-            role = agent.role if agent else "expert"
+        debate_history = []
+        
+        for turn in range(1, turns + 1):
+            turn_perspectives = []
+            for aid in agent_ids:
+                agents_config = self.load_agents()
+                agent = next(
+                    (a for a in agents_config.agents if a.id == aid), None
+                )
+                role = agent.role if agent else "expert"
 
-            prompt = (
-                f"You are agent {aid} with role {role}. "
-                f"Review this proposal: {proposal}\n"
-                "Provide a concise critique or support based on your role. "
-                "Focus on architectural impact and project standards."
-            )
+                # Build prompt for the current turn
+                history_str = "\n".join(debate_history) if debate_history else "No previous turns."
+                
+                if turn == 1:
+                    prompt = (
+                        f"You are agent {aid} with role {role}.\n"
+                        f"Review this proposal: {proposal}\n"
+                        "Provide your initial perspective, critique, or support. "
+                        "Focus on architectural impact and project standards."
+                    )
+                else:
+                    prompt = (
+                        f"You are agent {aid} with role {role}.\n"
+                        f"Original Proposal: {proposal}\n"
+                        f"Debate History:\n{history_str}\n\n"
+                        f"This is turn {turn} of {turns}. Review the other agents' perspectives "
+                        "and refine your position. Address their concerns or reinforce your points."
+                    )
 
-            # Simulate agent response using Claude
-        try:
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=512,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            perspective = "".join(
-                [
-                    block.text
-                    for block in message.content
-                    if hasattr(block, "text")
-                ]
-            )
-            perspectives.append(f"Agent {aid} ({role}): {perspective}")
-        except Exception as e:
-            perspectives.append(
-                f"Agent {aid}: Error getting perspective: {e}"
-            )
+                try:
+                    message = client.messages.create(
+                        model="claude-3-5-sonnet-20241022",
+                        max_tokens=512,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    perspective = "".join(
+                        [
+                            block.text
+                            for block in message.content
+                            if hasattr(block, "text")
+                        ]
+                    )
+                    turn_perspectives.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
+                except Exception as e:
+                    turn_perspectives.append(
+                        f"Turn {turn} - Agent {aid}: Error getting perspective: {e}"
+                    )
+            
+            debate_history.extend(turn_perspectives)
 
-        # 2. LLM-Referee logic
+        # Final LLM-Referee logic
         referee_prompt = (
             "You are the ACE Orchestrator Referee. "
-            "You must mediate a debate between multiple agents and reach "
+            "You must mediate a multi-turn debate between multiple agents and reach "
             "a consensus.\n\n"
             f"Original Proposal: {proposal}\n\n"
-            "Agent Perspectives:\n" + "\n".join(perspectives) + "\n\n"
-            "Analyze the perspectives, identify common ground, and "
+            "Full Debate History:\n" + "\n".join(debate_history) + "\n\n"
+            "Analyze the evolution of the debate, identify common ground, and "
             "provide a final recommendation or consensus decision. "
             "If no consensus is reached, explain why and suggest next steps."
         )
@@ -674,6 +687,16 @@ class ACEService:
                     if hasattr(block, "text")
                 ]
             )
+            
+            # Notify agents of the result
+            for aid in agent_ids:
+                self.send_mail(
+                    to_agent=aid,
+                    from_agent="orchestrator",
+                    subject="DEBATE CONSENSUS REACHED",
+                    body=f"The debate on '{proposal}' has concluded.\n\nConsensus:\n{consensus}"
+                )
+                
             return consensus
         except Exception as e:
             return f"Error during debate mediation: {e}"

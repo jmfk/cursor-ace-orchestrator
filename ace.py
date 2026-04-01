@@ -846,24 +846,27 @@ def debate(
     agents: List[str] = typer.Option(
         ..., "--agent", "-a", help="Agents to participate"
     ),
+    turns: int = typer.Option(
+        3, "--turns", "-t", help="Number of debate turns"
+    ),
 ):
-    """Initiate and mediate a debate between multiple agents."""
+    """Initiate and mediate a multi-turn debate between multiple agents."""
     console.print(
-        f"🚀 [bold blue]Initiating debate on proposal:[/bold blue] {proposal}"
+        f"🚀 [bold blue]Initiating {turns}-turn debate on proposal:[/bold blue] {proposal}"
     )
     console.print(f"Participants: {', '.join(agents)}")
 
     res = api_call(
         "POST",
         "/debate",
-        json={"proposal": proposal, "agent_ids": agents},
+        json={"proposal": proposal, "agent_ids": agents, "turns": turns},
     )
     if res:
         consensus = res["consensus"]
     else:
         svc = get_service()
         with console.status("[bold green]Mediating debate..."):
-            consensus = svc.debate(proposal, agents)
+            consensus = svc.debate(proposal, agents, turns)
 
     console.print("\n[bold]Consensus / Recommendation:[/bold]")
     console.print(consensus)

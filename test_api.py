@@ -123,7 +123,7 @@ def test_debate(client, monkeypatch):
     monkeypatch.setattr(
         ace_api.main.service,
         "debate",
-        lambda p, a: "Consensus reached"
+        lambda p, a, t=3: "Consensus reached"
     )
 
     response = client.post(
