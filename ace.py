@@ -887,6 +887,18 @@ def loop(
     if not anthropic_key:
         console.print("[yellow]Warning: ANTHROPIC_API_KEY not set. Reflection will be skipped.[/yellow]")
 
+    # Check for CURSOR_API_KEY
+    cursor_key = os.getenv("CURSOR_API_KEY")
+    if not cursor_key:
+        cred_file = Path.home() / ".ace" / "credentials"
+        if cred_file.exists():
+            for line in cred_file.read_text().splitlines():
+                if line.startswith("CURSOR_API_KEY="):
+                    cursor_key = line.split("=", 1)[1].strip()
+                    os.environ["CURSOR_API_KEY"] = cursor_key
+                    break
+
+    # Use the service to run the loop
     success, iterations = svc.run_loop(
         prompt, test_cmd, max_iterations, path, agent_id, git_commit
     )

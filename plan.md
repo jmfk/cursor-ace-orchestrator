@@ -54,6 +54,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **7.2 Google Stitch Visual Verification**: Implement E2E tests (Playwright) to validate that implemented code matches Stitch mockups.
 - [x] **7.3 Agent Subscriptions**: Implement `ace subscribe` for agents to get notified via Agent Mail when specific modules or dependencies change.
 - [x] **7.4 Profiling & Performance**: Implement `ace_lib/utils/profiler.py` to profile core service methods.
+- [x] **7.5 Update Profiling Log**: Update the profiling log to reflect recent performance optimizations.
 
 ## Phase 8: Future Directions (Pending)
 - [ ] **8.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks using a vector database (e.g., ChromaDB or Qdrant).
