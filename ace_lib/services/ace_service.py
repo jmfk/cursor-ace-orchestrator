@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
@@ -82,9 +83,7 @@ class ACEService:
             if path.startswith(module_path):
                 if len(module_path) > best_match_len:
                     best_match_len = len(module_path)
-                    best_match_id = (
-                        config.modules[module_path].agent_id
-                    )
+                    best_match_id = config.modules[module_path].agent_id
         return best_match_id
 
     # --- Agent Management ---
@@ -587,24 +586,24 @@ class ACEService:
             )
 
             # Simulate agent response using Claude
-            try:
-                message = client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=512,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                perspective = "".join(
-                    [
-                        block.text
-                        for block in message.content
-                        if hasattr(block, "text")
-                    ]
-                )
-                perspectives.append(f"Agent {aid} ({role}): {perspective}")
-            except Exception as e:
-                perspectives.append(
-                    f"Agent {aid}: Error getting perspective: {e}"
-                )
+        try:
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=512,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            perspective = "".join(
+                [
+                    block.text
+                    for block in message.content
+                    if hasattr(block, "text")
+                ]
+            )
+            perspectives.append(f"Agent {aid} ({role}): {perspective}")
+        except Exception as e:
+            perspectives.append(
+                f"Agent {aid}: Error getting perspective: {e}"
+            )
 
         # 2. LLM-Referee logic
         referee_prompt = (
@@ -649,9 +648,30 @@ class ACEService:
         iteration = 0
         success = False
 
+        # Initial state hash for stagnation detection
+        history = []
+
         while iteration < max_iterations:
             iteration += 1
             print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
+
+            # Stagnation detection (simplified for now)
+            state_str = f"{prompt}_{path}_{agent_id}"
+            current_hash = hashlib.sha256(
+                state_str.encode()
+            ).hexdigest()
+            history.append(current_hash)
+            if len(history) > 3 and all(
+                h == history[-1] for h in history[-3:]
+            ):
+                print(
+                    "[RALPH] ⚠️ Stagnation detected! Attempting recovery..."
+                )
+                prompt = (
+                    f"RECOVERY MODE: The previous approach is stuck. "
+                    "Try a different strategy.\n"
+                    f"Original task: {prompt}"
+                )
 
             # 1. Context Refresh & Build
             context, resolved_agent_id = self.build_context(
@@ -712,7 +732,10 @@ class ACEService:
 
             # 4. Reflection (Intermediate or Final)
             if os.getenv("ANTHROPIC_API_KEY"):
-                print(f"[RALPH] Performing reflection for iteration {iteration}...")
+                print(
+                    f"[RALPH] Performing reflection for "
+                    f"iteration {iteration}..."
+                )
                 # Reflect on current iteration output
                 reflection_text = self.reflect_on_session(
                     agent_proc.stdout + "\n" + result.stdout
@@ -728,10 +751,12 @@ class ACEService:
                                 for a in agents_config.agents
                                 if a.id == resolved_agent_id
                             ),
-                            None,
+                            None
                         )
                         if agent:
-                            playbook_path = self.base_path / agent.memory_file
+                            playbook_path = (
+                                self.base_path / agent.memory_file
+                            )
                     self.update_playbook(playbook_path, updates)
                     print(f"[RALPH] Updated playbook: {playbook_path.name}")
 
@@ -788,8 +813,7 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] Create/Verify `{agent.memory_file}` exists.
-- [ ] Ensure the playbook contains sections for "Strategier & patterns", \
-"Kända fallgropar", and "Arkitekturella beslut".
+- [ ] Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
 - [ ] Review existing codebase in assigned modules: {responsibilities}
@@ -800,6 +824,19 @@ class ACEService:
 - [ ] Send a "Ready" message to the orchestrator via `ace mail-send`.
 """
         onboarding_file.write_text(content)
+
+        # Inject SOP into agent's inbox
+        self.send_mail(
+            to_agent=agent_id,
+            from_agent="orchestrator",
+            subject="ONBOARDING SOP",
+            body=(
+                f"Your onboarding SOP has been generated: "
+                f"{onboarding_file.name}\n\n"
+                "Please follow the steps outlined in the file."
+            )
+        )
+
         return onboarding_file
 
     def audit_agent(self, agent_id: str):
@@ -812,29 +849,30 @@ class ACEService:
             raise ValueError(f"Agent {agent_id} not found.")
 
         audit_file = (
-            self.ace_dir
-            / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+            self.ace_dir /
+            f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
         )
-        content = (
-            f"# SOP: Agent Audit - {agent.name} ({agent.id})\n"
-            f"- **Auditor**: Orchestrator\n"
-            f"- **Date**: {datetime.now().isoformat()}\n\n"
-            f"## 1. Memory Health\n"
-            f"- [ ] Check `{agent.memory_file}` for structure and content.\n"
-            f"- [ ] Verify that strategies have helpful/harmful counters.\n"
-            f"- [ ] Identify stale or conflicting strategies.\n\n"
-            f"## 2. Decision Alignment\n"
-            f"- [ ] Review agent's recent contributions against "
-            f"`.ace/decisions/`.\n"
-            f"- [ ] Ensure agent is not repeating previously rejected "
-            f"patterns.\n\n"
-            f"## 3. Performance Review\n"
-            f"- [ ] Analyze session logs for success/failure ratio.\n"
-            f"- [ ] Identify recurring pitfalls [mis-XXX].\n\n"
-            f"## 4. Recommendations\n"
-            f"- [ ] **Action**: [KEEP/PRUNE/RE-ONBOARD]\n"
-            f"- [ ] **Notes**:\n"
-        )
+        content = f"""# SOP: Agent Audit - {agent.name} ({agent.id})
+- **Auditor**: Orchestrator
+- **Date**: {datetime.now().isoformat()}
+
+## 1. Memory Health
+- [ ] Check `{agent.memory_file}` for structure and content.
+- [ ] Verify that strategies have helpful/harmful counters.
+- [ ] Identify stale or conflicting strategies.
+
+## 2. Decision Alignment
+- [ ] Review agent's recent contributions against `.ace/decisions/`.
+- [ ] Ensure agent is not repeating previously rejected patterns.
+
+## 3. Performance Review
+- [ ] Analyze session logs for success/failure ratio.
+- [ ] Identify recurring pitfalls [mis-XXX].
+
+## 4. Recommendations
+- [ ] **Action**: [KEEP/PRUNE/RE-ONBOARD]
+- [ ] **Notes**:
+"""
         audit_file.write_text(content)
         return audit_file
 
@@ -842,27 +880,39 @@ class ACEService:
         """Run PR review SOP for an agent."""
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         review_file = self.ace_dir / f"review_{pr_id}_{agent_id}.md"
-        content = (
-            f"# SOP: PR Review - {pr_id}\n"
-            f"- **Reviewer**: {agent_id}\n"
-            f"- **Date**: {datetime.now().isoformat()}\n\n"
-            f"## 1. Strategy Alignment\n"
-            f"- [ ] Does PR follow strategies defined in reviewer's "
-            f"playbook?\n"
-            f"- [ ] Does the PR adhere to global rules in `_global.mdc`?\n\n"
-            f"## 2. Decision Verification\n"
-            f"- [ ] Does PR conflict with any recent ADRs in "
-            f"`.ace/decisions/`?\n\n"
-            f"## 3. Learning Extraction\n"
-            f"- [ ] Identify any new successful patterns: [str-NEW]\n"
-            f"- [ ] Identify any new pitfalls or bugs: [mis-NEW]\n"
-            f"- [ ] Identify any architectural choices that should be ADRs: "
-            f"[dec-NEW]\n\n"
-            f"## 4. Conclusion\n"
-            f"- [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]\n"
-            f"- [ ] **Comments**:\n"
-        )
+        content = f"""# SOP: PR Review - {pr_id}
+- **Reviewer**: {agent_id}
+- **Date**: {datetime.now().isoformat()}
+
+## 1. Strategy Alignment
+- [ ] Does PR follow strategies defined in reviewer's playbook?
+- [ ] Does the PR adhere to global rules in `_global.mdc`?
+
+## 2. Decision Verification
+- [ ] Does PR conflict with any recent ADRs in `.ace/decisions/`?
+
+## 3. Learning Extraction
+- [ ] Identify any new successful patterns: [str-NEW]
+- [ ] Identify any new pitfalls or bugs: [mis-NEW]
+- [ ] Identify any architectural choices that should be ADRs: [dec-NEW]
+
+## 4. Conclusion
+- [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
+- [ ] **Comments**:
+"""
         review_file.write_text(content)
+
+        # Notify agent of PR review task
+        self.send_mail(
+            to_agent=agent_id,
+            from_agent="orchestrator",
+            subject=f"PR REVIEW TASK: {pr_id}",
+            body=(
+                f"You have been assigned to review PR {pr_id}. "
+                f"SOP: {review_file.name}"
+            )
+        )
+
         return review_file
 
     # --- Google Stitch Integration ---
@@ -881,7 +931,8 @@ class ACEService:
         # Use cursor-agent to generate the "mockup"
         prompt = (
             f"Design a UI mockup for: {description}. "
-            "Output the design as a single TSX code block using Tailwind CSS. "
+            "Output the design as a single TSX code block using "
+            "Tailwind CSS. "
             "The output should be ONLY the code block."
         )
 
@@ -893,14 +944,17 @@ class ACEService:
         )
 
         print(f"[STITCH] Generating mockup for: {description}")
-        
+
         # Check for STITCH_API_KEY to simulate real API call if present
         api_key = os.getenv("STITCH_API_KEY")
         if api_key:
             print("[STITCH] Using real API key (simulated)...")
             # Here we would make a real API call
             # For now, we still use the agent but mark it as "API-driven"
-            ui_code = "// Generated via Stitch API\n" + self._simulate_stitch_api(description)
+            ui_code = (
+                "// Generated via Stitch API\n" +
+                self._simulate_stitch_api(description)
+            )
         else:
             result = subprocess.run(
                 agent_cmd, shell=True, capture_output=True, text=True
@@ -923,11 +977,34 @@ class ACEService:
             f"```tsx\n{ui_code}\n```\n"
         )
         mockup_file.write_text(content)
+
+        # Extract components if it's a complex mockup
+        if "export const" in ui_code:
+            self._extract_stitch_components(mockup_id, ui_code)
+
         return mockup_url
+
+    def _extract_stitch_components(self, mockup_id: str, code: str):
+        """Extract individual components from Stitch code."""
+        components_dir = self.ace_dir / "ui_mockups" / "components" / mockup_id
+        components_dir.mkdir(parents=True, exist_ok=True)
+
+        # Simple extraction of exported constants
+        component_matches = re.finditer(
+            r"export const (\w+) =.*?=>.*?;",
+            code,
+            re.DOTALL
+        )
+        for match in component_matches:
+            name, content = match.group(1), match.group(0)
+            (components_dir / f"{name}.tsx").write_text(content)
 
     def _simulate_stitch_api(self, description: str) -> str:
         """Simulate a real Stitch API call."""
-        return f"export const Mockup = () => <div className='p-4'>Mockup for {description}</div>;"
+        return (
+            f"export const Mockup = () => "
+            f"<div className='p-4'>Mockup for {description}</div>;"
+        )
 
     def ui_sync(self, url: str):
         """Sync UI code from Google Stitch (simulated)."""

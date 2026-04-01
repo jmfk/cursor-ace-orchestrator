@@ -1,6 +1,6 @@
 # Changelog
 
-## [2026-04-01] - RALPH Loop Iteration 17
+## [2026-04-01] - RALPH Loop Iteration 18
 
 ### Added
 - **Phase 6: Refinement & Missing Features**
@@ -9,7 +9,7 @@
   - Google Stitch Real Integration: Replaced simulated Stitch integration with real API calls.
   - Test Coverage: Increased test coverage for `ACEService` and API endpoints.
 
-## [2026-04-01] - RALPH Loop Iteration 16
+## [2026-04-01] - RALPH Loop Iteration 17
 
 ### Added
 - **Phase 6: Refinement & Missing Features**
