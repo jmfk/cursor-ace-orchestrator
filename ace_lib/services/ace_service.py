@@ -306,6 +306,17 @@ class ACEService:
                         f"### AGENT PLAYBOOK ({agent.role})\n"
                         f"{playbook_path.read_text()}"
                     )
+                    
+                    # 2.1 Vectorized Memory Search (Phase 8.1)
+                    # If we have a path or task description, search for relevant entries
+                    search_query = path if path else "general tasks"
+                    vector_results = self.search_memory(resolved_agent_id, search_query)
+                    if vector_results:
+                        context_parts.append("### RELEVANT MEMORY (Vector Search)")
+                        for res in vector_results:
+                            context_parts.append(
+                                f"- [{res['id']}] {res['content']}"
+                            )
 
         # 3. Recent decisions (ADRs)
         if self.decisions_dir.exists():
@@ -508,10 +519,19 @@ class ACEService:
             return False
 
         content = playbook_path.read_text()
-        for update in updates:
-            update_id, update_type = update["id"], update["type"]
+        agent_id = None
+        
+        # Try to resolve agent_id from the playbook path
+        agents_config = self.load_agents()
+        for a in agents_config.agents:
+            if playbook_path.name == f"{a.role}.mdc" or str(playbook_path).endswith(a.memory_file):
+                agent_id = a.id
+                break
 
-            # Pattern to match existing entries
+        for update in updates:
+            # ... existing update logic ...
+            update_id, update_type = update["id"], update["type"]
+            # ... (the rest of the loop) ...
             existing_pattern = (
                 rf"<!-- \[{update_type}-{update_id}\]"
                 r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
@@ -560,6 +580,11 @@ class ACEService:
                     content = content.rstrip() + f"\n\n{header}\n{new_line}\n"
 
         playbook_path.write_text(content)
+        
+        # Phase 8.1: Re-index playbook after update
+        if agent_id:
+            self.index_playbook(agent_id)
+            
         return True
 
     # --- ADR Management ---
@@ -1086,7 +1111,6 @@ class ACEService:
 
         return success, iteration
 
-
     # --- Shared Coffee Break Context ---
 
     def sync_shared_learnings(self):
@@ -1536,8 +1560,6 @@ class ACEService:
             return code_match.group(1)
 
         return f"// Error: No code found in mockup {mockup_id}."
-
-
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
         agent = next(

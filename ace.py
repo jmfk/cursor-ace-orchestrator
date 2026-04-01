@@ -747,6 +747,46 @@ def decision_list():
     console.print(table)
 
 
+memory_app = typer.Typer(help="Memory management commands")
+app.add_typer(memory_app, name="memory")
+
+
+@memory_app.command("index")
+def memory_index(
+    agent_id: str = typer.Argument(..., help="Agent ID to index memory for")
+):
+    """Index an agent's playbook into vectorized memory."""
+    svc = get_service()
+    success = svc.index_playbook(agent_id)
+    if success:
+        console.print(f"Indexed memory for agent [green]{agent_id}[/green]")
+    else:
+        console.print(f"[red]Failed to index memory for agent {agent_id}.[/red]")
+
+
+@memory_app.command("search")
+def memory_search(
+    agent_id: str = typer.Argument(..., help="Agent ID to search memory for"),
+    query: str = typer.Argument(..., help="Search query"),
+    n: int = typer.Option(3, "--results", "-n", help="Number of results")
+):
+    """Search vectorized memory for relevant entries."""
+    svc = get_service()
+    results = svc.search_memory(agent_id, query, n)
+    if not results:
+        console.print(f"No relevant memory found for query: [italic]{query}[/italic]")
+        return
+
+    table = Table(title=f"Memory Search: {query}")
+    table.add_column("ID", style="cyan")
+    table.add_column("Content", style="green")
+    table.add_column("Type", style="yellow")
+    
+    for res in results:
+        table.add_row(res["id"], res["content"], res["metadata"].get("type", "unknown"))
+    console.print(table)
+
+
 @app.command()
 def memory_prune(
     agent_id: Optional[str] = typer.Option(

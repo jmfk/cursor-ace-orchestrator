@@ -399,3 +399,27 @@ def test_multi_turn_debate(service, monkeypatch):
         assert len(report) == 1
         assert report[0].total_tokens == 150
 
+    def test_vector_memory(self, service, temp_workspace):
+        """Test vectorized memory (ChromaDB)."""
+        # Setup agent and playbook
+        service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+        playbook_path = service.cursor_rules_dir / "developer.mdc"
+        playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=0 :: Use pytest for testing. -->
+<!-- [str-002] helpful=1 harmful=0 :: Use FastAPI for backend. -->
+""")
+        service.create_agent(id="dev-1", name="Dev 1", role="developer")
+
+        # Index
+        success = service.index_playbook("dev-1")
+        assert success is True
+
+        # Search
+        results = service.search_memory("dev-1", "testing")
+        assert len(results) > 0
+        assert "pytest" in results[0]["content"]
+
+        results = service.search_memory("dev-1", "backend")
+        assert len(results) > 0
+        assert "FastAPI" in results[0]["content"]
