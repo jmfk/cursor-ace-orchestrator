@@ -871,6 +871,22 @@ def loop(
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
 
     svc = get_service()
+    
+    # Check for API keys
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    if not anthropic_key:
+        # Try to load from credentials
+        cred_file = Path.home() / ".ace" / "credentials"
+        if cred_file.exists():
+            for line in cred_file.read_text().splitlines():
+                if line.startswith("ANTHROPIC_API_KEY="):
+                    anthropic_key = line.split("=", 1)[1].strip()
+                    os.environ["ANTHROPIC_API_KEY"] = anthropic_key
+                    break
+    
+    if not anthropic_key:
+        console.print("[yellow]Warning: ANTHROPIC_API_KEY not set. Reflection will be skipped.[/yellow]")
+
     success, iterations = svc.run_loop(
         prompt, test_cmd, max_iterations, path, agent_id, git_commit
     )

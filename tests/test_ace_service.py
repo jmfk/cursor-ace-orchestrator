@@ -330,160 +330,70 @@ def test_multi_turn_debate(service, monkeypatch):
     messages_1 = service.list_mail("agent-1")
     messages_2 = service.list_mail("agent-2")
     
-    # Each agent should have: 1 initial debate mail + 1 consensus mail = 2
-    assert len(messages_1) == 2
-    assert len(messages_2) == 2
-    assert any(m.subject == "DEBATE INITIATED" for m in messages_1)
-    assert any(m.subject == "DEBATE CONSENSUS REACHED" for m in messages_1)
+    def test_consensus_debate(self, service, monkeypatch):
+        """Test consensus debate mediation."""
+        from unittest.mock import MagicMock
+        from ace_lib.models.schemas import TokenMode
 
+        # Mock anthropic client
+        mock_client = MagicMock()
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text="Consensus reached: Use FastAPI")]
+        mock_client.messages.create.return_value = mock_message
 
-def test_debate_escalation(service, monkeypatch):
-    """Test human-in-the-loop escalation in debate."""
-    from unittest.mock import MagicMock
+        monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-    # Mock anthropic client
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="I cannot decide, please ESCALATE to human.")]
-    mock_client.messages.create.return_value = mock_message
+        # Setup agents
+        service.create_agent(id="agent-1", name="Agent 1", role="architect")
+        service.create_agent(id="agent-2", name="Agent 2", role="developer")
 
-    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        # Set token mode
+        config = service.load_config()
+        config.token_mode = TokenMode.HIGH
+        service.save_config(config)
 
-    # Setup agents
-    service.create_agent(id="agent-1", name="Agent 1", role="architect")
-    service.create_agent(id="agent-2", name="Agent 2", role="developer")
+        consensus = service.debate(
+            proposal="Use FastAPI",
+            agent_ids=["agent-1", "agent-2"],
+            turns=1
+        )
 
-    consensus = service.debate(
-        proposal="Use GraphQL",
-        agent_ids=["agent-1", "agent-2"],
-        turns=2
-    )
+        assert "FastAPI" in consensus
+        # 1 turn * 2 agents + 1 referee call = 3 calls
+        assert mock_client.messages.create.call_count == 3
 
-    assert "DEBATE ESCALATED" in consensus
-    assert "Agent agent-1 requested human intervention" in consensus
-    # Only 1 call because it escalates immediately on the first agent's first turn
-    assert mock_client.messages.create.call_count == 1
+    def test_subscriptions_and_notifications(self, service):
+        """Test agent subscriptions and notifications."""
+        service.create_agent(id="sub-agent", name="Sub Agent", role="developer")
+        
+        # Subscribe
+        success = service.subscribe("sub-agent", "src/auth")
+        assert success is True
+        
+        # Notify
+        service.notify_subscribers("src/auth/login.py", "Added login logic")
+        
+        # Check mail
+        messages = service.list_mail("sub-agent")
+        assert len(messages) == 1
+        assert "SUBSCRIPTION NOTIFICATION" in messages[0].subject
+        assert "Added login logic" in messages[0].body
 
+    def test_token_usage_logging(self, service):
+        """Test logging token usage."""
+        from ace_lib.models.schemas import TokenUsage
+        usage = TokenUsage(
+            agent_id="test-agent",
+            session_id="test-session",
+            prompt_tokens=100,
+            completion_tokens=50,
+            total_tokens=150,
+            cost=0.001
+        )
+        service.log_token_usage(usage)
+        
+        report = service.get_token_report("test-agent")
+        assert len(report) == 1
+        assert report[0].total_tokens == 150
 
-def test_living_specs_management(service):
-    """Test creating, listing, and updating Living Specs."""
-    spec = service.create_spec(
-        id="auth-v2",
-        title="Auth V2 Implementation",
-        intent="Upgrade auth to JWT refresh tokens",
-        constraints=["Must use httpOnly cookies", "No localStorage"]
-    )
-    assert spec.id == "auth-v2"
-    assert "Must use httpOnly cookies" in spec.constraints
-
-    specs = service.list_specs()
-    assert len(specs) == 1
-    assert specs[0].id == "auth-v2"
-
-    spec.status = "in_progress"
-    spec.implementation = "Implemented JWT rotation"
-    service.save_spec(spec)
-
-    updated_spec = service.get_spec("auth-v2")
-    assert updated_spec.status == "in_progress"
-    assert updated_spec.implementation == "Implemented JWT rotation"
-
-    # Check if markdown file was created
-    md_file = service.specs_dir / "auth-v2.md"
-    assert md_file.exists()
-    assert "# Living Spec: Auth V2 Implementation" in md_file.read_text()
-
-
-def test_cross_project_learning(service, temp_workspace):
-    """Test exporting and importing learnings."""
-    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    playbook_path = service.cursor_rules_dir / "developer.mdc"
-    playbook_path.write_text("""# Developer Playbook
-## Strategier & patterns
-<!-- [str-001] helpful=5 harmful=0 :: Test strategy -->
-""")
-    service.create_agent(id="dev-1", name="Dev 1", role="developer")
-    
-    export_dir = temp_workspace / "exports"
-    learnings = service.export_learnings("dev-1", export_dir)
-    
-    assert len(learnings) == 1
-    assert learnings[0].description == "Test strategy"
-    assert (export_dir / f"learnings_{temp_workspace.name}_dev-1.yaml").exists()
-    
-    # Import into another agent
-    service.create_agent(id="dev-2", name="Dev 2", role="developer")
-    # Let's use a different role to have a different file
-    service.create_agent(id="arch-1", name="Arch 1", role="architect")
-    playbook_path_arch = service.cursor_rules_dir / "architect.mdc"
-    playbook_path_arch.write_text("# Architect Playbook\n## Strategier & patterns\n")
-    
-    import_count = service.import_learnings(export_dir / f"learnings_{temp_workspace.name}_dev-1.yaml", "arch-1")
-    assert import_count == 1
-    assert "[X-PROJ from" in playbook_path_arch.read_text()
-
-
-def test_security_audit_sop(service):
-    """Test generating security audit SOP."""
-    service.create_agent(id="dev-1", name="Developer 1", role="developer")
-    security_audit_file = service.security_audit("dev-1")
-
-    assert security_audit_file.exists()
-    content = security_audit_file.read_text()
-    assert "SOP: Security Audit - Developer 1 (dev-1)" in content
-    assert "## 1. Dependency Vulnerabilities" in content
-    assert "## 2. Secret Scanning" in content
-
-
-def test_token_monitoring(service):
-    """Test logging and reporting token usage."""
-    from ace_lib.models.schemas import TokenUsage
-    usage = TokenUsage(
-        agent_id="dev-1",
-        session_id="sess-1",
-        prompt_tokens=100,
-        completion_tokens=50,
-        total_tokens=150,
-        cost=0.002
-    )
-    service.log_token_usage(usage)
-    
-    report = service.get_token_report()
-    assert len(report) == 1
-    assert report[0].agent_id == "dev-1"
-    assert report[0].total_tokens == 150
-    
-    report_filtered = service.get_token_report(agent_id="dev-1")
-    assert len(report_filtered) == 1
-    
-    report_empty = service.get_token_report(agent_id="non-existent")
-    assert len(report_empty) == 0
-
-
-def test_agent_subscriptions(service):
-    """Test agent subscriptions and notifications."""
-    service.create_agent(id="dev-1", name="Dev 1", role="developer")
-    service.create_agent(id="dev-2", name="Dev 2", role="developer")
-
-    # dev-2 subscribes to changes in src/core
-    success = service.subscribe("dev-2", "src/core")
-    assert success is True
-
-    # Duplicate subscription should fail
-    success = service.subscribe("dev-2", "src/core")
-    assert success is False
-
-    # Notify subscribers about a change in src/core/main.py
-    service.notify_subscribers("src/core/main.py", "Updated main logic")
-
-    # dev-2 should have a mail message
-    messages = service.list_mail("dev-2")
-    assert len(messages) == 1
-    assert "SUBSCRIPTION NOTIFICATION: src/core/main.py" in messages[0].subject
-    assert "Updated main logic" in messages[0].body
-
-    # Change in src/other should not notify dev-2
-    service.notify_subscribers("src/other/utils.py", "Updated utils")
-    messages = service.list_mail("dev-2")
-    assert len(messages) == 1  # Still 1

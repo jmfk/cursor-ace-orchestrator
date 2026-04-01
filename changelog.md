@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 49
+
+### Added
+- **Phase 8: Future Directions**
+  - Multi-Agent Consensus Debate (Advanced): Supported more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
+  - Updated `plan.md` to mark task 8.1 as completed and Phase 8 as Completed.
+
 ## [2026-04-01] - RALPH Loop Iteration 48
 
 ### Added

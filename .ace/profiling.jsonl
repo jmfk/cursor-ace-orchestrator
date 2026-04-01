@@ -3739,3 +3739,67 @@
 {"timestamp": "2026-04-01T23:32:48.123704", "function": "load_agents", "duration_seconds": 1.0830117389559746e-06, "args_count": 1, "kwargs_keys": []}
 {"timestamp": "2026-04-01T23:32:48.123888", "function": "load_config", "duration_seconds": 4.4082989916205406e-05, "args_count": 1, "kwargs_keys": []}
 {"timestamp": "2026-04-01T23:32:48.123996", "function": "build_context", "duration_seconds": 0.0005815830081701279, "args_count": 1, "kwargs_keys": ["path", "task_type"]}
+{"timestamp": "2026-04-01T23:33:22.341665", "function": "load_agents", "duration_seconds": 3.4416967537254095e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.343574", "function": "load_agents", "duration_seconds": 1.5830155462026596e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.344681", "function": "load_ownership", "duration_seconds": 2.924998989328742e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.345340", "function": "load_ownership", "duration_seconds": 8.750357665121555e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.346043", "function": "load_ownership", "duration_seconds": 5.829497240483761e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.346090", "function": "resolve_owner", "duration_seconds": 4.85840137116611e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.346142", "function": "load_ownership", "duration_seconds": 4.169996827840805e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.346178", "function": "resolve_owner", "duration_seconds": 3.691698657348752e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.346212", "function": "load_ownership", "duration_seconds": 3.750319592654705e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.346244", "function": "resolve_owner", "duration_seconds": 3.308401210233569e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.347154", "function": "load_agents", "duration_seconds": 2.500001573935151e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.347950", "function": "load_agents", "duration_seconds": 6.67001586407423e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.356219", "function": "load_agents", "duration_seconds": 2.033304190263152e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.357047", "function": "load_agents", "duration_seconds": 6.25033862888813e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.357146", "function": "load_config", "duration_seconds": 1.5209021512418985e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.357202", "function": "build_context", "duration_seconds": 0.00019300001440569758, "args_count": 1, "kwargs_keys": ["path", "agent_id"]}
+{"timestamp": "2026-04-01T23:33:22.359435", "function": "update_playbook", "duration_seconds": 0.0003937919973395765, "args_count": 3, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.360481", "function": "load_agents", "duration_seconds": 2.0833977032452822e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.367509", "function": "load_agents", "duration_seconds": 2.2208027075976133e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.368265", "function": "load_agents", "duration_seconds": 7.500057108700275e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.368378", "function": "load_config", "duration_seconds": 1.5666009858250618e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.368441", "function": "build_context", "duration_seconds": 0.0001978750224225223, "args_count": 1, "kwargs_keys": ["path", "task_type", "agent_id"]}
+{"timestamp": "2026-04-01T23:33:22.395928", "function": "load_agents", "duration_seconds": 1.0840012691915035e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.396232", "function": "update_playbook", "duration_seconds": 0.00020237499848008156, "args_count": 3, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.397619", "function": "load_agents", "duration_seconds": 2.7709000278264284e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.398449", "function": "load_agents", "duration_seconds": 8.330098353326321e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.399424", "function": "load_config", "duration_seconds": 2.2208027075976133e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.399679", "function": "load_config", "duration_seconds": 6.669433787465096e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.400889", "function": "load_agents", "duration_seconds": 6.25033862888813e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.400959", "function": "load_agents", "duration_seconds": 4.169996827840805e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.401014", "function": "load_agents", "duration_seconds": 2.919696271419525e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:22.401064", "function": "load_agents", "duration_seconds": 2.9098009690642357e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.904203", "function": "load_agents", "duration_seconds": 3.14170029014349e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.906003", "function": "load_agents", "duration_seconds": 1.167005393654108e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.906773", "function": "load_ownership", "duration_seconds": 2.0792009308934212e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.907350", "function": "load_ownership", "duration_seconds": 7.500057108700275e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.908007", "function": "load_ownership", "duration_seconds": 5.420297384262085e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.908053", "function": "resolve_owner", "duration_seconds": 4.7084002289921045e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.908088", "function": "load_ownership", "duration_seconds": 4.1601015254855156e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.908122", "function": "resolve_owner", "duration_seconds": 3.420800203457475e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.908153", "function": "load_ownership", "duration_seconds": 4.169996827840805e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.908182", "function": "resolve_owner", "duration_seconds": 3.0124967452138662e-05, "args_count": 2, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.909137", "function": "load_agents", "duration_seconds": 3.15000070258975e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.909957", "function": "load_agents", "duration_seconds": 7.500057108700275e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.917938", "function": "load_agents", "duration_seconds": 1.795799471437931e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.918778", "function": "load_agents", "duration_seconds": 5.830079317092896e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.918883", "function": "load_config", "duration_seconds": 1.7209036741405725e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.918942", "function": "build_context", "duration_seconds": 0.00020154198864474893, "args_count": 1, "kwargs_keys": ["path", "agent_id"]}
+{"timestamp": "2026-04-01T23:33:52.920904", "function": "update_playbook", "duration_seconds": 0.0003202089574187994, "args_count": 3, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.921754", "function": "load_agents", "duration_seconds": 1.6457983292639256e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.928216", "function": "load_agents", "duration_seconds": 2.220796886831522e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.929060", "function": "load_agents", "duration_seconds": 7.08969309926033e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.929197", "function": "load_config", "duration_seconds": 1.712498487904668e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.929259", "function": "build_context", "duration_seconds": 0.00022375001572072506, "args_count": 1, "kwargs_keys": ["path", "task_type", "agent_id"]}
+{"timestamp": "2026-04-01T23:33:52.957107", "function": "load_agents", "duration_seconds": 1.1249794624745846e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.957378", "function": "update_playbook", "duration_seconds": 0.00017366698011755943, "args_count": 3, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.959709", "function": "load_agents", "duration_seconds": 8.354202145710588e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.960932", "function": "load_agents", "duration_seconds": 1.2500095181167126e-06, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.962025", "function": "load_config", "duration_seconds": 3.3791991882026196e-05, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.962321", "function": "load_config", "duration_seconds": 7.080379873514175e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.963613", "function": "load_agents", "duration_seconds": 7.500057108700275e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.963691", "function": "load_agents", "duration_seconds": 4.5797787606716156e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.963748", "function": "load_agents", "duration_seconds": 3.7497375160455704e-07, "args_count": 1, "kwargs_keys": []}
+{"timestamp": "2026-04-01T23:33:52.963800", "function": "load_agents", "duration_seconds": 2.500019036233425e-07, "args_count": 1, "kwargs_keys": []}
