@@ -10,7 +10,7 @@ from datetime import datetime
 
 # Configuration
 MODEL = "gemini-3-flash"
-MAX_ITERATIONS = 10
+MAX_SPEND_USD = 20.0
 PLAN_FILE = "plan.md"
 CHANGELOG_FILE = "changelog.md"
 LOG_FILE = "ralph_execution.log"
@@ -152,14 +152,14 @@ def generate_commit_message(task_name: str):
     if api_key:
         log_message("Generating commit message via direct Gemini API...")
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-               f"gemini-1.5-flash:generateContent?key={api_key}")
+               f"gemini-2.5-flash:generateContent?key={api_key}")
         headers = {'Content-Type': 'application/json'}
         data = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
         try:
             response = requests.post(url, headers=headers, json=data,
-                                     timeout=10)
+                                     timeout=30)
             if response.status_code == 200:
                 result = response.json()
                 msg = (result['candidates'][0]['content']['parts'][0]['text']
@@ -167,8 +167,8 @@ def generate_commit_message(task_name: str):
                 return msg
             else:
                 log_message(f"⚠️ Direct Gemini API failed (Status "
-                            f"{response.status_code}). Falling back to "
-                            f"cursor-agent.")
+                            f"{response.status_code}). Error: {response.text}")
+                log_message("Falling back to cursor-agent.")
         except Exception as e:
             log_message(f"⚠️ Error calling Gemini API: {e}. Falling back to "
                         f"cursor-agent.")
@@ -265,6 +265,15 @@ def check_stagnation(current_hash: str):
     return False
 
 
+def get_total_cost():
+    """Get total cost from stats file."""
+    if os.path.exists(STATS_FILE):
+        with open(STATS_FILE, "r") as f:
+            stats = json.load(f)
+            return stats.get("total_cost_usd", 0.0)
+    return 0.0
+
+
 def main():
     """Main execution loop for RALPH."""
     # Simple argument parsing
@@ -307,9 +316,14 @@ def main():
     run_cursor_agent(analysis_prompt)
 
     iteration = 0
-    while iteration < MAX_ITERATIONS:
+    while True:
+        current_cost = get_total_cost()
+        if current_cost >= MAX_SPEND_USD:
+            log_message(f"Reached maximum spending limit (${MAX_SPEND_USD}). Stopping.")
+            break
+
         iteration += 1
-        log_message(f"=== Iteration {iteration}/{MAX_ITERATIONS} ===")
+        log_message(f"=== Iteration {iteration} (Current Cost: ${current_cost:.4f}) ===")
 
         # Get current task for context and commit messages
         current_task = get_current_task()
@@ -471,8 +485,10 @@ def main():
                 log_message("🔄 PRD is not fully implemented. Re-planning...")
                 continue
 
-    if iteration >= MAX_ITERATIONS:
-        print(f"Reached maximum iterations ({MAX_ITERATIONS}). Stopping.")
+    # Final check after loop
+    final_cost = get_total_cost()
+    if final_cost >= MAX_SPEND_USD:
+        print(f"Reached maximum spending limit (${MAX_SPEND_USD}). Stopping.")
 
 
 if __name__ == "__main__":

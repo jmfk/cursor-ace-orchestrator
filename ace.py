@@ -73,6 +73,51 @@ def init():
     svc.ace_dir.mkdir(parents=True, exist_ok=True)
     svc.ace_local_dir.mkdir(exist_ok=True)
 
+    # Check for GOOGLE_API_KEY
+    cred_file = Path.home() / ".ace" / "credentials"
+    google_key = os.getenv("GOOGLE_API_KEY")
+
+    if not google_key and cred_file.exists():
+        for line in cred_file.read_text().splitlines():
+            if line.startswith("GOOGLE_API_KEY="):
+                google_key = line.split("=", 1)[1].strip()
+                break
+
+    if not google_key:
+        console.print("[yellow]GOOGLE_API_KEY not found.[/yellow]")
+        google_key = typer.prompt("Please enter your GOOGLE_API_KEY", hide_input=True)
+        if google_key:
+            cred_file.parent.mkdir(parents=True, exist_ok=True)
+            # Simple append/update logic
+            lines = []
+            if cred_file.exists():
+                lines = [l for l in cred_file.read_text().splitlines() if not l.startswith("GOOGLE_API_KEY=")]
+            lines.append(f"GOOGLE_API_KEY={google_key}")
+            cred_file.write_text("\n".join(lines) + "\n")
+            os.chmod(cred_file, 0o600)
+            console.print(f"Saved GOOGLE_API_KEY to [green]{cred_file}[/green]")
+
+    # Check for CURSOR_API_KEY
+    cursor_key = os.getenv("CURSOR_API_KEY")
+    if not cursor_key and cred_file.exists():
+        for line in cred_file.read_text().splitlines():
+            if line.startswith("CURSOR_API_KEY="):
+                cursor_key = line.split("=", 1)[1].strip()
+                break
+
+    if not cursor_key:
+        console.print("[yellow]CURSOR_API_KEY not found.[/yellow]")
+        cursor_key = typer.prompt("Please enter your CURSOR_API_KEY", hide_input=True)
+        if cursor_key:
+            cred_file.parent.mkdir(parents=True, exist_ok=True)
+            lines = []
+            if cred_file.exists():
+                lines = [l for l in cred_file.read_text().splitlines() if not l.startswith("CURSOR_API_KEY=")]
+            lines.append(f"CURSOR_API_KEY={cursor_key}")
+            cred_file.write_text("\n".join(lines) + "\n")
+            os.chmod(cred_file, 0o600)
+            console.print(f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]")
+
     for subdir in ["mail", "sessions", "decisions"]:
         (svc.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
         console.print(
@@ -393,12 +438,12 @@ def run(
     console.print(f"Session logged to: [green]{session_file}[/green]")
 
     if exit_code == 0:
-        if os.getenv("ANTHROPIC_API_KEY"):
+        if svc.get_anthropic_client():
             _perform_reflection(session_file)
         else:
             console.print(
                 "[yellow]Skipping reflection: "
-                "ANTHROPIC_API_KEY not set.[/yellow]"
+                "ANTHROPIC_API_KEY not set and not in ~/.ace/credentials.[/yellow]"
             )
 
     if exit_code != 0:

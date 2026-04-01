@@ -282,11 +282,47 @@ class ACEService:
     def get_anthropic_client(self):
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY environment variable not set.")
+            # Fallback to ~/.ace/credentials
+            cred_file = Path.home() / ".ace" / "credentials"
+            if cred_file.exists():
+                for line in cred_file.read_text().splitlines():
+                    if line.startswith("ANTHROPIC_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+        if not api_key:
+            return None # Return None instead of raising error
         return anthropic.Anthropic(api_key=api_key)
+
+    def get_google_client(self):
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            # Fallback to ~/.ace/credentials
+            cred_file = Path.home() / ".ace" / "credentials"
+            if cred_file.exists():
+                for line in cred_file.read_text().splitlines():
+                    if line.startswith("GOOGLE_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY environment variable not set and not found in ~/.ace/credentials")
+        return api_key  # Return key for now, as we use it in subprocess/requests
+
+    def get_cursor_key(self):
+        api_key = os.getenv("CURSOR_API_KEY")
+        if not api_key:
+            # Fallback to ~/.ace/credentials
+            cred_file = Path.home() / ".ace" / "credentials"
+            if cred_file.exists():
+                for line in cred_file.read_text().splitlines():
+                    if line.startswith("CURSOR_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+        return api_key
 
     def reflect_on_session(self, session_output: str) -> str:
         client = self.get_anthropic_client()
+        if not client:
+            return "No new learnings (Anthropic client not available)."
         prompt = (
             "You are an ACE Reflection Engine. Your task is to analyze the "
             "output of a coding agent session and extract structured "
@@ -572,6 +608,8 @@ class ACEService:
             )
 
         client = self.get_anthropic_client()
+        if not client:
+            return "Consensus: Debate mediation requires ANTHROPIC_API_KEY."
 
         # 1. Gather agent perspectives (simulated via mail)
         perspectives = []
@@ -687,6 +725,17 @@ class ACEService:
             # 2. Execute (using cursor-agent)
             print(f"[RALPH] Executing task: {prompt[:50]}...")
 
+            # Inject GOOGLE_API_KEY and CURSOR_API_KEY from credentials if needed
+            env = os.environ.copy()
+            try:
+                env["GOOGLE_API_KEY"] = self.get_google_client()
+            except ValueError:
+                pass
+            
+            cursor_key = self.get_cursor_key()
+            if cursor_key:
+                env["CURSOR_API_KEY"] = cursor_key
+
             # Write context to a temporary file
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".txt", delete=False
@@ -701,7 +750,7 @@ class ACEService:
 
             print("[RALPH] Running agent command...")
             agent_proc = subprocess.run(
-                agent_cmd, shell=True, capture_output=True, text=True
+                agent_cmd, shell=True, capture_output=True, text=True, env=env
             )
 
             # 3. Verify (Run tests)
@@ -736,50 +785,51 @@ class ACEService:
             )
             session_file.write_text(session_content)
 
-            # 4. Reflection (Intermediate or Final)
-            if os.getenv("ANTHROPIC_API_KEY"):
-                print(
-                    f"[RALPH] Performing reflection for "
-                    f"iteration {iteration}..."
-                )
-                # Reflect on current iteration output
-                reflection_text = self.reflect_on_session(
-                    agent_proc.stdout + "\n" + result.stdout
-                )
-                updates = self.parse_reflection_output(reflection_text)
-                if updates:
-                    playbook_path = self.cursor_rules_dir / "_global.mdc"
-                    if resolved_agent_id:
-                        agents_config = self.load_agents()
-                        agent = next(
-                            (
-                                a
-                                for a in agents_config.agents
-                                if a.id == resolved_agent_id
-                            ),
-                            None
+        # 4. Reflection (Intermediate or Final)
+        if self.get_anthropic_client():
+            print(
+                f"[RALPH] Performing reflection for "
+                f"iteration {iteration}..."
+            )
+            # Reflect on current iteration output
+            reflection_text = self.reflect_on_session(
+                agent_proc.stdout + "\n" + result.stdout
+            )
+            updates = self.parse_reflection_output(reflection_text)
+            if updates:
+                playbook_path = self.cursor_rules_dir / "_global.mdc"
+                if resolved_agent_id:
+                    agents_config = self.load_agents()
+                    agent = next(
+                        (
+                            a
+                            for a in agents_config.agents
+                            if a.id == resolved_agent_id
+                        ),
+                        None
+                    )
+                    if agent:
+                        playbook_path = (
+                            self.base_path / agent.memory_file
                         )
-                        if agent:
-                            playbook_path = (
-                                self.base_path / agent.memory_file
-                            )
-                    self.update_playbook(playbook_path, updates)
-                    print(f"[RALPH] Updated playbook: {playbook_path.name}")
+                self.update_playbook(playbook_path, updates)
+                print(f"[RALPH] Updated playbook: {playbook_path.name}")
 
-                # Update prompt with reflection insights if it failed
-                if result.returncode != 0 and reflection_text != "No new learnings.":
-                    prompt = (
-                        f"Previous attempt failed. Reflection insights:\n"
-                        f"{reflection_text}\n\n"
-                        f"Original task: {prompt}"
-                    )
-                elif result.returncode != 0:
-                    prompt = (
-                        f"Previous attempt failed. Test output:\n"
-                        f"{result.stdout}\n{result.stderr}\n\n"
-                        f"Original task: {prompt}"
-                    )
+            # Update prompt with reflection insights if it failed
+            if result.returncode != 0 and reflection_text != "No new learnings.":
+                prompt = (
+                    f"Previous attempt failed. Reflection insights:\n"
+                    f"{reflection_text}\n\n"
+                    f"Original task: {prompt}"
+                )
             elif result.returncode != 0:
+                prompt = (
+                    f"Previous attempt failed. Test output:\n"
+                    f"{result.stdout}\n{result.stderr}\n\n"
+                    f"Original task: {prompt}"
+                )
+        else:
+            if result.returncode != 0:
                 print(
                     f"[RALPH] ❌ Verification failed "
                     f"(Exit code: {result.returncode})"
