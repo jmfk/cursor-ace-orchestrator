@@ -40,30 +40,18 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **5.3 FastAPI Backend Implementation**: Create the actual FastAPI app and endpoints.
 - [x] **5.4 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
 
-## Phase 6: Refinement & Advanced Features (Completed)
-- [x] **6.1 Memory Write-back Verification**: Added tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
-- [x] **6.2 RALPH Loop Reflection Integration**: Ensure the loop correctly uses reflection to update memory between iterations.
-- [x] **6.3 Native ace loop**: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
-- [x] **6.4 SOP Logic**: Implement formal instructions/SOPs for agent onboarding and PR reviews.
-- [x] **6.5 Google Stitch Integration**: Connect the CLI stubs to actual API or code extraction logic.
-- [x] **6.6 Advanced Consensus**: Implement multi-turn debate logic (currently 1-turn mediation).
-- [x] **6.7 Test Coverage Expansion**: Increase test coverage for `ACEService` and API endpoints beyond basic tests.
-- [x] **6.8 Production Readiness**: Add logging and error handling middleware for FastAPI.
+## Phase 6: Advanced Features & Refinement (Completed)
+- [x] **6.1 Living Specs Implementation**: Fully automate the creation and update of `.ace/specs/` (intent, constraints, implementation, verification) via `ace spec` commands.
+- [x] **6.2 Cross-Project Learning**: Implement logic to export/import anonymized learnings in `.ace-meta/cross-project/` via `ace meta` commands.
+- [x] **6.3 Meta Mode Enhancements**: Implement `ace meta self-audit` for ACE to audit its own codebase and memory.
+- [x] **6.4 Token Consumption Monitoring**: Implement `ace token-stats` to track and report token usage and costs per agent/session.
+- [x] **6.5 Multi-Turn Debate**: Support multi-turn debate logic in `ace debate` with LLM mediation.
+- [x] **6.6 Security Audit SOP**: Implement `ace agent security-audit` to perform security checks on agent-owned modules.
+- [x] **6.7 Agentic Feedback Loop**: Automate success/failure flagging in RALPH loop based on test-output, connecting write-back to CI/CD.
 
-## Phase 7: Final Polish & Maintenance (Completed)
-- [x] **7.1 Living Specs Implementation**: Fully automate the creation and update of `.ace/specs/` (intent, constraints, implementation, verification) via `ace spec` commands.
-- [x] **7.2 Cross-Project Learning**: Implement logic to aggregate anonymized learnings in `.ace-meta/cross-project/`.
-- [x] **7.3 Meta Mode Enhancements**: Refine `.ace-meta/` usage when ACE works on itself.
-- [x] **7.4 Token Consumption Monitoring**: Add a command to track and report token usage per agent/session.
-- [x] **7.5 IDE Extension Integration**: Prepare manifest and basic bridge for a Cursor/VSCode extension.
-
-## Phase 8: Future Directions (Completed)
-- [x] **8.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks.
-- [x] **8.2 Agentic Feedback Loop**: Automate success/failure flagging based on test-output, connecting write-back to CI/CD.
-- [x] **8.3 Advanced Multi-Agent Consensus**: Support more complex debate formats and human-in-the-loop escalation.
-- [x] **8.4 IDE Extension Development**: Build a native Cursor/VSCode extension for ACE.
-
-## Phase 9: Maintenance & Support (Completed)
-- [x] **9.1 Performance Optimization**: Profile and optimize core logic for large codebases.
-- [x] **9.2 Security Audit**: Conduct a security audit of the agent execution environment.
-- [ ] **9.3 Community Outreach**: Establish a community for ACE users and contributors.
+## Phase 7: Future Directions (Pending)
+- [ ] **7.1 Vectorized Memory**: Replace flat `.mdc` with embedding-based search for large playbooks.
+- [ ] **7.2 IDE Extension Integration**: Build a native Cursor/VSCode extension for ACE.
+- [ ] **7.3 Advanced Multi-Agent Consensus**: Support more complex debate formats and human-in-the-loop escalation UI.
+- [ ] **7.4 Performance Optimization**: Profile and optimize core logic for extremely large codebases.
+- [ ] **7.5 Security Audit**: Conduct a formal security audit of the agent execution environment.

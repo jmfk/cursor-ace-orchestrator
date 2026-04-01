@@ -1117,7 +1117,7 @@ class ACEService:
         if api_key:
             print(f"[STITCH] Calling Google Stitch API for: {description}")
             try:
-                # Actual Google Stitch API call (simulated)
+                # Actual Google Stitch API call
                 response = requests.post(
                     "https://api.stitch.google.com/v1/mockup",
                     headers={"Authorization": f"Bearer {api_key}"},
@@ -1125,7 +1125,10 @@ class ACEService:
                     timeout=30
                 )
                 if response.status_code == 200:
-                    ui_code = response.json().get("code", self._simulate_stitch_api(description))
+                    ui_code = response.json().get("code")
+                    if not ui_code:
+                         # Fallback if code missing in response
+                         ui_code = self._generate_mockup_with_agent(description)
                 else:
                     print(f"[STITCH] API failed ({response.status_code}). Falling back to agent.")
                     ui_code = self._generate_mockup_with_agent(description)
@@ -1146,7 +1149,7 @@ class ACEService:
         )
         mockup_file.write_text(content)
 
-        if "export const" in ui_code:
+        if ui_code and "export const" in ui_code:
             self._extract_stitch_components(mockup_id, ui_code)
 
         return mockup_url
@@ -1198,7 +1201,7 @@ class ACEService:
             (components_dir / f"{name}.tsx").write_text(content)
 
     def _simulate_stitch_api(self, description: str) -> str:
-        """Simulate a real Stitch API call."""
+        """Simulate a real Stitch API call for testing."""
         return (
             f"export const Mockup = () => "
             f"<div className='p-4'>Mockup for {description}</div>;"
@@ -1214,14 +1217,28 @@ class ACEService:
         if api_key:
             print(f"[STITCH] Syncing code from Google Stitch API for: {url}")
             try:
-                # Actual Google Stitch API call (simulated)
+                # Actual Google Stitch API call
                 response = requests.get(
                     f"https://api.stitch.google.com/v1/mockup/{mockup_id}",
                     headers={"Authorization": f"Bearer {api_key}"},
                     timeout=30
                 )
                 if response.status_code == 200:
-                    return response.json().get("code", "// Error: Code not found in API response.")
+                    ui_code = response.json().get("code")
+                    if ui_code:
+                        # Update local mockup file with synced code
+                        mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+                        if mockup_file.exists():
+                            content = mockup_file.read_text()
+                            # Replace code block
+                            new_content = re.sub(
+                                r"```(?:tsx|jsx|html|javascript|typescript)?\n.*?\n```",
+                                f"```tsx\n{ui_code}\n```",
+                                content,
+                                flags=re.DOTALL
+                            )
+                            mockup_file.write_text(new_content)
+                        return ui_code
                 else:
                     print(f"[STITCH] API failed ({response.status_code}). Falling back to local.")
             except Exception as e:
