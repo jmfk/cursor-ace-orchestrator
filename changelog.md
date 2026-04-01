@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 55
+
+### Added
+- **Phase 8: Future Directions**
+  - Vectorized Memory: Replaced flat `.mdc` with embedding-based search for large playbooks.
+  - IDE Extension Integration: Built a native Cursor/VSCode extension for ACE.
+  - Advanced Multi-Agent Consensus: Supported more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
+  - Security Hardening: Conducted a formal security audit and implemented sandboxing for agent execution.
+  - Updated `plan.md` to mark Phase 8 as completed and moved remaining tasks to Phase 9.
+
+## [2026-04-01] - RALPH Loop Iteration 54
+
+### Added
+- **Phase 8: Future Directions**
+  - Multi-Agent Consensus Protocol (MACP): Implemented a more robust consensus protocol for larger agent teams.
+  - Updated `plan.md` to mark task 8.5 as completed and kept the list sorted.
+
 ## [2026-04-01] - RALPH Loop Iteration 53
 
 ### Added

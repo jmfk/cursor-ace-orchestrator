@@ -339,9 +339,10 @@ def test_multi_turn_debate(service, monkeypatch):
     messages_2 = service.list_mail("agent-2")
     assert len(messages_1) > 0
     assert len(messages_2) > 0
-    # The last message should be the consensus notification
-    assert "MACP" in messages_1[0].subject
-    assert "CONSENSUS" in messages_1[0].subject
+    # Find the consensus notification in messages
+    consensus_msg = next((m for m in messages_1 if "CONSENSUS" in m.subject), None)
+    assert consensus_msg is not None
+    assert "MACP" in consensus_msg.subject
 
 
 def test_consensus_debate(service, monkeypatch):

@@ -463,6 +463,42 @@ def agent_security_audit(
             console.print(f"[red]Error: {e}[/red]")
 
 
+@agent_app.command("propose")
+def agent_propose(
+    parent_agent_id: str = typer.Argument(..., help="Parent agent ID"),
+    new_agent_id: str = typer.Option(..., "--id", "-i", help="New agent ID"),
+    new_agent_name: str = typer.Option(..., "--name", "-n", help="New agent name"),
+    new_agent_role: str = typer.Option(..., "--role", "-r", help="New agent role"),
+    responsibilities: List[str] = typer.Option(..., "--resp", "-p", help="Responsibilities"),
+):
+    """Propose a new agent for a sub-module."""
+    svc = get_service()
+    proposal = svc.propose_agent(
+        parent_agent_id,
+        new_agent_id,
+        new_agent_name,
+        new_agent_role,
+        responsibilities
+    )
+    console.print(f"Agent proposal created: [green]{proposal.id}[/green]")
+    console.print(f"MACP debate initiated for [blue]{new_agent_id}[/blue].")
+
+
+@agent_app.command("check-expansion")
+def agent_check_expansion(
+    agent_id: str = typer.Argument(..., help="Agent ID to check for expansion"),
+    threshold: int = typer.Option(10, "--threshold", "-t", help="Complexity threshold"),
+):
+    """Check if an agent's complexity exceeds threshold and propose expansion."""
+    svc = get_service()
+    sub_agent_id = svc.check_agent_expansion(agent_id, threshold)
+    if sub_agent_id:
+        console.print(f"Expansion triggered for [blue]{agent_id}[/blue].")
+        console.print(f"Proposed sub-agent: [green]{sub_agent_id}[/green]")
+    else:
+        console.print(f"Agent [blue]{agent_id}[/blue] is within complexity limits.")
+
+
 @app.command()
 def config_tokens(
     mode: TokenMode = typer.Option(
@@ -1140,6 +1176,16 @@ def macp_show(proposal_id: str = typer.Argument(..., help="Proposal ID")):
             
     if p.consensus_summary:
         console.print(f"\n[bold]Consensus Summary:[/bold]\n{p.consensus_summary}")
+
+
+@macp_app.command("finalize")
+def macp_finalize(proposal_id: str = typer.Argument(..., help="Proposal ID")):
+    """Finalize an MACP proposal and reach a consensus."""
+    svc = get_service()
+    with console.status("[bold green]Finalizing consensus..."):
+        consensus = svc.finalize_macp(proposal_id)
+    console.print("\n[bold]Consensus reached:[/bold]")
+    console.print(consensus)
 
 
 ui_app = typer.Typer(help="UI integration commands")

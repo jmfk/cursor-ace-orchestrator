@@ -798,6 +798,53 @@ class ACEService:
                     proposals.append(MACPProposal(**data))
         return proposals
 
+    def finalize_macp(self, proposal_id: str) -> str:
+        """Finalize an MACP proposal by reaching a consensus."""
+        proposal = self.get_macp_proposal(proposal_id)
+        if not proposal:
+            return f"Error: Proposal {proposal_id} not found."
+
+        client = self.get_anthropic_client()
+        if not client:
+            return "Consensus: Referee mediation requires ANTHROPIC_API_KEY."
+
+        referee_prompt = (
+            "You are the ACE MACP Referee. Reach a consensus based on the debate history and votes.\n\n"
+            f"Proposal: {proposal.title}\n{proposal.description}\n\n"
+            f"History:\n" + "\n".join(proposal.history) + "\n\n"
+            f"Votes: {proposal.votes}\n"
+            "Provide a clear consensus summary and final recommendation."
+        )
+
+        try:
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": referee_prompt}],
+            )
+            consensus = "".join([b.text for b in message.content if hasattr(b, "text")])
+            proposal.consensus_summary = consensus
+            proposal.status = ConsensusStatus.CONSENSUS
+            proposal.updated_at = datetime.now().isoformat()
+            self._save_macp_proposal(proposal)
+            
+            # Notify participants
+            participants = set(proposal.votes.keys())
+            for line in proposal.history:
+                match = re.search(r"Agent (\w+)", line)
+                if match:
+                    participants.add(match.group(1))
+            
+            # Ensure proposer and participants are notified
+            participants.add(proposal.proposer_id)
+
+            for aid in participants:
+                self.send_mail(aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus)
+                
+            return consensus
+        except Exception as e:
+            return f"Error: {e}"
+
     def debate(self, proposal_id: str, agent_ids: List[str], turns: int = 3) -> str:
         """Mediate a multi-turn debate for an MACP proposal."""
         proposal = self.get_macp_proposal(proposal_id)
@@ -854,33 +901,7 @@ class ACEService:
             proposal.turns_remaining -= 1
             self._save_macp_proposal(proposal)
 
-        # Referee logic
-        referee_prompt = (
-            "You are the ACE MACP Referee. Reach a consensus.\n\n"
-            f"Proposal: {proposal.title}\n{proposal.description}\n\n"
-            f"History:\n" + "\n".join(proposal.history) + "\n\n"
-            f"Votes: {proposal.votes}\n"
-        )
-
-        try:
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": referee_prompt}],
-            )
-            consensus = "".join([b.text for b in message.content if hasattr(b, "text")])
-            proposal.consensus_summary = consensus
-            proposal.status = ConsensusStatus.CONSENSUS
-            proposal.updated_at = datetime.now().isoformat()
-            self._save_macp_proposal(proposal)
-            
-            # Notify
-            for aid in agent_ids:
-                self.send_mail(aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus)
-                
-            return consensus
-        except Exception as e:
-            return f"Error: {e}"
+        return self.finalize_macp(proposal_id)
 
     # --- RALPH Loop Engine ---
 
@@ -1358,7 +1379,7 @@ class ACEService:
 
     # --- Autonomous Agent Expansion ---
 
-    def check_agent_expansion(self, agent_id: str, threshold: int = 10) -> Optional[Agent]:
+    def check_agent_expansion(self, agent_id: str, threshold: int = 10) -> Optional[str]:
         """Check if an agent's complexity exceeds threshold and propose expansion."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
@@ -1394,6 +1415,33 @@ class ACEService:
             
             return sub_agent_id
         return None
+
+    def propose_agent(
+        self,
+        parent_agent_id: str,
+        new_agent_id: str,
+        new_agent_name: str,
+        new_agent_role: str,
+        responsibilities: List[str],
+    ) -> MACPProposal:
+        """Propose a new agent via MACP."""
+        proposal_title = f"New Agent Proposal: {new_agent_name} ({new_agent_id})"
+        proposal_desc = (
+            f"Proposing a new agent to handle specific responsibilities.\n\n"
+            f"- **ID**: {new_agent_id}\n"
+            f"- **Name**: {new_agent_name}\n"
+            f"- **Role**: {new_agent_role}\n"
+            f"- **Responsibilities**: {', '.join(responsibilities)}\n"
+            f"- **Parent Agent**: {parent_agent_id}\n"
+        )
+        
+        proposal = self.create_macp_proposal(
+            proposer_id=parent_agent_id,
+            title=proposal_title,
+            description=proposal_desc,
+            agent_ids=[parent_agent_id, "orchestrator"]
+        )
+        return proposal
 
     # --- Google Stitch Integration ---
 
