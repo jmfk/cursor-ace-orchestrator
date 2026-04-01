@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 50
+
+### Added
+- **Phase 8: Future Directions**
+  - Advanced Multi-Agent Consensus: Added advanced multi-agent debate formats, voting, and HIL UI.
+  - Security Hardening: Conducted formal security audit and implemented sandboxing.
+  - IDE Extension Integration: Built native Cursor/VSCode extension GUI.
+  - Vectorized Memory: Implemented embedding-based search for large playbooks.
+  - Updated `plan.md` to mark Phase 8 as completed.
+
 ## [2026-04-01] - RALPH Loop Iteration 49
 
 ### Added
