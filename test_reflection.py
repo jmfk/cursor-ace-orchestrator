@@ -52,7 +52,13 @@ description: "Test playbook"
     # 1. Add new strategy
     reflections = ReflectionResult(
         entries=[
-            ReflectionEntry(id="001", type="str", helpful=1, harmful=0, content="Use TDD."),
+            ReflectionEntry(
+                id="001",
+                type="str",
+                helpful=1,
+                harmful=0,
+                content="Use TDD.",
+            ),
         ]
     )
     updater.update(reflections)
@@ -62,7 +68,9 @@ description: "Test playbook"
     # 2. Update existing decision
     reflections = ReflectionResult(
         entries=[
-            ReflectionEntry(id="001", type="dec", content="Use PostgreSQL."),
+            ReflectionEntry(
+                id="001", type="dec", content="Use PostgreSQL."
+            ),
         ]
     )
     updater.update(reflections)
@@ -79,9 +87,21 @@ def test_add_missing_sections(tmp_path):
     updater = PlaybookUpdater(str(playbook_file))
     reflections = ReflectionResult(
         entries=[
-            ReflectionEntry(id="001", type="str", helpful=1, harmful=0, content="Strategy 1"),
+            ReflectionEntry(
+                id="001",
+                type="str",
+                helpful=1,
+                harmful=0,
+                content="Strategy 1",
+            ),
             ReflectionEntry(id="001", type="dec", content="Decision 1"),
-            ReflectionEntry(id="001", type="mis", helpful=0, harmful=1, content="Pitfall 1"),
+            ReflectionEntry(
+                id="001",
+                type="mis",
+                helpful=0,
+                harmful=1,
+                content="Pitfall 1",
+            ),
         ]
     )
 

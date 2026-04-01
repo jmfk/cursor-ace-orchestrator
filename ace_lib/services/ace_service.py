@@ -82,7 +82,9 @@ class ACEService:
             if path.startswith(module_path):
                 if len(module_path) > best_match_len:
                     best_match_len = len(module_path)
-                    best_match_id = config.modules[module_path].agent_id
+                    best_match_id = (
+                        config.modules[module_path].agent_id
+                    )
         return best_match_id
 
     # --- Agent Management ---
@@ -364,10 +366,10 @@ class ACEService:
                 new_h = old_h + update.get("helpful", 0)
                 new_m = old_m + update.get("harmful", 0)
 
-                new_line = f"<!-- [{update_type}-{update_id}]"
-                if update_type != "dec":
-                    new_line += f" helpful={new_h} harmful={new_m}"
-                new_line += f" :: {update['description']} -->"
+                new_line = (f"<!-- [{update_type}-{update_id}]"
+                            + (f" helpful={new_h} harmful={new_m}"
+                               if update_type != "dec" else "")
+                            + f" :: {update['description']} -->")
                 content = content.replace(match.group(0), new_line)
             else:
                 # Handle NEW entries
@@ -764,6 +766,7 @@ class ACEService:
         if not agent:
             raise ValueError(f"Agent {agent_id} not found.")
 
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
         onboarding_file = self.ace_dir / f"onboarding_{agent_id}.md"
         responsibilities = (
             ", ".join(agent.responsibilities)
@@ -783,19 +786,11 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] Create/Verify `{agent.memory_file}` exists.
-- [ ] Ensure the playbook contains sections for "Strategier & patterns",
+- [ ] Ensure the playbook contains sections for "Strategier & patterns", \
 "Kända fallgropar", and "Arkitekturella beslut".
-"""
 
-        # 3. Initial Task
-        initial_modules = (
-            ", ".join(agent.responsibilities)
-            if agent.responsibilities
-            else "None"
-        )
-        content += f"""
 ## 3. Initial Task
-- [ ] Review existing codebase in assigned modules: {initial_modules}
+- [ ] Review existing codebase in assigned modules: {responsibilities}
 - [ ] Identify initial technical debts and document as [mis-NEW] in playbook.
 - [ ] Propose first strategy improvement as [str-NEW].
 
@@ -843,6 +838,7 @@ class ACEService:
 
     def review_pr(self, pr_id: str, agent_id: str):
         """Run PR review SOP for an agent."""
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
         review_file = self.ace_dir / f"review_{pr_id}_{agent_id}.md"
         content = (
             f"# SOP: PR Review - {pr_id}\n"

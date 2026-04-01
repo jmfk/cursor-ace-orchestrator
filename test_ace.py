@@ -15,9 +15,9 @@ def temp_ace_dir(tmp_path):
     # Mock the Path in ace.py or change working directory
     original_cwd = os.getcwd()
     os.chdir(tmp_path)
-    
+
     # Ensure we don't pick up the real .cursor/rules from the project root
-    # by creating a dummy one if needed, but since we are in tmp_path, 
+    # by creating a dummy one if needed, but since we are in tmp_path,
     # it should be fine as long as we don't use absolute paths that point outside.
 
     yield tmp_path
@@ -34,7 +34,8 @@ def test_ownership_longest_prefix_match(temp_ace_dir, monkeypatch):
 
     config = OwnershipConfig()
     config.modules["src/auth"] = OwnershipModule(agent_id="auth-agent")
-    config.modules["src/auth/special"] = OwnershipModule(agent_id="special-agent")
+    config.modules["src/auth/special"] = OwnershipModule(
+        agent_id="special-agent")
     save_ownership(config)
 
     # Test matching
@@ -64,20 +65,19 @@ def test_agent_registry(temp_ace_dir, monkeypatch):
     """Test agent creation and listing in the registry."""
     # Ensure we are not using the global service from ace.py
     import ace
-    from ace_lib.services.ace_service import ACEService
     svc = ACEService(temp_ace_dir)
-    
+
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
-    
+
     # Mock api_call to always return None to force local service usage
     monkeypatch.setattr(ace, "api_call", lambda *args, **kwargs: None)
-    
+
     from ace import app
     from typer.testing import CliRunner
-    
+
     runner = CliRunner()
-    
+
     # Create agent
     result = runner.invoke(
         app,
@@ -130,7 +130,6 @@ def test_config_tokens(temp_ace_dir, monkeypatch):
 def test_build_context(temp_ace_dir, monkeypatch):
     """Test composing the context slice for an agent call."""
     import ace
-    from ace_lib.services.ace_service import ACEService
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -214,7 +213,6 @@ def test_run_session_logging(temp_ace_dir, monkeypatch):
 def test_session_continuity(temp_ace_dir, monkeypatch):
     """Test that recent sessions are included in the context."""
     import ace
-    from ace_lib.services.ace_service import ACEService
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -272,8 +270,10 @@ def test_update_playbook(tmp_path):
 """)
 
     updates = [
-        {"type": "str", "id": "NEW", "helpful": 1, "harmful": 0, "description": "New strategy"},
-        {"type": "dec", "id": "001", "helpful": 0, "harmful": 0, "description": "Existing decision"},
+        {"type": "str", "id": "NEW", "helpful": 1,
+            "harmful": 0, "description": "New strategy"},
+        {"type": "dec", "id": "001", "helpful": 0,
+            "harmful": 0, "description": "Existing decision"},
     ]
 
     # Add new
@@ -440,7 +440,6 @@ def test_memory_sync(temp_ace_dir, monkeypatch):
 def test_mail_system(temp_ace_dir, monkeypatch):
     """Test the agent mail system."""
     import ace
-    from ace_lib.services.ace_service import ACEService
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
@@ -501,23 +500,22 @@ def test_mail_system(temp_ace_dir, monkeypatch):
 def test_debate(temp_ace_dir, monkeypatch):
     """Test the debate command."""
     import ace
-    from ace_lib.services.ace_service import ACEService
     svc = ACEService(temp_ace_dir)
     monkeypatch.setattr(ace, "service", svc)
     monkeypatch.setattr(ace, "get_service", lambda: svc)
     monkeypatch.setattr(ace, "api_call", lambda *args, **kwargs: None)
-    
+
     # Mock debate mediation to avoid API call
-    original_debate = svc.debate
     def mocked_debate(proposal, agent_ids):
         # Call the original debate logic but it will fail at client creation
         # So we just manually do what debate does before failing
         for aid in agent_ids:
-            svc.send_mail(aid, "orchestrator", "DEBATE PROPOSAL", f"Proposal: {proposal}")
+            svc.send_mail(aid, "orchestrator", "DEBATE PROPOSAL",
+                          f"Proposal: {proposal}")
         return "Consensus reached."
-    
+
     monkeypatch.setattr(svc, "debate", mocked_debate)
-    
+
     from ace import app
     from typer.testing import CliRunner
 
@@ -554,7 +552,6 @@ def test_debate(temp_ace_dir, monkeypatch):
     # Verify mail in agent-a's inbox
     result = runner.invoke(app, ["mail-list", "agent-a"])
     assert "DEBATE PROPOSAL" in result.stdout
-    # End of test_debate
 
 
 def test_ui_mockup(temp_ace_dir, monkeypatch):
@@ -564,7 +561,8 @@ def test_ui_mockup(temp_ace_dir, monkeypatch):
     svc = get_service()
 
     # Mock ui_mockup to avoid API call/subprocess
-    monkeypatch.setattr(svc, "ui_mockup", lambda d, a: "https://stitch.google.com/canvas/mock_123")
+    monkeypatch.setattr(svc, "ui_mockup", lambda d,
+                        a: "https://stitch.google.com/canvas/mock_123")
 
     from typer.testing import CliRunner
 
@@ -575,7 +573,6 @@ def test_ui_mockup(temp_ace_dir, monkeypatch):
     )
     assert result.exit_code == 0
     assert "Generating UI mockup for: Admin Dashboard" in result.stdout
-    # End of test_ui_mockup
 
 
 def test_ui_sync(temp_ace_dir, monkeypatch):
@@ -585,7 +582,8 @@ def test_ui_sync(temp_ace_dir, monkeypatch):
     svc = get_service()
 
     # Mock ui_sync
-    monkeypatch.setattr(svc, "ui_sync", lambda u: "export const UI = () => <div>Mock</div>;")
+    monkeypatch.setattr(
+        svc, "ui_sync", lambda u: "export const UI = () => <div>Mock</div>;")
 
     from typer.testing import CliRunner
 
@@ -595,4 +593,3 @@ def test_ui_sync(temp_ace_dir, monkeypatch):
     result = runner.invoke(app, ["ui", "sync", url])
     assert result.exit_code == 0
     assert f"Syncing UI code from: {url}" in result.stdout
-    # End of test_ui_sync

@@ -36,7 +36,13 @@ def test_list_agents_empty(client):
 
 def test_create_agent(client):
     response = client.post(
-        "/agents", params={"id": "test-agent", "name": "Test Agent", "role": "tester", "email": "test@example.com"}
+        "/agents",
+        params={
+            "id": "test-agent",
+            "name": "Test Agent",
+            "role": "tester",
+            "email": "test@example.com",
+        },
     )
     assert response.status_code == 200
     data = response.json()
@@ -45,7 +51,9 @@ def test_create_agent(client):
 
 
 def test_assign_ownership(client):
-    response = client.post("/ownership", params={"path": "src/test", "agent_id": "test-agent"})
+    response = client.post(
+        "/ownership", params={"path": "src/test", "agent_id": "test-agent"}
+    )
     assert response.status_code == 200
 
     response = client.get("/ownership")
@@ -57,8 +65,13 @@ def test_assign_ownership(client):
 
 def test_get_context(client):
     # Create agent first
-    client.post("/agents", params={"id": "test-agent", "name": "Test Agent", "role": "tester"})
-    client.post("/ownership", params={"path": "src/test", "agent_id": "test-agent"})
+    client.post(
+        "/agents",
+        params={"id": "test-agent", "name": "Test Agent", "role": "tester"},
+    )
+    client.post(
+        "/ownership", params={"path": "src/test", "agent_id": "test-agent"}
+    )
 
     response = client.get("/context", params={"path": "src/test"})
     assert response.status_code == 200

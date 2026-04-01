@@ -25,7 +25,16 @@ def test_ui_mockup_command(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # Run ace ui mockup
-    result = runner.invoke(app, ["ui", "mockup", "Create a login page", "--agent", "ui-agent-01"])
+    result = runner.invoke(
+        app,
+        [
+            "ui",
+            "mockup",
+            "Create a login page",
+            "--agent",
+            "ui-agent-01",
+        ],
+    )
 
     assert result.exit_code == 0
     assert "Generating UI mockup" in result.stdout
@@ -41,7 +50,9 @@ def test_ui_sync_command(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # Run ace ui sync
-    result = runner.invoke(app, ["ui", "sync", "https://stitch.google.com/canvas/123"])
+    result = runner.invoke(
+        app, ["ui", "sync", "https://stitch.google.com/canvas/123"]
+    )
 
     assert result.exit_code == 0
     assert "Syncing UI code from:" in result.stdout

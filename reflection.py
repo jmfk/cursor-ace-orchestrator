@@ -58,7 +58,13 @@ class ReflectionEngine:
 
         # Find all matches for decisions
         for match in re.finditer(self.DEC_PATTERN, text):
-            result.entries.append(ReflectionEntry(id=match.group(1), type="dec", content=match.group(2).strip()))
+            result.entries.append(
+                ReflectionEntry(
+                    id=match.group(1),
+                    type="dec",
+                    content=match.group(2).strip()
+                )
+            )
 
         return result
 
@@ -82,11 +88,17 @@ class PlaybookUpdater:
         new_content = content
         for entry in reflections.entries:
             if entry.type == "str":
-                new_content = self._update_section(new_content, "## Strategier & patterns", entry)
+                new_content = self._update_section(
+                    new_content, "## Strategier & patterns", entry
+                )
             elif entry.type == "mis":
-                new_content = self._update_section(new_content, "## Kända fallgropar", entry)
+                new_content = self._update_section(
+                    new_content, "## Kända fallgropar", entry
+                )
             elif entry.type == "dec":
-                new_content = self._update_section(new_content, "## Arkitekturella beslut", entry)
+                new_content = self._update_section(
+                    new_content, "## Arkitekturella beslut", entry
+                )
 
         if new_content != content:
             with open(self.playbook_path, "w") as f:
@@ -102,7 +114,8 @@ class PlaybookUpdater:
             section_start = content.find(section_header)
 
         # Find the end of the section (next header or end of file)
-        next_section = content.find("\n## ", section_start + len(section_header))
+        next_section = content.find(
+            "\n## ", section_start + len(section_header))
         if next_section == -1:
             section_content = content[section_start:]
             post_content = ""
@@ -115,22 +128,41 @@ class PlaybookUpdater:
         if entry_id_marker in section_content:
             # Update existing entry
             if entry.type == "dec":
-                new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
+                new_entry_line = (
+                    f"<!-- [dec-{entry.id}] :: {entry.content} -->"
+                )
                 old_entry_pattern = rf"<!-- \[dec-{entry.id}\] :: .*? -->"
             else:
-                new_entry_line = f"<!-- [{entry.type}-{entry.id}] helpful={entry.helpful} harmful={entry.harmful} :: {entry.content} -->"
-                old_entry_pattern = rf"<!-- \[{entry.type}-{entry.id}\] helpful=\d+ harmful=\d+ :: .*? -->"
+                new_entry_line = (
+                    f"<!-- [{entry.type}-{entry.id}] "
+                    f"helpful={entry.helpful} harmful={entry.harmful} :: "
+                    f"{entry.content} -->"
+                )
+                old_entry_pattern = (
+                    rf"<!-- \[{entry.type}-{entry.id}\] "
+                    rf"helpful=\d+ harmful=\d+ :: .*? -->"
+                )
 
             match = re.search(old_entry_pattern, section_content)
             if match:
-                section_content = section_content[: match.start()] + new_entry_line + section_content[match.end() :]
+                section_content = (section_content[:match.start()] +
+                                   new_entry_line +
+                                   section_content[match.end():])
         else:
             # Add new entry
             if entry.type == "dec":
-                new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
+                new_entry_line = (
+                    f"<!-- [dec-{entry.id}] :: {entry.content} -->"
+                )
             else:
-                new_entry_line = f"<!-- [{entry.type}-{entry.id}] helpful={entry.helpful} harmful={entry.harmful} :: {entry.content} -->"
+                new_entry_line = (
+                    f"<!-- [{entry.type}-{entry.id}] "
+                    f"helpful={entry.helpful} harmful={entry.harmful} :: "
+                    f"{entry.content} -->"
+                )
 
-            section_content = section_content.rstrip() + f"\n{new_entry_line}\n"
+            section_content = (
+                section_content.rstrip() + f"\n{new_entry_line}\n"
+            )
 
         return content[:section_start] + section_content + post_content
