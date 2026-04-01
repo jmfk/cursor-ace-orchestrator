@@ -367,6 +367,10 @@ class ACEService:
         framing = self.get_task_framing(task_type, module_name)
         context_parts.append(f"### TASK FRAMING\n{framing}")
 
+        # 7. RALPH Loop Context (if applicable)
+        if os.getenv("ACE_LOOP_PROMPT"):
+            context_parts.append(f"### RALPH LOOP PROMPT\n{os.getenv('ACE_LOOP_PROMPT')}")
+
         return "\n\n".join(context_parts), resolved_agent_id
 
     # --- Reflection Engine ---
@@ -915,7 +919,7 @@ class ACEService:
         agent_id: Optional[str] = None,
         git_commit: bool = False,
     ):
-        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect."""
+        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 9.5)."""
         iteration = 0
         success = False
         state_history = []
@@ -926,6 +930,7 @@ class ACEService:
             print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
 
             # 1. Context Refresh & Build
+            os.environ["ACE_LOOP_PROMPT"] = prompt
             context, resolved_agent_id = self.build_context(
                 path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id
             )
@@ -1203,12 +1208,13 @@ class ACEService:
             if agent.responsibilities
             else "None"
         )
-        # Formal SOP for Agent Onboarding
+        # Formal SOP for Agent Onboarding (PRD-01 / Phase 9.5)
         content = f"""# SOP: Agent Onboarding - {agent.name} ({agent.id})
 - **Role**: {agent.role}
 - **Responsibilities**: {responsibilities}
 - **Memory File**: {agent.memory_file}
 - **Status**: {agent.status}
+- **Date**: {datetime.now().isoformat()}
 
 ## 1. Context Acquisition
 - [ ] **Registry**: Read `AGENTS.md` to understand the current agent landscape.
@@ -1218,8 +1224,7 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] **Playbook**: Create/Verify `{agent.memory_file}` exists.
-        - [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns",
-        "Kända fallgropar", and "Arkitekturella beslut".
+- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
 - [ ] **Audit**: Review existing codebase in assigned modules: {responsibilities}
@@ -1300,7 +1305,7 @@ class ACEService:
         
         review_file = sop_dir / f"review_{pr_id}_{agent_id}.md"
         
-        # Formal SOP for PR Reviews
+        # Formal SOP for PR Reviews (PRD-01 / Phase 9.5)
         content = f"""# SOP: PR Review - {pr_id}
 - **Reviewer**: {agent_id}
 - **Date**: {datetime.now().isoformat()}
@@ -1459,6 +1464,15 @@ class ACEService:
 
         # Check for STITCH_API_KEY to use real API call
         api_key = os.getenv("STITCH_API_KEY")
+        if not api_key:
+            # Fallback to ~/.ace/credentials
+            cred_file = Path.home() / ".ace" / "credentials"
+            if cred_file.exists():
+                for line in cred_file.read_text().splitlines():
+                    if line.startswith("STITCH_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+
         if api_key:
             print(f"[STITCH] Calling Google Stitch API for: {description}")
             try:
@@ -1603,6 +1617,15 @@ class ACEService:
         mockup_id = url.split("/")[-1]
         
         api_key = os.getenv("STITCH_API_KEY")
+        if not api_key:
+            # Fallback to ~/.ace/credentials
+            cred_file = Path.home() / ".ace" / "credentials"
+            if cred_file.exists():
+                for line in cred_file.read_text().splitlines():
+                    if line.startswith("STITCH_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+
         if api_key:
             try:
                 # Actual Google Stitch API call

@@ -63,8 +63,8 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 
 ## Phase 9: Future Directions (In Progress)
 - [x] **9.1 IDE Extension Integration**: Build a native Cursor/VSCode extension to provide a GUI for ACE Orchestrator.
+- [x] **9.2 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
 - [x] **9.4 Multi-Agent Consensus Protocol (MACP) Refinement**: Implement a more robust consensus protocol for larger agent teams.
 - [x] **9.5 TDD & Core SOPs**: Establish the 'tests/' directory, write unit tests for ACEService, integrate RALPH loop into 'ace.py', and implement formal SOPs for onboarding and PR reviews.
-- [ ] **9.2 Security Hardening**: Conduct a formal security audit and implement sandboxing for agent execution.
 - [ ] **9.3 Advanced Multi-Agent Consensus**: Support more complex debate formats, voting mechanisms, and human-in-the-loop escalation UI.
 - [ ] **9.6 Google Stitch Integration**: Connect the CLI stubs to actual API or code extraction logic.
