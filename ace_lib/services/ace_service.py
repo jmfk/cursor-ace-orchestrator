@@ -98,7 +98,9 @@ class ACEService:
         with open(agents_file, "w") as f:
             yaml.dump(config.model_dump(), f)
 
-    def create_agent(self, id: str, name: str, role: str, email: Optional[str] = None) -> Agent:
+    def create_agent(
+        self, id: str, name: str, role: str, email: Optional[str] = None
+    ) -> Agent:
         config = self.load_agents()
         if any(a.id == id for a in config.agents):
             raise ValueError(f"Agent with ID {id} already exists.")
@@ -107,7 +109,10 @@ class ACEService:
             email = f"{id}@ace.local"
 
         memory_file = f".cursor/rules/{role}.mdc"
-        new_agent = Agent(id=id, name=name, role=role, email=email, memory_file=memory_file)
+        new_agent = Agent(
+            id=id, name=name, role=role, email=email,
+            memory_file=memory_file, status="active"
+        )
         config.agents.append(new_agent)
         self.save_agents(config)
         return new_agent
@@ -117,37 +122,46 @@ class ACEService:
     def get_task_framing(self, task_type: TaskType, module: str) -> str:
         framing = {
             TaskType.IMPLEMENT: (
-                f"You are implementing new functionality in {module}. Follow the playbook strategies. "
+                f"You are implementing new functionality in {module}. "
+                "Follow the playbook strategies. "
                 "Write back new learnings in the write-back section."
             ),
             TaskType.REVIEW: (
-                f"You are reviewing code in {module}. Identify deviations from playbook strategies. "
+                f"You are reviewing code in {module}. "
+                "Identify deviations from playbook strategies. "
                 "Add any new pitfalls to the write-back section."
             ),
             TaskType.DEBUG: (
-                f"You are debugging an issue in {module}. If the root cause reveals a new pattern, "
+                f"You are debugging an issue in {module}. "
+                "If the root cause reveals a new pattern, "
                 "document it as [mis-XXX] in write-back."
             ),
             TaskType.REFACTOR: (
-                f"You are refactoring code in {module}. Ensure that the refactoring adheres to the "
-                "architectural decisions and strategies in the playbook."
+                f"You are refactoring code in {module}. Ensure that the "
+                "refactoring adheres to the architectural decisions and "
+                "strategies in the playbook."
             ),
             TaskType.PLAN: (
-                f"You are planning a task in {module}. Outline the steps and consider the impact on "
-                "existing strategies and decisions."
+                f"You are planning a task in {module}. Outline the steps "
+                "and consider the impact on existing strategies and "
+                "decisions."
             ),
         }
         return framing.get(task_type, "")
 
     def build_context(
-        self, path: Optional[str] = None, task_type: TaskType = TaskType.IMPLEMENT, agent_id: Optional[str] = None
+        self, path: Optional[str] = None,
+        task_type: TaskType = TaskType.IMPLEMENT,
+        agent_id: Optional[str] = None
     ) -> Tuple[str, Optional[str]]:
         context_parts = []
 
         # 1. Global rules
         global_rules_file = self.cursor_rules_dir / "_global.mdc"
         if global_rules_file.exists():
-            context_parts.append(f"### GLOBAL RULES\n{global_rules_file.read_text()}")
+            context_parts.append(
+                f"### GLOBAL RULES\n{global_rules_file.read_text()}"
+            )
 
         # 2. Resolve agent and playbook
         resolved_agent_id = agent_id
@@ -156,18 +170,27 @@ class ACEService:
 
         if resolved_agent_id:
             agents_config = self.load_agents()
-            agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+            agent = next(
+                (a for a in agents_config.agents if a.id == resolved_agent_id),
+                None
+            )
             if agent:
                 playbook_path = self.base_path / agent.memory_file
                 if not playbook_path.exists():
                     playbook_path = self.cursor_rules_dir / f"{agent.role}.mdc"
 
                 if playbook_path.exists():
-                    context_parts.append(f"### AGENT PLAYBOOK ({agent.role})\n{playbook_path.read_text()}")
+                    context_parts.append(
+                        f"### AGENT PLAYBOOK ({agent.role})\n"
+                        f"{playbook_path.read_text()}"
+                    )
 
         # 3. Recent decisions (ADRs)
         if self.decisions_dir.exists():
-            decisions = sorted(list(self.decisions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)[:3]
+            decisions = sorted(
+                list(self.decisions_dir.glob("*.md")),
+                key=lambda x: x.stat().st_mtime, reverse=True
+            )[:3]
             if decisions:
                 context_parts.append("### RECENT DECISIONS")
                 for d in decisions:
@@ -176,8 +199,14 @@ class ACEService:
         # 4. Session continuity
         config = self.load_config()
         if self.sessions_dir.exists():
-            session_files = sorted(list(self.sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
-            num_sessions = {TokenMode.LOW: 1, TokenMode.MEDIUM: 3, TokenMode.HIGH: 5}.get(config.token_mode, 1)
+            session_files = sorted(
+                list(self.sessions_dir.glob("*.md")),
+                key=lambda x: x.stat().st_mtime, reverse=True
+            )
+            token_map = {
+                TokenMode.LOW: 1, TokenMode.MEDIUM: 3, TokenMode.HIGH: 5
+            }
+            num_sessions = token_map.get(config.token_mode, 1)
             recent_sessions = session_files[:num_sessions]
             if recent_sessions:
                 context_parts.append("### RECENT SESSIONS")
@@ -196,7 +225,10 @@ class ACEService:
     def list_sessions(self) -> List[Dict]:
         if not self.sessions_dir.exists():
             return []
-        session_files = sorted(list(self.sessions_dir.glob("*.md")), key=lambda x: x.stat().st_mtime, reverse=True)
+        session_files = sorted(
+            list(self.sessions_dir.glob("*.md")),
+            key=lambda x: x.stat().st_mtime, reverse=True
+        )
         sessions = []
         for s in session_files:
             content = s.read_text()
@@ -205,9 +237,13 @@ class ACEService:
             agent_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", content)
             sessions.append({
                 "id": s.stem.replace("session_", ""),
-                "command": command_match.group(1) if command_match else "unknown",
+                "command": (
+                    command_match.group(1) if command_match else "unknown"
+                ),
                 "agent_id": agent_match.group(1) if agent_match else "unknown",
-                "timestamp": datetime.fromtimestamp(s.stat().st_mtime).isoformat()
+                "timestamp": datetime.fromtimestamp(
+                    s.stat().st_mtime
+                ).isoformat()
             })
         return sessions
 
@@ -226,33 +262,46 @@ class ACEService:
     def reflect_on_session(self, session_output: str) -> str:
         client = self.get_anthropic_client()
         prompt = (
-            "You are an ACE Reflection Engine. Your task is to analyze the output of a coding agent session "
-            "and extract structured learnings.\n\n"
+            "You are an ACE Reflection Engine. Your task is to analyze the "
+            "output of a coding agent session and extract structured "
+            "learnings.\n\n"
             "Look for:\n"
-            "1. **Strategies [str-XXX]**: Successful patterns, helpful libraries, or effective approaches.\n"
-            "2. **Pitfalls [mis-XXX]**: Bugs encountered, harmful patterns, or things to avoid.\n"
-            "3. **Decisions [dec-XXX]**: Architectural choices made during the task.\n\n"
+            "1. **Strategies [str-XXX]**: Successful patterns, helpful "
+            "libraries, or effective approaches.\n"
+            "2. **Pitfalls [mis-XXX]**: Bugs encountered, harmful "
+            "patterns, or things to avoid.\n"
+            "3. **Decisions [dec-XXX]**: Architectural choices made "
+            "during the task.\n\n"
             "Format your output EXACTLY as follows:\n"
             "[str-NEW] helpful=1 harmful=0 :: <description of the strategy>\n"
             "[mis-NEW] helpful=0 harmful=1 :: <description of the pitfall>\n"
             "[dec-NEW] :: <description of the decision>\n\n"
-            "Only include items that are clearly supported by the session output. If no new learnings are found, "
+            "Only include items that are clearly supported by the session "
+            "output. If no new learnings are found, "
             'return "No new learnings."\n\n'
             f"Session Output:\n{session_output}\n"
         )
         try:
             message = client.messages.create(
-                model="claude-3-5-sonnet-20241022", max_tokens=1024, messages=[{"role": "user", "content": prompt}]
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}]
             )
             if isinstance(message.content, list):
-                return "".join([block.text for block in message.content if hasattr(block, "text")])
+                return "".join([
+                    block.text for block in message.content
+                    if hasattr(block, "text")
+                ])
             return str(message.content)
         except Exception as e:
             return f"Error during reflection: {e}"
 
     def parse_reflection_output(self, reflection_text: str) -> List[Dict]:
         updates = []
-        pattern = r"\[(str|mis|dec)-([^\]]+)\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*)"
+        pattern = (
+            r"\[(str|mis|dec)-([^\]]+)\]"
+            r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*)"
+        )
         for line in reflection_text.splitlines():
             match = re.search(pattern, line)
             if match:
@@ -274,33 +323,41 @@ class ACEService:
         content = playbook_path.read_text()
         for update in updates:
             update_id, update_type = update["id"], update["type"]
-            
-            # Pattern to match existing entries with optional helpful/harmful values
+
+            # Pattern to match existing entries
             existing_pattern = (
-                rf"<!-- \[{update_type}-{update_id}\](?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
+                rf"<!-- \[{update_type}-{update_id}\]"
+                r"(?:\s+helpful=(\d+)\s+harmful=(\d+))?\s*::\s*(.*?) -->"
             )
             match = re.search(existing_pattern, content)
 
             if match:
-                # Update existing entry by accumulating helpful/harmful counts
-                old_h, old_m = int(match.group(1) or 0), int(match.group(2) or 0)
-                new_h, new_m = old_h + update.get("helpful", 0), old_m + update.get("harmful", 0)
-                
+                # Update existing entry
+                old_h = int(match.group(1) or 0)
+                old_m = int(match.group(2) or 0)
+                new_h = old_h + update.get("helpful", 0)
+                new_m = old_m + update.get("harmful", 0)
+
                 new_line = f"<!-- [{update_type}-{update_id}]"
                 if update_type != "dec":
                     new_line += f" helpful={new_h} harmful={new_m}"
                 new_line += f" :: {update['description']} -->"
                 content = content.replace(match.group(0), new_line)
             else:
-                # Handle NEW entries by generating a sequential ID
+                # Handle NEW entries
                 if update_id == "NEW":
-                    existing_ids = re.findall(rf"\[{update_type}-(\d+)\]", content)
+                    existing_ids = re.findall(
+                        rf"\[{update_type}-(\d+)\]", content
+                    )
                     next_id = max([int(i) for i in existing_ids] + [0]) + 1
                     update_id = f"{next_id:03d}"
 
                 update_str = f"[{update_type}-{update_id}]"
                 if update_type != "dec":
-                    update_str += f" helpful={update.get('helpful', 0)} harmful={update.get('harmful', 0)}"
+                    update_str += (
+                        f" helpful={update.get('helpful', 0)} "
+                        f"harmful={update.get('harmful', 0)}"
+                    )
                 new_line = f"<!-- {update_str} :: {update['description']} -->"
 
                 section_map = {
@@ -313,7 +370,9 @@ class ACEService:
                     parts = content.split(header, 1)
                     content = parts[0] + header + "\n" + new_line + parts[1]
                 else:
-                    content = content.rstrip() + f"\n\n{header}\n{new_line}\n"
+                    content = (
+                        content.rstrip() + f"\n\n{header}\n{new_line}\n"
+                    )
 
         playbook_path.write_text(content)
         return True
@@ -331,21 +390,37 @@ class ACEService:
             status_match = re.search(r"- \*\*Status\*\*: (.*)", content)
             date_match = re.search(r"- \*\*Date\*\*: (.*)", content)
             agent_match = re.search(r"- \*\*Agent\*\*: (.*)", content)
-            
+
             # Extract sections
-            context_match = re.search(r"## Context\n(.*?)\n\n## Decision", content, re.DOTALL)
-            decision_match = re.search(r"## Decision\n(.*?)\n\n## Consequences", content, re.DOTALL)
-            consequences_match = re.search(r"## Consequences\n(.*)", content, re.DOTALL)
+            context_match = re.search(
+                r"## Context\n(.*?)\n\n## Decision", content, re.DOTALL
+            )
+            decision_match = re.search(
+                r"## Decision\n(.*?)\n\n## Consequences", content, re.DOTALL
+            )
+            consequences_match = re.search(
+                r"## Consequences\n(.*)", content, re.DOTALL
+            )
 
             decisions.append(Decision(
                 id=adr_path.stem,
                 title=title_match.group(1) if title_match else adr_path.name,
                 status=status_match.group(1) if status_match else "unknown",
-                created_at=date_match.group(1) if date_match else datetime.now().isoformat(),
+                created_at=(
+                    date_match.group(1) if date_match
+                    else datetime.now().isoformat()
+                ),
                 agent_id=agent_match.group(1) if agent_match else None,
-                context=context_match.group(1).strip() if context_match else "",
-                decision=decision_match.group(1).strip() if decision_match else "",
-                consequences=consequences_match.group(1).strip() if consequences_match else ""
+                context=(
+                    context_match.group(1).strip() if context_match else ""
+                ),
+                decision=(
+                    decision_match.group(1).strip() if decision_match else ""
+                ),
+                consequences=(
+                    consequences_match.group(1).strip()
+                    if consequences_match else ""
+                )
             ))
         return decisions
 
@@ -363,7 +438,8 @@ class ACEService:
         next_num = 1
         if existing_adrs:
             nums = [
-                int(re.search(r"ADR-(\d+)", f.name).group(1)) for f in existing_adrs if re.search(r"ADR-(\d+)", f.name)
+                int(re.search(r"ADR-(\d+)", f.name).group(1))
+                for f in existing_adrs if re.search(r"ADR-(\d+)", f.name)
             ]
             if nums:
                 next_num = max(nums) + 1
@@ -380,7 +456,7 @@ class ACEService:
         )
 
         adr_file = self.decisions_dir / f"{adr_id}.md"
-        content = (
+        adr_content = (
             f"# {adr_id}: {title}\n"
             f"- **Status**: {status}\n"
             f"- **Date**: {new_decision.created_at}\n"
@@ -389,7 +465,7 @@ class ACEService:
             f"## Decision\n{decision}\n\n"
             f"## Consequences\n{consequences}\n"
         )
-        adr_file.write_text(content)
+        adr_file.write_text(adr_content)
         return new_decision
 
     # --- Mail System ---
@@ -420,13 +496,18 @@ class ACEService:
 
         return MailMessage(**data)
 
-    def send_mail(self, to_agent: str, from_agent: str, subject: str, body: str) -> MailMessage:
+    def send_mail(
+        self, to_agent: str, from_agent: str, subject: str, body: str
+    ) -> MailMessage:
         agent_mail_dir = self.mail_dir / to_agent
         agent_mail_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         msg_id = f"{timestamp}_{from_agent}"
-        msg = MailMessage(id=msg_id, **{"from": from_agent, "to": to_agent}, subject=subject, body=body)
+        msg = MailMessage(
+            id=msg_id, **{"from": from_agent, "to": to_agent},
+            subject=subject, body=body
+        )
 
         with open(agent_mail_dir / f"{msg_id}.yaml", "w") as f:
             yaml.dump(msg.model_dump(by_alias=True), f)
@@ -442,40 +523,52 @@ class ACEService:
         path: Optional[str] = None,
         agent_id: Optional[str] = None,
     ):
-        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat."""
+        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect."""
         iteration = 0
         success = False
-        
+
         while iteration < max_iterations:
             iteration += 1
             print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
-            
+
             # 1. Context Refresh & Build
-            context, resolved_agent_id = self.build_context(path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id)
-            
+            context, resolved_agent_id = self.build_context(
+                path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id
+            )
+
             # 2. Execute (using cursor-agent)
             print(f"[RALPH] Executing task: {prompt[:50]}...")
-            
+
             # Write context to a temporary file
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False
+            ) as tmp:
                 tmp.write(context)
                 context_file = tmp.name
 
-            # Construct cursor-agent command
-            # We use the prompt + context file
-            agent_cmd = f"cursor-agent --print --model gemini-3-flash --force --trust --context-file {context_file} \"{prompt}\""
-            
+            agent_cmd = (
+                "cursor-agent --print --model gemini-3-flash --force --trust "
+                f"--context-file {context_file} \"{prompt}\""
+            )
+
             print(f"[RALPH] Running agent command...")
-            agent_proc = subprocess.run(agent_cmd, shell=True, capture_output=True, text=True)
-            
+            agent_proc = subprocess.run(
+                agent_cmd, shell=True, capture_output=True, text=True
+            )
+
             # 3. Verify (Run tests)
             print(f"[RALPH] Verifying with: {test_cmd}")
-            result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
-            
+            result = subprocess.run(
+                test_cmd, shell=True, capture_output=True, text=True
+            )
+
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            session_file = self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
+            session_file = (
+                self.sessions_dir /
+                f"session_loop_{session_id}_{iteration}.md"
+            )
             self.sessions_dir.mkdir(parents=True, exist_ok=True)
-            
+
             session_content = f"""# Session Loop {session_id} (Iteration {iteration})
 - **Prompt**: `{prompt}`
 - **Test Command**: `{test_cmd}`
@@ -505,34 +598,49 @@ class ACEService:
 ```
 """
             session_file.write_text(session_content)
-            
+
             if result.returncode == 0:
                 print("[RALPH] ✅ Verification successful!")
                 success = True
-                
+
                 # Final Reflection on success
                 if os.getenv("ANTHROPIC_API_KEY"):
-                    print("[RALPH] Performing final reflection...")
-                    reflection_text = self.reflect_on_session(agent_proc.stdout + "\n" + result.stdout)
+                    print(f"[RALPH] Performing final reflection...")
+                    reflection_text = self.reflect_on_session(
+                        agent_proc.stdout + "\n" + result.stdout
+                    )
                     updates = self.parse_reflection_output(reflection_text)
                     if updates:
                         playbook_path = self.cursor_rules_dir / "_global.mdc"
                         if resolved_agent_id:
                             agents_config = self.load_agents()
-                            agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+                            agent = next(
+                                (
+                                    a for a in agents_config.agents
+                                    if a.id == resolved_agent_id
+                                ),
+                                None
+                            )
                             if agent:
                                 playbook_path = Path(agent.memory_file)
                         self.update_playbook(playbook_path, updates)
                 break
             else:
-                print(f"[RALPH] ❌ Verification failed (Exit code: {result.returncode})")
+                print(
+                    f"[RALPH] ❌ Verification failed "
+                    f"(Exit code: {result.returncode})"
+                )
                 # Update prompt for next iteration with failure info
-                prompt = f"Previous attempt failed. Test output:\n{result.stdout}\n{result.stderr}\n\nOriginal task: {prompt}"
-            
+                prompt = (
+                    f"Previous attempt failed. Test output:\n"
+                    f"{result.stdout}\n{result.stderr}\n\n"
+                    f"Original task: {prompt}"
+                )
+
             # Cleanup context file
             if os.path.exists(context_file):
                 os.remove(context_file)
-            
+
         return success, iteration
 
     # --- SOP Engine ---
@@ -540,14 +648,20 @@ class ACEService:
     def onboard_agent(self, agent_id: str):
         """Run onboarding SOP for an agent."""
         agents_config = self.load_agents()
-        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        agent = next(
+            (a for a in agents_config.agents if a.id == agent_id), None
+        )
         if not agent:
             raise ValueError(f"Agent {agent_id} not found.")
 
         onboarding_file = self.ace_dir / f"onboarding_{agent_id}.md"
+        responsibilities = (
+            ', '.join(agent.responsibilities)
+            if agent.responsibilities else 'None'
+        )
         content = f"""# SOP: Agent Onboarding - {agent.name} ({agent.id})
 - **Role**: {agent.role}
-- **Responsibilities**: {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
+- **Responsibilities**: {responsibilities}
 - **Memory File**: {agent.memory_file}
 - **Status**: {agent.status}
 
@@ -558,11 +672,19 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] Create/Verify `{agent.memory_file}` exists.
-- [ ] Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
+- [ ] Ensure the playbook contains sections for "Strategier & patterns",
+"Kända fallgropar", and "Arkitekturella beslut".
+"""
 
+        # 3. Initial Task
+        initial_modules = (
+            ', '.join(agent.responsibilities)
+            if agent.responsibilities else 'None'
+        )
+        content += f"""
 ## 3. Initial Task
-- [ ] Review existing codebase in assigned modules: {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
-- [ ] Identify initial technical debts and document as [mis-NEW] in the playbook.
+- [ ] Review existing codebase in assigned modules: {initial_modules}
+- [ ] Identify initial technical debts and document as [mis-NEW] in playbook.
 - [ ] Propose first strategy improvement as [str-NEW].
 
 ## 4. Handover & Verification
@@ -579,11 +701,11 @@ class ACEService:
 - **Date**: {datetime.now().isoformat()}
 
 ## 1. Strategy Alignment
-- [ ] Does the PR follow the strategies defined in the reviewer's playbook?
+- [ ] Does PR follow strategies defined in reviewer's playbook?
 - [ ] Does the PR adhere to global rules in `_global.mdc`?
 
 ## 2. Decision Verification
-- [ ] Does the PR conflict with any recent ADRs in `.ace/decisions/`?
+- [ ] Does PR conflict with any recent ADRs in `.ace/decisions/`?
 
 ## 3. Learning Extraction
 - [ ] Identify any new successful patterns: [str-NEW]
@@ -602,19 +724,27 @@ class ACEService:
     def ui_mockup(self, description: str, agent_id: str):
         """Generate a UI mockup using Google Stitch (simulated)."""
         # In a real scenario, this would call Google Stitch API
-        # We simulate this by creating a prompt for the agent to design the UI
+        # We simulate this by creating a prompt for the agent
         mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
-        
+
         mockup_dir = self.ace_dir / "ui_mockups"
         mockup_dir.mkdir(parents=True, exist_ok=True)
         mockup_file = mockup_dir / f"{mockup_id}.md"
-        
-        # Use cursor-agent to generate the "mockup" (which is actually code/design)
-        prompt = f"Design a UI mockup for: {description}. Output the design as a markdown file with Tailwind CSS code."
-        agent_cmd = f"cursor-agent --print --model gemini-3-flash --force --trust \"{prompt}\""
-        result = subprocess.run(agent_cmd, shell=True, capture_output=True, text=True)
-        
+
+        # Use cursor-agent to generate the "mockup"
+        prompt = (
+            f"Design a UI mockup for: {description}. "
+            "Output the design as a markdown file with Tailwind CSS code."
+        )
+        agent_cmd = (
+            "cursor-agent --print --model gemini-3-flash --force --trust "
+            f"\"{prompt}\""
+        )
+        result = subprocess.run(
+            agent_cmd, shell=True, capture_output=True, text=True
+        )
+
         content = f"""# UI Mockup: {description}
 - **Agent**: {agent_id}
 - **URL**: {mockup_url}
@@ -635,21 +765,26 @@ class ACEService:
         # Extract mockup_id from URL
         mockup_id = url.split("/")[-1]
         mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
-        
+
         if not mockup_file.exists():
             return f"// Error: Mockup {mockup_id} not found."
 
         content = mockup_file.read_text()
         # Extract code block from the mockup file
-        code_match = re.search(r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```", content, re.DOTALL)
+        code_match = re.search(
+            r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
+            content, re.DOTALL
+        )
         if code_match:
             return code_match.group(1)
-        
+
         return f"// Error: No code found in mockup {mockup_id}."
 
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
-        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        agent = next(
+            (a for a in agents_config.agents if a.id == agent_id), None
+        )
         if not agent:
             return 0
         return self.prune_memory(agent, threshold)
@@ -660,7 +795,10 @@ class ACEService:
             return 0
 
         content = playbook_path.read_text()
-        pattern = r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s*::\s*(.*?) -->"
+        pattern = (
+            r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)"
+            r"\s*::\s*(.*?) -->"
+        )
 
         pruned_count = 0
 

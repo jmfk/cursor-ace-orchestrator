@@ -59,7 +59,13 @@ def test_agent_registry(temp_ace_dir):
     runner = CliRunner()
 
     # Create agent
-    result = runner.invoke(app, ["agent", "create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    result = runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Test", "--role", "tester",
+            "--id", "test-01"
+        ]
+    )
     assert result.exit_code == 0
     assert "Created agent Test" in result.stdout
 
@@ -69,7 +75,13 @@ def test_agent_registry(temp_ace_dir):
     assert "tester" in result.stdout
 
     # Duplicate ID
-    result = runner.invoke(app, ["agent", "create", "--name", "Test2", "--role", "tester", "--id", "test-01"])
+    result = runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Test2", "--role", "tester",
+            "--id", "test-01"
+        ]
+    )
     assert result.exit_code == 1
     assert "Error: Agent with ID test-01 already exists." in result.stdout
 
@@ -107,7 +119,10 @@ def test_build_context(temp_ace_dir):
     global_rules.write_text("Global rules content")
 
     # Setup agent and playbook
-    runner.invoke(app, ["agent", "create", "--name", "Auth", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(
+        app,
+        ["agent", "create", "--name", "Auth", "--role", "auth", "--id", "auth-01"]
+    )
     playbook = rules_dir / "auth.mdc"
     playbook.write_text("Auth playbook content")
 
@@ -115,14 +130,23 @@ def test_build_context(temp_ace_dir):
     runner.invoke(app, ["own", "src/auth", "auth-01"])
 
     # Build context
-    result = runner.invoke(app, ["build-context", "--path", "src/auth/login.ts", "--task-type", "implement"])
+    result = runner.invoke(
+        app,
+        [
+            "build-context", "--path", "src/auth/login.ts",
+            "--task-type", "implement"
+        ]
+    )
     assert result.exit_code == 0
     assert "GLOBAL RULES" in result.stdout
     assert "Global rules content" in result.stdout
     assert "AGENT PLAYBOOK (auth)" in result.stdout
     assert "Auth playbook content" in result.stdout
     assert "TASK FRAMING" in result.stdout
-    assert "You are implementing new functionality in src/auth/login.ts" in result.stdout
+    assert (
+        "You are implementing new functionality in src/auth/login.ts"
+        in result.stdout
+    )
 
 
 def test_run_session_logging(temp_ace_dir):
@@ -296,7 +320,13 @@ def test_memory_prune(temp_ace_dir):
     runner = CliRunner()
 
     # Setup agent and playbook with harmful strategy
-    runner.invoke(app, ["agent", "create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Test", "--role", "tester",
+            "--id", "test-01"
+        ]
+    )
     playbook_path = Path(".cursor/rules/tester.mdc")
     playbook_path.parent.mkdir(parents=True, exist_ok=True)
     playbook_path.write_text("""
@@ -306,7 +336,9 @@ def test_memory_prune(temp_ace_dir):
 """)
 
     # Prune
-    result = runner.invoke(app, ["memory-prune", "--agent", "test-01", "--threshold", "0"])
+    result = runner.invoke(
+        app, ["memory-prune", "--agent", "test-01", "--threshold", "0"]
+    )
     assert result.exit_code == 0
     assert "Pruning memory for agent: test-01" in result.stdout
 
@@ -324,7 +356,13 @@ def test_memory_sync(temp_ace_dir):
     runner = CliRunner()
 
     # Setup agents and decisions
-    runner.invoke(app, ["agent", "create", "--name", "Auth Agent", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Auth Agent", "--role", "auth",
+            "--id", "auth-01"
+        ]
+    )
     runner.invoke(
         app,
         [
@@ -363,12 +401,28 @@ def test_mail_system(temp_ace_dir):
     runner = CliRunner()
 
     # Create agents
-    runner.invoke(app, ["agent", "create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
-    runner.invoke(app, ["agent", "create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Agent A", "--role", "role-a",
+            "--id", "agent-a"
+        ]
+    )
+    runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Agent B", "--role", "role-b",
+            "--id", "agent-b"
+        ]
+    )
 
     # Send mail
     result = runner.invoke(
-        app, ["mail-send", "--to", "agent-b", "--from", "agent-a", "--subject", "Hello", "--body", "How are you?"]
+        app,
+        [
+            "mail-send", "--to", "agent-b", "--from", "agent-a",
+            "--subject", "Hello", "--body", "How are you?"
+        ]
     )
     assert result.exit_code == 0
     assert "Message sent from agent-a to agent-b" in result.stdout
@@ -388,6 +442,9 @@ def test_mail_system(temp_ace_dir):
         result = runner.invoke(app, ["mail-read", "agent-b", msg_id])
         assert result.exit_code == 0
         assert "How are you?" in result.stdout
+    else:
+        # Fallback for different ID format
+        pass
 
 
 def test_debate(temp_ace_dir):
@@ -398,17 +455,36 @@ def test_debate(temp_ace_dir):
     runner = CliRunner()
 
     # Create agents
-    runner.invoke(app, ["agent", "create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
-    runner.invoke(app, ["agent", "create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Agent A", "--role", "role-a",
+            "--id", "agent-a"
+        ]
+    )
+    runner.invoke(
+        app,
+        [
+            "agent", "create", "--name", "Agent B", "--role", "role-b",
+            "--id", "agent-b"
+        ]
+    )
 
     # Initiate debate
-    result = runner.invoke(app, ["debate", "--proposal", "Use Python", "--agent", "agent-a", "--agent", "agent-b"])
+    result = runner.invoke(
+        app,
+        [
+            "debate", "--proposal", "Use Python", "--agent", "agent-a",
+            "--agent", "agent-b"
+        ]
+    )
     assert result.exit_code == 0
     assert "Proposal sent to participants: agent-a, agent-b" in result.stdout
 
     # Verify mail in agent-a's inbox
     result = runner.invoke(app, ["mail-list", "agent-a"])
     assert "DEBATE PROPOSAL" in result.stdout
+    # End of test_debate
 
 
 def test_ui_mockup(temp_ace_dir):
@@ -418,9 +494,12 @@ def test_ui_mockup(temp_ace_dir):
 
     runner = CliRunner()
 
-    result = runner.invoke(app, ["ui", "mockup", "Admin Dashboard", "--agent", "ui-agent"])
+    result = runner.invoke(
+        app, ["ui", "mockup", "Admin Dashboard", "--agent", "ui-agent"]
+    )
     assert result.exit_code == 0
     assert "Generating UI mockup for: Admin Dashboard" in result.stdout
+    # End of test_ui_mockup
 
 
 def test_ui_sync(temp_ace_dir):
@@ -434,3 +513,4 @@ def test_ui_sync(temp_ace_dir):
     result = runner.invoke(app, ["ui", "sync", url])
     assert result.exit_code == 0
     assert f"Syncing UI code from: {url}" in result.stdout
+    # End of test_ui_sync

@@ -13,7 +13,9 @@ def test_ui_mockup_command(tmp_path, monkeypatch):
 
     # Mock load_agents to return a test agent
     test_agent = Agent(
-        id="ui-agent-01", name="Vogue", role="ui-agent", email="vogue@ace.local", memory_file=".cursor/rules/ui.mdc"
+        id="ui-agent-01", name="Vogue", role="ui-agent",
+        email="vogue@ace.local", memory_file=".cursor/rules/ui.mdc",
+        status="active"
     )
 
     def mock_load_agents():

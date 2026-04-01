@@ -29,7 +29,9 @@ class Decision(BaseModel):
     context: str
     decision: str
     consequences: str
-    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    created_at: str = Field(
+        default_factory=lambda: datetime.now().strftime("%Y-%m-%d")
+    )
     agent_id: Optional[str] = None
 
 
@@ -39,7 +41,9 @@ class Agent(BaseModel):
     role: str
     email: str
     created_by: str = "user"
-    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    created_at: str = Field(
+        default_factory=lambda: datetime.now().strftime("%Y-%m-%d")
+    )
     responsibilities: List[str] = Field(default_factory=list)
     memory_file: str
     status: str = "active"
@@ -52,8 +56,12 @@ class AgentsConfig(BaseModel):
 
 class OwnershipModule(BaseModel):
     agent_id: str
-    owned_since: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
-    last_active: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    owned_since: str = Field(
+        default_factory=lambda: datetime.now().strftime("%Y-%m-%d")
+    )
+    last_active: str = Field(
+        default_factory=lambda: datetime.now().strftime("%Y-%m-%d")
+    )
 
 
 class OwnershipConfig(BaseModel):
