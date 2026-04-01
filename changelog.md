@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 47
+
+### Added
+- **Phase 7: Future Directions**
+  - Living Specs Sync: Implemented `ace spec sync` to ensure `intent.md` and `verification.md` stay aligned with the actual implementation.
+  - Updated `plan.md` to mark task 7.10 as completed and kept the list sorted.
+
 ## [2026-04-01] - RALPH Loop Iteration 46
 
 ### Added

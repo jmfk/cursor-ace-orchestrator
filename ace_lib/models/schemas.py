@@ -103,6 +103,17 @@ class TokenUsage(BaseModel):
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class Subscription(BaseModel):
+    agent_id: str
+    path: str
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class SubscriptionsConfig(BaseModel):
+    version: str = "1"
+    subscriptions: List[Subscription] = Field(default_factory=list)
+
+
 class MailMessage(BaseModel):
     id: str
     from_agent: str = Field(..., alias="from")

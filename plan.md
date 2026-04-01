@@ -59,5 +59,5 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **7.7 Shared "Coffee Break" Context**: Implement a shared `.ace/shared-learnings.mdc` for cross-pollination of general architectural patterns.
 - [x] **7.8 Token Consumption Modes (L/M/H)**: Refine the impact of Token Modes on debate depth and context composition.
 - [x] **7.9 Google Stitch Visual Verification**: Implement E2E tests (Playwright) to validate that implemented code matches Stitch mockups.
-- [ ] **7.10 Living Specs Sync**: Implement `ace spec sync` to ensure `intent.md` and `verification.md` stay aligned with the actual implementation.
+- [x] **7.10 Living Specs Sync**: Implement `ace spec sync` to ensure `intent.md` and `verification.md` stay aligned with the actual implementation.
 - [ ] **7.11 Agent Subscriptions**: Implement `ace subscribe` for agents to get notified via Agent Mail when specific modules or dependencies change.

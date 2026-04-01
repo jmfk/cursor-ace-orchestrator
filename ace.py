@@ -1140,5 +1140,23 @@ def spec_update(
     console.print(f"Updated Living Spec: [green]{spec.id}[/green]")
 
 
+@app.command()
+def subscribe(
+    agent_id: str = typer.Argument(..., help="Agent ID to subscribe"),
+    path: str = typer.Argument(..., help="Path or module to subscribe to"),
+):
+    """Subscribe an agent to changes in a specific module or path."""
+    svc = get_service()
+    success = svc.subscribe(agent_id, path)
+    if success:
+        console.print(
+            f"Agent [green]{agent_id}[/green] subscribed to [blue]{path}[/blue]"
+        )
+    else:
+        console.print(
+            f"Agent [green]{agent_id}[/green] is already subscribed to [blue]{path}[/blue]"
+        )
+
+
 if __name__ == "__main__":
     app()

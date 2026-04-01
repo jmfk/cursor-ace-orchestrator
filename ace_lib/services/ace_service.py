@@ -23,6 +23,8 @@ from ace_lib.models.schemas import (
     LivingSpec,
     CrossProjectLearning,
     TokenUsage,
+    Subscription,
+    SubscriptionsConfig,
 )
 
 yaml = YAML()
@@ -977,6 +979,9 @@ class ACEService:
 
             if test_passed:
                 print("[RALPH] ✅ Verification successful!")
+                # Notify subscribers of the change
+                if path:
+                    self.notify_subscribers(path, f"RALPH Loop successful for: {prompt}")
                 success = True
                 break
 
@@ -1585,6 +1590,51 @@ class ACEService:
             self.update_playbook(playbook_path, updates)
         
         return len(updates)
+
+    # --- Subscriptions ---
+
+    @profiler.profile
+    def load_subscriptions(self) -> SubscriptionsConfig:
+        return self._get_cached("subscriptions", self._load_subscriptions_uncached)
+
+    def _load_subscriptions_uncached(self) -> SubscriptionsConfig:
+        sub_file = self.ace_dir / "subscriptions.yaml"
+        if not sub_file.exists():
+            return SubscriptionsConfig()
+        with open(sub_file, "r") as f:
+            data = yaml.load(f)
+            return SubscriptionsConfig(**data) if data else SubscriptionsConfig()
+
+    def save_subscriptions(self, config: SubscriptionsConfig):
+        self._cache["subscriptions"] = config
+        self.ace_dir.mkdir(parents=True, exist_ok=True)
+        sub_file = self.ace_dir / "subscriptions.yaml"
+        with open(sub_file, "w") as f:
+            yaml.dump(config.model_dump(), f)
+
+    def subscribe(self, agent_id: str, path: str):
+        config = self.load_subscriptions()
+        # Avoid duplicates
+        if any(s.agent_id == agent_id and s.path == path for s in config.subscriptions):
+            return False
+        config.subscriptions.append(Subscription(agent_id=agent_id, path=path))
+        self.save_subscriptions(config)
+        return True
+
+    def notify_subscribers(self, changed_path: str, change_description: str):
+        config = self.load_subscriptions()
+        for sub in config.subscriptions:
+            if changed_path.startswith(sub.path):
+                self.send_mail(
+                    to_agent=sub.agent_id,
+                    from_agent="orchestrator",
+                    subject=f"SUBSCRIPTION NOTIFICATION: {changed_path}",
+                    body=(
+                        f"A module you are subscribed to has changed.\n\n"
+                        f"Path: {changed_path}\n"
+                        f"Change: {change_description}"
+                    )
+                )
 
     # --- Token Monitoring ---
 

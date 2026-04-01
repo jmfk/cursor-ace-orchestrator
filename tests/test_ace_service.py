@@ -459,3 +459,31 @@ def test_token_monitoring(service):
     
     report_empty = service.get_token_report(agent_id="non-existent")
     assert len(report_empty) == 0
+
+
+def test_agent_subscriptions(service):
+    """Test agent subscriptions and notifications."""
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    service.create_agent(id="dev-2", name="Dev 2", role="developer")
+
+    # dev-2 subscribes to changes in src/core
+    success = service.subscribe("dev-2", "src/core")
+    assert success is True
+
+    # Duplicate subscription should fail
+    success = service.subscribe("dev-2", "src/core")
+    assert success is False
+
+    # Notify subscribers about a change in src/core/main.py
+    service.notify_subscribers("src/core/main.py", "Updated main logic")
+
+    # dev-2 should have a mail message
+    messages = service.list_mail("dev-2")
+    assert len(messages) == 1
+    assert "SUBSCRIPTION NOTIFICATION: src/core/main.py" in messages[0].subject
+    assert "Updated main logic" in messages[0].body
+
+    # Change in src/other should not notify dev-2
+    service.notify_subscribers("src/other/utils.py", "Updated utils")
+    messages = service.list_mail("dev-2")
+    assert len(messages) == 1  # Still 1
