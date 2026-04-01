@@ -33,6 +33,9 @@ class ACEService:
         self.mail_dir = self.ace_dir / "mail"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
 
+        # Reset any cached data if needed
+        # (Though Pydantic models are usually fresh)
+
     # --- Config Management ---
 
     def load_config(self) -> Config:
@@ -110,8 +113,12 @@ class ACEService:
 
         memory_file = f".cursor/rules/{role}.mdc"
         new_agent = Agent(
-            id=id, name=name, role=role, email=email,
-            memory_file=memory_file, status="active"
+            id=id,
+            name=name,
+            role=role,
+            email=email,
+            memory_file=memory_file,
+            status="active",
         )
         config.agents.append(new_agent)
         self.save_agents(config)
@@ -150,9 +157,10 @@ class ACEService:
         return framing.get(task_type, "")
 
     def build_context(
-        self, path: Optional[str] = None,
+        self,
+        path: Optional[str] = None,
         task_type: TaskType = TaskType.IMPLEMENT,
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
     ) -> Tuple[str, Optional[str]]:
         context_parts = []
 
@@ -172,7 +180,7 @@ class ACEService:
             agents_config = self.load_agents()
             agent = next(
                 (a for a in agents_config.agents if a.id == resolved_agent_id),
-                None
+                None,
             )
             if agent:
                 playbook_path = self.base_path / agent.memory_file
@@ -189,7 +197,8 @@ class ACEService:
         if self.decisions_dir.exists():
             decisions = sorted(
                 list(self.decisions_dir.glob("*.md")),
-                key=lambda x: x.stat().st_mtime, reverse=True
+                key=lambda x: x.stat().st_mtime,
+                reverse=True,
             )[:3]
             if decisions:
                 context_parts.append("### RECENT DECISIONS")
@@ -201,17 +210,22 @@ class ACEService:
         if self.sessions_dir.exists():
             session_files = sorted(
                 list(self.sessions_dir.glob("*.md")),
-                key=lambda x: x.stat().st_mtime, reverse=True
+                key=lambda x: x.stat().st_mtime,
+                reverse=True,
             )
             token_map = {
-                TokenMode.LOW: 1, TokenMode.MEDIUM: 3, TokenMode.HIGH: 5
+                TokenMode.LOW: 1,
+                TokenMode.MEDIUM: 3,
+                TokenMode.HIGH: 5,
             }
             num_sessions = token_map.get(config.token_mode, 1)
             recent_sessions = session_files[:num_sessions]
             if recent_sessions:
                 context_parts.append("### RECENT SESSIONS")
                 for s in recent_sessions:
-                    context_parts.append(f"#### Session: {s.name}\n{s.read_text()}")
+                    context_parts.append(
+                        f"#### Session: {s.name}\n{s.read_text()}"
+                    )
 
         # 5. Task framing
         module_name = path if path else "the project"
@@ -227,7 +241,8 @@ class ACEService:
             return []
         session_files = sorted(
             list(self.sessions_dir.glob("*.md")),
-            key=lambda x: x.stat().st_mtime, reverse=True
+            key=lambda x: x.stat().st_mtime,
+            reverse=True,
         )
         sessions = []
         for s in session_files:
@@ -235,16 +250,20 @@ class ACEService:
             # Extract basic metadata from markdown
             command_match = re.search(r"- \*\*Command\*\*: `(.*?)`", content)
             agent_match = re.search(r"- \*\*Agent ID\*\*: `(.*?)`", content)
-            sessions.append({
-                "id": s.stem.replace("session_", ""),
-                "command": (
-                    command_match.group(1) if command_match else "unknown"
-                ),
-                "agent_id": agent_match.group(1) if agent_match else "unknown",
-                "timestamp": datetime.fromtimestamp(
-                    s.stat().st_mtime
-                ).isoformat()
-            })
+            sessions.append(
+                {
+                    "id": s.stem.replace("session_", ""),
+                    "command": (
+                        command_match.group(1) if command_match else "unknown"
+                    ),
+                    "agent_id": (
+                        agent_match.group(1) if agent_match else "unknown"
+                    ),
+                    "timestamp": datetime.fromtimestamp(
+                        s.stat().st_mtime
+                    ).isoformat(),
+                }
+            )
         return sessions
 
     def get_session(self, session_id: str) -> Optional[str]:
@@ -285,13 +304,16 @@ class ACEService:
             message = client.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
             )
             if isinstance(message.content, list):
-                return "".join([
-                    block.text for block in message.content
-                    if hasattr(block, "text")
-                ])
+                return "".join(
+                    [
+                        block.text
+                        for block in message.content
+                        if hasattr(block, "text")
+                    ]
+                )
             return str(message.content)
         except Exception as e:
             return f"Error during reflection: {e}"
@@ -309,8 +331,12 @@ class ACEService:
                     {
                         "type": match.group(1),
                         "id": match.group(2),
-                        "helpful": int(match.group(3)) if match.group(3) else 0,
-                        "harmful": int(match.group(4)) if match.group(4) else 0,
+                        "helpful": (
+                            int(match.group(3)) if match.group(3) else 0
+                        ),
+                        "harmful": (
+                            int(match.group(4)) if match.group(4) else 0
+                        ),
                         "description": match.group(5).strip(),
                     }
                 )
@@ -370,9 +396,7 @@ class ACEService:
                     parts = content.split(header, 1)
                     content = parts[0] + header + "\n" + new_line + parts[1]
                 else:
-                    content = (
-                        content.rstrip() + f"\n\n{header}\n{new_line}\n"
-                    )
+                    content = content.rstrip() + f"\n\n{header}\n{new_line}\n"
 
         playbook_path.write_text(content)
         return True
@@ -402,26 +426,36 @@ class ACEService:
                 r"## Consequences\n(.*)", content, re.DOTALL
             )
 
-            decisions.append(Decision(
-                id=adr_path.stem,
-                title=title_match.group(1) if title_match else adr_path.name,
-                status=status_match.group(1) if status_match else "unknown",
-                created_at=(
-                    date_match.group(1) if date_match
-                    else datetime.now().isoformat()
-                ),
-                agent_id=agent_match.group(1) if agent_match else None,
-                context=(
-                    context_match.group(1).strip() if context_match else ""
-                ),
-                decision=(
-                    decision_match.group(1).strip() if decision_match else ""
-                ),
-                consequences=(
-                    consequences_match.group(1).strip()
-                    if consequences_match else ""
+            decisions.append(
+                Decision(
+                    id=adr_path.stem,
+                    title=(
+                        title_match.group(1) if title_match else adr_path.name
+                    ),
+                    status=(
+                        status_match.group(1) if status_match else "unknown"
+                    ),
+                    created_at=(
+                        date_match.group(1)
+                        if date_match
+                        else datetime.now().isoformat()
+                    ),
+                    agent_id=agent_match.group(1) if agent_match else None,
+                    context=(
+                        context_match.group(1).strip() if context_match else ""
+                    ),
+                    decision=(
+                        decision_match.group(1).strip()
+                        if decision_match
+                        else ""
+                    ),
+                    consequences=(
+                        consequences_match.group(1).strip()
+                        if consequences_match
+                        else ""
+                    ),
                 )
-            ))
+            )
         return decisions
 
     def add_decision(
@@ -439,7 +473,8 @@ class ACEService:
         if existing_adrs:
             nums = [
                 int(re.search(r"ADR-(\d+)", f.name).group(1))
-                for f in existing_adrs if re.search(r"ADR-(\d+)", f.name)
+                for f in existing_adrs
+                if re.search(r"ADR-(\d+)", f.name)
             ]
             if nums:
                 next_num = max(nums) + 1
@@ -505,72 +540,95 @@ class ACEService:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         msg_id = f"{timestamp}_{from_agent}"
         msg = MailMessage(
-            id=msg_id, **{"from": from_agent, "to": to_agent},
-            subject=subject, body=body
+            id=msg_id,
+            **{"from": from_agent, "to": to_agent},
+            subject=subject,
+            body=body,
         )
 
         with open(agent_mail_dir / f"{msg_id}.yaml", "w") as f:
             yaml.dump(msg.model_dump(by_alias=True), f)
         return msg
 
-    def debate(
-        self, proposal: str, agent_ids: List[str]
-    ) -> str:
+    def debate(self, proposal: str, agent_ids: List[str]) -> str:
         """Mediate a debate between multiple agents."""
+        # Send mail to participants about the debate
+        for aid in agent_ids:
+            self.send_mail(
+                to_agent=aid,
+                from_agent="orchestrator",
+                subject="DEBATE PROPOSAL",
+                body=(
+                    f"A debate has been initiated on the following "
+                    f"proposal: {proposal}"
+                ),
+            )
+
         client = self.get_anthropic_client()
-        
-        # 1. Gather agent perspectives (simulated by having agents "write" to mail)
+
+        # 1. Gather agent perspectives (simulated via mail)
         perspectives = []
         for aid in agent_ids:
             # In a real scenario, we'd wait for agents to respond to mail.
             # Here we simulate their input based on their roles.
             agents_config = self.load_agents()
-            agent = next((a for a in agents_config.agents if a.id == aid), None)
+            agent = next(
+                (a for a in agents_config.agents if a.id == aid), None
+            )
             role = agent.role if agent else "expert"
-            
+
             prompt = (
                 f"You are agent {aid} with role {role}. "
                 f"Review this proposal: {proposal}\n"
                 "Provide a concise critique or support based on your role. "
                 "Focus on architectural impact and project standards."
             )
-            
+
             # Simulate agent response using Claude
             try:
                 message = client.messages.create(
                     model="claude-3-5-sonnet-20241022",
                     max_tokens=512,
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
                 )
-                perspective = "".join([
-                    block.text for block in message.content
-                    if hasattr(block, "text")
-                ])
+                perspective = "".join(
+                    [
+                        block.text
+                        for block in message.content
+                        if hasattr(block, "text")
+                    ]
+                )
                 perspectives.append(f"Agent {aid} ({role}): {perspective}")
             except Exception as e:
-                perspectives.append(f"Agent {aid}: Error getting perspective: {e}")
+                perspectives.append(
+                    f"Agent {aid}: Error getting perspective: {e}"
+                )
 
         # 2. LLM-Referee logic
         referee_prompt = (
             "You are the ACE Orchestrator Referee. "
-            "You must mediate a debate between multiple agents and reach a consensus.\n\n"
+            "You must mediate a debate between multiple agents and reach "
+            "a consensus.\n\n"
             f"Original Proposal: {proposal}\n\n"
             "Agent Perspectives:\n" + "\n".join(perspectives) + "\n\n"
-            "Analyze the perspectives, identify common ground, and provide a final "
-            "recommendation or consensus decision. "
+            "Analyze the perspectives, identify common ground, and "
+            "provide a final recommendation or consensus decision. "
             "If no consensus is reached, explain why and suggest next steps."
         )
-        
+
         try:
             message = client.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=1024,
-                messages=[{"role": "user", "content": referee_prompt}]
+                messages=[{"role": "user", "content": referee_prompt}],
             )
-            consensus = "".join([
-                block.text for block in message.content
-                if hasattr(block, "text")
-            ])
+            consensus = "".join(
+                [
+                    block.text
+                    for block in message.content
+                    if hasattr(block, "text")
+                ]
+            )
             return consensus
         except Exception as e:
             return f"Error during debate mediation: {e}"
@@ -610,7 +668,7 @@ class ACEService:
 
             agent_cmd = (
                 "cursor-agent --print --model gemini-3-flash --force --trust "
-                f"--context-file {context_file} \"{prompt}\""
+                f'--context-file {context_file} "{prompt}"'
             )
 
             print("[RALPH] Running agent command...")
@@ -626,39 +684,28 @@ class ACEService:
 
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             session_file = (
-                self.sessions_dir /
-                f"session_loop_{session_id}_{iteration}.md"
+                self.sessions_dir
+                / f"session_loop_{session_id}_{iteration}.md"
             )
             self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
-            session_content = f"""# Session Loop {session_id} (Iteration {iteration})
-- **Prompt**: `{prompt}`
-- **Test Command**: `{test_cmd}`
-- **Agent ID**: `{resolved_agent_id}`
-- **Agent Exit Code**: {agent_proc.returncode}
-- **Test Exit Code**: {result.returncode}
-- **Timestamp**: {datetime.now().isoformat()}
-
-## Agent Output
-### Stdout
-```
-{agent_proc.stdout}
-```
-### Stderr
-```
-{agent_proc.stderr}
-```
-
-## Test Output
-### Stdout
-```
-{result.stdout}
-```
-### Stderr
-```
-{result.stderr}
-```
-"""
+            session_content = (
+                f"# Session Loop {session_id} (Iteration {iteration})\n"
+                f"- **Prompt**: `{prompt}`\n"
+                f"- **Test Command**: `{test_cmd}`\n"
+                f"- **Agent ID**: `{resolved_agent_id}`\n"
+                f"- **Agent Exit Code**: {agent_proc.returncode}\n"
+                f"- **Test Exit Code**: {result.returncode}\n"
+            )
+            session_content += (
+                f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+                f"## Agent Output\n"
+                f"### Stdout\n```\n{agent_proc.stdout}\n```\n"
+                f"### Stderr\n```\n{agent_proc.stderr}\n```\n\n"
+                f"## Test Output\n"
+                f"### Stdout\n```\n{result.stdout}\n```\n"
+                f"### Stderr\n```\n{result.stderr}\n```\n"
+            )
             session_file.write_text(session_content)
 
             if result.returncode == 0:
@@ -678,10 +725,11 @@ class ACEService:
                             agents_config = self.load_agents()
                             agent = next(
                                 (
-                                    a for a in agents_config.agents
+                                    a
+                                    for a in agents_config.agents
                                     if a.id == resolved_agent_id
                                 ),
-                                None
+                                None,
                             )
                             if agent:
                                 playbook_path = Path(agent.memory_file)
@@ -718,8 +766,9 @@ class ACEService:
 
         onboarding_file = self.ace_dir / f"onboarding_{agent_id}.md"
         responsibilities = (
-            ', '.join(agent.responsibilities)
-            if agent.responsibilities else 'None'
+            ", ".join(agent.responsibilities)
+            if agent.responsibilities
+            else "None"
         )
         content = f"""# SOP: Agent Onboarding - {agent.name} ({agent.id})
 - **Role**: {agent.role}
@@ -740,8 +789,9 @@ class ACEService:
 
         # 3. Initial Task
         initial_modules = (
-            ', '.join(agent.responsibilities)
-            if agent.responsibilities else 'None'
+            ", ".join(agent.responsibilities)
+            if agent.responsibilities
+            else "None"
         )
         content += f"""
 ## 3. Initial Task
@@ -764,54 +814,56 @@ class ACEService:
         if not agent:
             raise ValueError(f"Agent {agent_id} not found.")
 
-        audit_file = self.ace_dir / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
-        content = f"""# SOP: Agent Audit - {agent.name} ({agent.id})
-- **Auditor**: Orchestrator
-- **Date**: {datetime.now().isoformat()}
-
-## 1. Memory Health
-- [ ] Check `{agent.memory_file}` for structure and content.
-- [ ] Verify that strategies have helpful/harmful counters.
-- [ ] Identify stale or conflicting strategies.
-
-## 2. Decision Alignment
-- [ ] Review agent's recent contributions against `.ace/decisions/`.
-- [ ] Ensure agent is not repeating previously rejected patterns.
-
-## 3. Performance Review
-- [ ] Analyze session logs for success/failure ratio.
-- [ ] Identify recurring pitfalls [mis-XXX].
-
-## 4. Recommendations
-- [ ] **Action**: [KEEP/PRUNE/RE-ONBOARD]
-- [ ] **Notes**: 
-"""
+        audit_file = (
+            self.ace_dir
+            / f"audit_{agent_id}_{datetime.now().strftime('%Y%m%d')}.md"
+        )
+        content = (
+            f"# SOP: Agent Audit - {agent.name} ({agent.id})\n"
+            f"- **Auditor**: Orchestrator\n"
+            f"- **Date**: {datetime.now().isoformat()}\n\n"
+            f"## 1. Memory Health\n"
+            f"- [ ] Check `{agent.memory_file}` for structure and content.\n"
+            f"- [ ] Verify that strategies have helpful/harmful counters.\n"
+            f"- [ ] Identify stale or conflicting strategies.\n\n"
+            f"## 2. Decision Alignment\n"
+            f"- [ ] Review agent's recent contributions against "
+            f"`.ace/decisions/`.\n"
+            f"- [ ] Ensure agent is not repeating previously rejected "
+            f"patterns.\n\n"
+            f"## 3. Performance Review\n"
+            f"- [ ] Analyze session logs for success/failure ratio.\n"
+            f"- [ ] Identify recurring pitfalls [mis-XXX].\n\n"
+            f"## 4. Recommendations\n"
+            f"- [ ] **Action**: [KEEP/PRUNE/RE-ONBOARD]\n"
+            f"- [ ] **Notes**:\n"
+        )
         audit_file.write_text(content)
         return audit_file
 
     def review_pr(self, pr_id: str, agent_id: str):
         """Run PR review SOP for an agent."""
         review_file = self.ace_dir / f"review_{pr_id}_{agent_id}.md"
-        content = f"""# SOP: PR Review - {pr_id}
-- **Reviewer**: {agent_id}
-- **Date**: {datetime.now().isoformat()}
-
-## 1. Strategy Alignment
-- [ ] Does PR follow strategies defined in reviewer's playbook?
-- [ ] Does the PR adhere to global rules in `_global.mdc`?
-
-## 2. Decision Verification
-- [ ] Does PR conflict with any recent ADRs in `.ace/decisions/`?
-
-## 3. Learning Extraction
-- [ ] Identify any new successful patterns: [str-NEW]
-- [ ] Identify any new pitfalls or bugs: [mis-NEW]
-- [ ] Identify any architectural choices that should be ADRs: [dec-NEW]
-
-## 4. Conclusion
-- [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
-- [ ] **Comments**: 
-"""
+        content = (
+            f"# SOP: PR Review - {pr_id}\n"
+            f"- **Reviewer**: {agent_id}\n"
+            f"- **Date**: {datetime.now().isoformat()}\n\n"
+            f"## 1. Strategy Alignment\n"
+            f"- [ ] Does PR follow strategies defined in reviewer's "
+            f"playbook?\n"
+            f"- [ ] Does the PR adhere to global rules in `_global.mdc`?\n\n"
+            f"## 2. Decision Verification\n"
+            f"- [ ] Does PR conflict with any recent ADRs in "
+            f"`.ace/decisions/`?\n\n"
+            f"## 3. Learning Extraction\n"
+            f"- [ ] Identify any new successful patterns: [str-NEW]\n"
+            f"- [ ] Identify any new pitfalls or bugs: [mis-NEW]\n"
+            f"- [ ] Identify any architectural choices that should be ADRs: "
+            f"[dec-NEW]\n\n"
+            f"## 4. Conclusion\n"
+            f"- [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]\n"
+            f"- [ ] **Comments**:\n"
+        )
         review_file.write_text(content)
         return review_file
 
@@ -834,14 +886,14 @@ class ACEService:
             "Output the design as a single TSX code block using Tailwind CSS. "
             "The output should be ONLY the code block."
         )
-        
+
         # In a real implementation, we might use a specialized Stitch API
         # For now, we use the agent to simulate the generation
         agent_cmd = (
             "cursor-agent --print --model gemini-3-flash --force --trust "
-            f"\"{prompt}\""
+            f'"{prompt}"'
         )
-        
+
         print(f"[STITCH] Generating mockup for: {description}")
         result = subprocess.run(
             agent_cmd, shell=True, capture_output=True, text=True
@@ -850,27 +902,22 @@ class ACEService:
         # Extract the code block to ensure we have clean UI code
         code_match = re.search(
             r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
-            result.stdout, re.DOTALL
+            result.stdout,
+            re.DOTALL,
         )
         ui_code = code_match.group(1) if code_match else result.stdout
 
-        content = f"""# UI Mockup: {description}
-- **Agent**: {agent_id}
-- **URL**: {mockup_url}
-- **Status**: Generated
-- **Timestamp**: {datetime.now().isoformat()}
-
-## Design & Code
-```tsx
-{ui_code}
-```
-
-## Raw Output
-{result.stdout}
-
-## Errors (if any)
-{result.stderr}
-"""
+        content = (
+            f"# UI Mockup: {description}\n"
+            f"- **Agent**: {agent_id}\n"
+            f"- **URL**: {mockup_url}\n"
+            f"- **Status**: Generated\n"
+            f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+            f"## Design & Code\n"
+            f"```tsx\n{ui_code}\n```\n\n"
+            f"## Raw Output\n{result.stdout}\n\n"
+            f"## Errors (if any)\n{result.stderr}\n"
+        )
         mockup_file.write_text(content)
         return mockup_url
 
@@ -887,7 +934,8 @@ class ACEService:
         # Extract code block from the mockup file
         code_match = re.search(
             r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
-            content, re.DOTALL
+            content,
+            re.DOTALL,
         )
         if code_match:
             return code_match.group(1)

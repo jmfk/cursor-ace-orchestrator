@@ -18,24 +18,33 @@ console = Console()
 service = ACEService()
 
 
+def get_service() -> ACEService:
+    return service
+
+
+def reset_service(base_path: Path):
+    global service
+    service = ACEService(base_path)
+
+
 def save_ownership(config: OwnershipConfig):
-    service.save_ownership(config)
+    get_service().save_ownership(config)
 
 
 def load_config():
-    return service.load_config()
+    return get_service().load_config()
 
 
 def load_agents():
-    return service.load_agents()
+    return get_service().load_agents()
 
 
 def parse_reflection_output(text: str):
-    return service.parse_reflection_output(text)
+    return get_service().parse_reflection_output(text)
 
 
 def update_playbook(playbook_path: Path, updates: List[Dict]):
-    return service.update_playbook(playbook_path, updates)
+    return get_service().update_playbook(playbook_path, updates)
 
 
 # --- CLI-to-API Bridge ---
@@ -46,7 +55,7 @@ def api_call(method: str, endpoint: str, **kwargs):
     """Make an API call, fallback to local service if API is unavailable."""
     try:
         url = f"{API_BASE_URL}{endpoint}"
-        response = requests.request(method, url, timeout=2, **kwargs)
+        response = requests.request(method, url, timeout=0.1, **kwargs)
         if response.status_code == 200:
             return response.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
@@ -60,31 +69,28 @@ def api_call(method: str, endpoint: str, **kwargs):
 @app.command()
 def init():
     """Initialize .ace/ and .ace-local/ directories."""
-    service.ace_dir.mkdir(parents=True, exist_ok=True)
-    service.ace_local_dir.mkdir(exist_ok=True)
+    svc = get_service()
+    svc.ace_dir.mkdir(parents=True, exist_ok=True)
+    svc.ace_local_dir.mkdir(exist_ok=True)
 
     for subdir in ["mail", "sessions", "decisions"]:
-        (service.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
+        (svc.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
         console.print(
-            f"Created directory: [green]{service.ace_dir / subdir}[/green]"
+            f"Created directory: [green]{svc.ace_dir / subdir}[/green]"
         )
 
-    console.print(
-        f"Created directory: [green]{service.ace_local_dir}[/green]"
-    )
+    console.print(f"Created directory: [green]{svc.ace_local_dir}[/green]")
 
     # Initialize files if they don't exist
-    if not (service.ace_dir / "agents.yaml").exists():
-        service.save_agents(service.load_agents())
-    if not (service.ace_dir / "config.yaml").exists():
-        service.save_config(service.load_config())
-    if not (service.ace_dir / "ownership.yaml").exists():
-        service.save_ownership(service.load_ownership())
+    if not (svc.ace_dir / "agents.yaml").exists():
+        svc.save_agents(svc.load_agents())
+    if not (svc.ace_dir / "config.yaml").exists():
+        svc.save_config(svc.load_config())
+    if not (svc.ace_dir / "ownership.yaml").exists():
+        svc.save_ownership(svc.load_ownership())
 
-    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    console.print(
-        f"Created directory: [green]{service.cursor_rules_dir}[/green]"
-    )
+    svc.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    console.print(f"Created directory: [green]{svc.cursor_rules_dir}[/green]")
     console.print(
         "[bold green]ACE Orchestrator initialized successfully![/bold green]"
     )
@@ -97,7 +103,7 @@ def own(path: str, agent: str):
         "POST", "/ownership", json={"path": path, "agent_id": agent}
     )
     if not res:
-        service.assign_ownership(path, agent)
+        get_service().assign_ownership(path, agent)
     console.print(
         f"Assigned [blue]{path}[/blue] to agent [green]{agent}[/green]"
     )
@@ -107,14 +113,16 @@ def own(path: str, agent: str):
 def who(path: str):
     """Find out who owns a path (longest prefix match)."""
     # Fallback to local for read-only if API fails
-    owner = service.resolve_owner(path)
+    owner = get_service().resolve_owner(path)
     if owner:
         console.print(
-            f"Path [blue]{path}[/blue] is owned by agent [green]{owner}[/green]"
+            f"Path [blue]{path}[/blue] is owned by "
+            f"agent [green]{owner}[/green]"
         )
     else:
         console.print(
-            f"Path [blue]{path}[/blue] is currently [yellow]unowned[/yellow]"
+            f"Path [blue]{path}[/blue] is currently "
+            f"[yellow]unowned[/yellow]"
         )
 
 
@@ -122,7 +130,7 @@ def who(path: str):
 def list_owners():
     """List all ownership assignments."""
     res = api_call("GET", "/ownership")
-    config = OwnershipConfig(**res) if res else service.load_ownership()
+    config = OwnershipConfig(**res) if res else get_service().load_ownership()
     if not config.modules:
         console.print("No ownership assignments found.")
         return
@@ -146,12 +154,15 @@ def agent_create(
     name: str = typer.Option(..., "--name", "-n", help="Agent name"),
     role: str = typer.Option(..., "--role", "-r", help="Agent role"),
     id: str = typer.Option(..., "--id", "-i", help="Agent unique ID"),
-    email: Optional[str] = typer.Option(None, "--email", "-e", help="Agent email"),
+    email: Optional[str] = typer.Option(
+        None, "--email", "-e", help="Agent email"
+    ),
 ):
     """Create a new agent in the registry."""
     res = api_call(
-        "POST", "/agents",
-        json={"id": id, "name": name, "role": role, "email": email}
+        "POST",
+        "/agents",
+        json={"id": id, "name": name, "role": role, "email": email},
     )
     if res:
         console.print(
@@ -159,7 +170,7 @@ def agent_create(
         )
     else:
         try:
-            agent = service.create_agent(id, name, role, email)
+            agent = get_service().create_agent(id, name, role, email)
             console.print(
                 f"Created agent [green]{agent.name}[/green] (ID: {agent.id})"
             )
@@ -172,7 +183,7 @@ def agent_create(
 def agent_list():
     """List all agents in the registry."""
     res = api_call("GET", "/agents")
-    agents = res if res else service.load_agents().agents
+    agents = res if res else get_service().load_agents().agents
     if not agents:
         console.print("No agents found.")
         return
@@ -199,7 +210,7 @@ def agent_onboard(
 ):
     """Run onboarding SOP for an agent."""
     try:
-        onboarding_file = service.onboard_agent(agent_id)
+        onboarding_file = get_service().onboard_agent(agent_id)
         console.print(
             f"Onboarding SOP started. File created: "
             f"[green]{onboarding_file}[/green]"
@@ -216,21 +227,20 @@ def agent_review(
     ),
 ):
     """Run PR review SOP for an agent."""
-    review_file = service.review_pr(pr_id, agent_id)
+    review_file = get_service().review_pr(pr_id, agent_id)
     console.print(
         f"PR Review SOP started. File created: [green]{review_file}[/green]"
     )
 
 
 @agent_app.command("audit")
-def agent_audit(
-    agent_id: str = typer.Argument(..., help="Agent ID to audit")
-):
+def agent_audit(agent_id: str = typer.Argument(..., help="Agent ID to audit")):
     """Run audit SOP for an agent."""
     try:
-        audit_file = service.audit_agent(agent_id)
+        audit_file = get_service().audit_agent(agent_id)
         console.print(
-            f"Agent Audit SOP started. File created: [green]{audit_file}[/green]"
+            f"Agent Audit SOP started. File created: "
+            f"[green]{audit_file}[/green]"
         )
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -243,9 +253,10 @@ def config_tokens(
     )
 ):
     """Set token consumption mode (low/medium/high)."""
-    config = service.load_config()
+    svc = get_service()
+    config = svc.load_config()
     config.token_mode = mode
-    service.save_config(config)
+    svc.save_config(config)
     console.print(f"Token mode set to [bold blue]{mode.value}[/bold blue]")
 
 
@@ -263,15 +274,18 @@ def build_context(
 ):
     """Compose the context slice for an agent call."""
     res = api_call(
-        "GET", "/context",
+        "GET",
+        "/context",
         params={
-            "path": path, "task_type": task_type.value, "agent_id": agent_id
-        }
+            "path": path,
+            "task_type": task_type.value,
+            "agent_id": agent_id,
+        },
     )
     if res:
         context, resolved_agent_id = res["context"], res["agent_id"]
     else:
-        context, resolved_agent_id = service.build_context(
+        context, resolved_agent_id = get_service().build_context(
             path, task_type, agent_id
         )
     console.print(context)
@@ -292,9 +306,8 @@ def run(
     ),
 ):
     """Execute an agent command with ACE context."""
-    context, resolved_agent_id = service.build_context(
-        path, task_type, agent_id
-    )
+    svc = get_service()
+    context, resolved_agent_id = svc.build_context(path, task_type, agent_id)
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False
@@ -328,7 +341,7 @@ def run(
         full_output = str(e)
 
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_file = service.sessions_dir / f"session_{session_id}.md"
+    session_file = svc.sessions_dir / f"session_{session_id}.md"
     session_content = f"""# Session {session_id}
 - **Command**: `{command}`
 - **Path**: `{path}`
@@ -352,13 +365,17 @@ def run(
         if os.getenv("ANTHROPIC_API_KEY"):
             _perform_reflection(session_file)
         else:
-            console.print("[yellow]Skipping reflection: ANTHROPIC_API_KEY not set.[/yellow]")
+            console.print(
+                "[yellow]Skipping reflection: "
+                "ANTHROPIC_API_KEY not set.[/yellow]"
+            )
 
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
 
 def _perform_reflection(session_file: Path):
+    svc = get_service()
     session_content = session_file.read_text()
     output_match = re.search(
         r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL
@@ -369,29 +386,30 @@ def _perform_reflection(session_file: Path):
         )
         return
 
-    reflection_text = service.reflect_on_session(output_match.group(1))
+    reflection_text = svc.reflect_on_session(output_match.group(1))
     console.print("\n[bold]Reflection Output:[/bold]")
     console.print(reflection_text)
 
-    updates = service.parse_reflection_output(reflection_text)
+    updates = svc.parse_reflection_output(reflection_text)
     if updates:
         agent_id_match = re.search(
             r"- \*\*Agent ID\*\*: `(.*?)`", session_content
         )
-        playbook_path = service.cursor_rules_dir / "_global.mdc"
+        playbook_path = svc.cursor_rules_dir / "_global.mdc"
         if agent_id_match and agent_id_match.group(1) != "None":
-            agents_config = service.load_agents()
+            agents_config = svc.load_agents()
             agent = next(
                 (
-                    a for a in agents_config.agents
+                    a
+                    for a in agents_config.agents
                     if a.id == agent_id_match.group(1)
                 ),
-                None
+                None,
             )
             if agent:
                 playbook_path = Path(agent.memory_file)
 
-        service.update_playbook(playbook_path, updates)
+        svc.update_playbook(playbook_path, updates)
     else:
         console.print("[yellow]No new learnings extracted.[/yellow]")
 
@@ -403,9 +421,10 @@ def reflect(
     )
 ):
     """Reflect on a session and extract learnings."""
+    svc = get_service()
     if not session_id:
         res = api_call("GET", "/sessions")
-        sessions = res if res else service.list_sessions()
+        sessions = res if res else svc.list_sessions()
         if not sessions:
             console.print("[red]No sessions found to reflect on.[/red]")
             return
@@ -420,7 +439,7 @@ def reflect(
         if not res["updates"]:
             console.print("[yellow]No new learnings extracted.[/yellow]")
     else:
-        session_file = service.sessions_dir / f"session_{session_id}.md"
+        session_file = svc.sessions_dir / f"session_{session_id}.md"
         if not session_file.exists():
             console.print(f"[red]Session {session_id} not found.[/red]")
             return
@@ -447,6 +466,7 @@ def decision_add(
     ),
 ):
     """Add a new Architectural Decision Record (ADR)."""
+    svc = get_service()
     res = api_call(
         "POST",
         "/decisions",
@@ -462,23 +482,24 @@ def decision_add(
     if res:
         console.print(
             f"Created ADR: "
-            f"[green]{service.decisions_dir / (res['id'] + '.md')}[/green]"
+            f"[green]{svc.decisions_dir / (res['id'] + '.md')}[/green]"
         )
     else:
-        adr = service.add_decision(
+        adr = svc.add_decision(
             title, context, decision, consequences, status, agent_id
         )
         console.print(
             f"Created ADR: "
-            f"[green]{service.decisions_dir / f'{adr.id}.md'}[/green]"
+            f"[green]{svc.decisions_dir / f'{adr.id}.md'}[/green]"
         )
 
 
 @app.command()
 def decision_list():
     """List all Architectural Decision Records."""
+    svc = get_service()
     res = api_call("GET", "/decisions")
-    adrs = res if res else service.list_decisions()
+    adrs = res if res else svc.list_decisions()
 
     if not adrs:
         console.print("No ADRs found.")
@@ -519,9 +540,11 @@ def memory_prune(
 ):
     """Archive or remove 'harmful' strategies."""
     res = api_call(
-        "POST", "/memory/prune",
-        params={"agent_id": agent_id, "threshold": threshold}
+        "POST",
+        "/memory/prune",
+        params={"agent_id": agent_id, "threshold": threshold},
     )
+    svc = get_service()
     if res:
         for aid, count in res.items():
             console.print(f"Pruning memory for agent: [blue]{aid}[/blue]")
@@ -532,17 +555,16 @@ def memory_prune(
                     "  [yellow]No items met the pruning threshold.[/yellow]"
                 )
     else:
-        agents_config = service.load_agents()
+        agents_config = svc.load_agents()
         agents = (
             [a for a in agents_config.agents if a.id == agent_id]
-            if agent_id else agents_config.agents
+            if agent_id
+            else agents_config.agents
         )
 
         for agent in agents:
-            console.print(
-                f"Pruning memory for agent: [blue]{agent.id}[/blue]"
-            )
-            pruned_count = service.prune_memory(agent, threshold)
+            console.print(f"Pruning memory for agent: [blue]{agent.id}[/blue]")
+            pruned_count = svc.prune_memory(agent, threshold)
             if pruned_count > 0:
                 console.print(
                     f"  [green]Done.[/green] Pruned {pruned_count} items."
@@ -556,7 +578,8 @@ def memory_prune(
 @app.command()
 def memory_sync():
     """Keep AGENTS.md in sync with the Agent Registry and recent Decisions."""
-    agents_config = service.load_agents()
+    svc = get_service()
+    agents_config = svc.load_agents()
     content = ["# ACE Agents Registry", "", "## Active Agents"]
     if not agents_config.agents:
         content.append("No agents registered.")
@@ -575,18 +598,27 @@ def memory_sync():
             content.append("")
 
     content.append("## Recent Architectural Decisions")
-    if not service.decisions_dir.exists():
+    if not svc.decisions_dir.exists():
         content.append("No decisions found.")
     else:
-        adrs = sorted(list(service.decisions_dir.glob("ADR-*.md")), reverse=True)[:5]
+        adrs = sorted(
+            list(svc.decisions_dir.glob("ADR-*.md")), reverse=True
+        )[:5]
         for adr_path in adrs:
             adr_content = adr_path.read_text()
             title_match = re.search(r"# (ADR-\d+: .*)", adr_content)
             status_match = re.search(r"- \*\*Status\*\*: (.*)", adr_content)
-            content.append(
-                f"- **{title_match.group(1) if title_match else adr_path.name}** "
-                f"[{status_match.group(1) if status_match else 'unknown'}]"
+            title = (
+                title_match.group(1)
+                if title_match
+                else adr_path.name
             )
+            status = (
+                status_match.group(1)
+                if status_match
+                else "unknown"
+            )
+            content.append(f"- **{title}** [{status}]")
 
     Path("AGENTS.md").write_text("\n".join(content))
     console.print("Updated [green]AGENTS.md[/green]")
@@ -595,7 +627,9 @@ def memory_sync():
 @app.command()
 def loop(
     prompt: str = typer.Argument(..., help="The prompt to solve"),
-    test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
+    test_cmd: str = typer.Option(
+        ..., "--test", "-t", help="Command to run tests"
+    ),
     max_iterations: int = typer.Option(
         10, "--max", "-m", help="Maximum number of iterations"
     ),
@@ -606,13 +640,16 @@ def loop(
         None, "--agent", "-a", help="Explicit agent ID"
     ),
 ):
-    """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat."""
+    """
+    Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
+    """
     console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
     console.print(f"Prompt: [italic]{prompt}[/italic]")
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
 
-    success, iterations = service.run_loop(
+    svc = get_service()
+    success, iterations = svc.run_loop(
         prompt, test_cmd, max_iterations, path, agent_id
     )
 
@@ -638,14 +675,17 @@ def mail_send(
 ):
     """Send a message to another agent."""
     res = api_call(
-        "POST", "/mail",
+        "POST",
+        "/mail",
         json={
-            "to_agent": to, "from_agent": sender,
-            "subject": subject, "body": body
-        }
+            "to_agent": to,
+            "from_agent": sender,
+            "subject": subject,
+            "body": body,
+        },
     )
     if not res:
-        service.send_mail(to, sender, subject, body)
+        get_service().send_mail(to, sender, subject, body)
     console.print(
         f"Message sent from [blue]{sender}[/blue] to [green]{to}[/green]"
     )
@@ -655,7 +695,8 @@ def mail_send(
 def mail_list(agent_id: str):
     """List messages in an agent's inbox."""
     res = api_call("GET", f"/mail/{agent_id}")
-    messages = res if res else service.list_mail(agent_id)
+    svc = get_service()
+    messages = res if res else svc.list_mail(agent_id)
 
     if not messages:
         console.print(f"No mail for agent [blue]{agent_id}[/blue]")
@@ -681,7 +722,8 @@ def mail_list(agent_id: str):
 def mail_read(agent_id: str, msg_id: str):
     """Read a specific message."""
     res = api_call("GET", f"/mail/{agent_id}/{msg_id}")
-    data = res if res else service.read_mail(agent_id, msg_id)
+    svc = get_service()
+    data = res if res else svc.read_mail(agent_id, msg_id)
 
     if not data:
         console.print(f"Message [red]{msg_id}[/red] not found.")
@@ -716,12 +758,15 @@ def debate(
     ),
 ):
     """Initiate and mediate a debate between multiple agents."""
-    console.print(f"🚀 [bold blue]Initiating debate on proposal:[/bold blue] {proposal}")
+    console.print(
+        f"🚀 [bold blue]Initiating debate on proposal:[/bold blue] {proposal}"
+    )
     console.print(f"Participants: {', '.join(agents)}")
-    
+
+    svc = get_service()
     with console.status("[bold green]Mediating debate..."):
-        consensus = service.debate(proposal, agents)
-    
+        consensus = svc.debate(proposal, agents)
+
     console.print("\n[bold]Consensus / Recommendation:[/bold]")
     console.print(consensus)
 
@@ -744,15 +789,17 @@ def ui_mockup(
         f"Generating UI mockup for: [bold]{description}[/bold] "
         f"using agent [green]{agent_id}[/green]"
     )
-    url = service.ui_mockup(description, agent_id)
+    url = get_service().ui_mockup(description, agent_id)
     console.print(f"Mockup generated at: [blue]{url}[/blue]")
 
 
 @ui_app.command("sync")
-def ui_sync(url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")):
+def ui_sync(
+    url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")
+):
     """Sync UI code from Google Stitch."""
     console.print(f"Syncing UI code from: [blue]{url}[/blue]")
-    code = service.ui_sync(url)
+    code = get_service().ui_sync(url)
     console.print(f"Code synced successfully:\n[dim]{code}[/dim]")
 
 
