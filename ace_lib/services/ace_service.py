@@ -1241,7 +1241,8 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] **Playbook**: Create/Verify `{agent.memory_file}` exists.
-- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
+- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns",
+      "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
 - [ ] **Audit**: Review existing codebase in assigned modules: {responsibilities}

@@ -237,11 +237,11 @@ def generate_commit_message(task_name: str):
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
             log_message("Falling back to iteration-based message.")
     except Exception as e:
-            CONSECUTIVE_FAILURES += 1
-            log_message(f"⚠️ Error calling Gemini API: {e}.")
-            if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
-                LLM_CIRCUIT_BREAKER_TRIPPED = True
-            log_message("Falling back to iteration-based message.")
+        CONSECUTIVE_FAILURES += 1
+        log_message(f"⚠️ Error calling Gemini API: {e}.")
+        if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
+            LLM_CIRCUIT_BREAKER_TRIPPED = True
+        log_message("Falling back to iteration-based message.")
 
     log_message("Using iteration-based commit message fallback.")
     return f"RALPH Loop: Task {task_name[:50]}"

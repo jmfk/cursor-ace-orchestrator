@@ -1241,7 +1241,9 @@ def ui_mockup(
     if res:
         url = res["url"]
     else:
-        url = get_service().ui_mockup(description, agent_id)
+        url = get_service().ui_mockup(
+            description, agent_id
+        )
     console.print(f"Mockup generated at: [blue]{url}[/blue]")
 
 

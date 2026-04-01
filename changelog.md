@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 67
+
+### Updated
+- **Phase 9: Future Directions**
+  - Marked task 9.8 (Future Task) as completed in `plan.md`.
+  - Re-sorted Phase 9 tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 66
 
 ### Updated
