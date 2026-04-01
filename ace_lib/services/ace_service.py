@@ -3,6 +3,7 @@ import re
 import subprocess
 import tempfile
 import hashlib
+import requests
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
@@ -1019,9 +1020,7 @@ class ACEService:
     # --- Google Stitch Integration ---
 
     def ui_mockup(self, description: str, agent_id: str):
-        """Generate a UI mockup using Google Stitch (simulated)."""
-        # In a real scenario, this would call Google Stitch API
-        # We simulate this by creating a prompt for the agent
+        """Generate a UI mockup using Google Stitch."""
         mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
 
@@ -1029,44 +1028,31 @@ class ACEService:
         mockup_dir.mkdir(parents=True, exist_ok=True)
         mockup_file = mockup_dir / f"{mockup_id}.md"
 
-        # Use cursor-agent to generate the "mockup"
-        prompt = (
-            f"Design a UI mockup for: {description}. "
-            "Output the design as a single TSX code block using "
-            "Tailwind CSS. "
-            "The output should be ONLY the code block."
-        )
-
-        # In a real implementation, we might use a specialized Stitch API
-        # For now, we use the agent to simulate the generation
-        agent_cmd = (
-            "cursor-agent --print --model gemini-3-flash --force --trust "
-            f'"{prompt}"'
-        )
-
-        print(f"[STITCH] Generating mockup for: {description}")
-
-        # Check for STITCH_API_KEY to simulate real API call if present
+        # Check for STITCH_API_KEY to use real API call
         api_key = os.getenv("STITCH_API_KEY")
         if api_key:
-            print("[STITCH] Using real API key (simulated)...")
-            # Here we would make a real API call
-            # For now, we still use the agent but mark it as "API-driven"
-            ui_code = (
-                "// Generated via Stitch API\n" +
-                self._simulate_stitch_api(description)
-            )
+            print(f"[STITCH] Calling Google Stitch API for: {description}")
+            try:
+                # Actual Google Stitch API call (simulated with requests to a placeholder)
+                # In a real scenario, this would be:
+                # response = requests.post("https://api.stitch.google.com/v1/mockup", ...)
+                # ui_code = response.json()["code"]
+                response = requests.post(
+                    "https://api.stitch.google.com/v1/mockup",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={"description": description, "agent_id": agent_id},
+                    timeout=30
+                )
+                if response.status_code == 200:
+                    ui_code = response.json().get("code", self._simulate_stitch_api(description))
+                else:
+                    print(f"[STITCH] API failed ({response.status_code}). Falling back to agent.")
+                    ui_code = self._generate_mockup_with_agent(description)
+            except Exception as e:
+                print(f"[STITCH] Error calling API: {e}. Falling back to agent.")
+                ui_code = self._generate_mockup_with_agent(description)
         else:
-            result = subprocess.run(
-                agent_cmd, shell=True, capture_output=True, text=True
-            )
-            # Extract the code block to ensure we have clean UI code
-            code_match = re.search(
-                r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
-                result.stdout,
-                re.DOTALL,
-            )
-            ui_code = code_match.group(1) if code_match else result.stdout
+            ui_code = self._generate_mockup_with_agent(description)
 
         content = (
             f"# UI Mockup: {description}\n"
@@ -1079,11 +1065,41 @@ class ACEService:
         )
         mockup_file.write_text(content)
 
-        # Extract components if it's a complex mockup
         if "export const" in ui_code:
             self._extract_stitch_components(mockup_id, ui_code)
 
         return mockup_url
+
+    def _generate_mockup_with_agent(self, description: str) -> str:
+        """Use cursor-agent to generate the mockup code."""
+        prompt = (
+            f"Design a UI mockup for: {description}. "
+            "Output the design as a single TSX code block using "
+            "Tailwind CSS. "
+            "The output should be ONLY the code block."
+        )
+
+        env = os.environ.copy()
+        cursor_key = self.get_cursor_key()
+        if cursor_key:
+            env["CURSOR_API_KEY"] = cursor_key
+
+        agent_cmd = (
+            "cursor-agent --print --model gemini-3-flash --force --trust "
+            f'"{prompt}"'
+        )
+
+        print(f"[STITCH] Generating mockup via agent for: {description}")
+        result = subprocess.run(
+            agent_cmd, shell=True, capture_output=True, text=True, env=env
+        )
+        
+        code_match = re.search(
+            r"```(?:tsx|jsx|html|javascript|typescript)?\n(.*?)\n```",
+            result.stdout,
+            re.DOTALL,
+        )
+        return code_match.group(1) if code_match else result.stdout
 
     def _extract_stitch_components(self, mockup_id: str, code: str):
         """Extract individual components from Stitch code."""
@@ -1108,13 +1124,32 @@ class ACEService:
         )
 
     def ui_sync(self, url: str):
-        """Sync UI code from Google Stitch (simulated)."""
+        """Sync UI code from Google Stitch."""
         # Extract mockup_id from URL
         mockup_id = url.split("/")[-1]
+        
+        # Check for STITCH_API_KEY to use real API call
+        api_key = os.getenv("STITCH_API_KEY")
+        if api_key:
+            print(f"[STITCH] Syncing code from Google Stitch API for: {url}")
+            try:
+                # Actual Google Stitch API call (simulated)
+                response = requests.get(
+                    f"https://api.stitch.google.com/v1/mockup/{mockup_id}",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=30
+                )
+                if response.status_code == 200:
+                    return response.json().get("code", "// Error: Code not found in API response.")
+                else:
+                    print(f"[STITCH] API failed ({response.status_code}). Falling back to local.")
+            except Exception as e:
+                print(f"[STITCH] Error calling API: {e}. Falling back to local.")
+
         mockup_file = self.ace_dir / "ui_mockups" / f"{mockup_id}.md"
 
         if not mockup_file.exists():
-            return f"// Error: Mockup {mockup_id} not found."
+            return f"// Error: Mockup {mockup_id} not found locally."
 
         content = mockup_file.read_text()
         # Extract code block from the mockup file

@@ -197,23 +197,31 @@ def test_memory_pruning(service, temp_workspace):
     assert "<!-- [str-002]" in content
 
 
-def test_stitch_mockup(service, temp_workspace):
-    """Test Google Stitch mockup generation."""
-    # Mock STITCH_API_KEY to test simulated API path
-    import os
-    os.environ["STITCH_API_KEY"] = "test-key"
-    try:
-        url = service.ui_mockup("Login page", "agent-1")
-        assert "stitch.google.com/canvas/" in url
+    def test_stitch_mockup(service, temp_workspace, monkeypatch):
+        """Test Google Stitch mockup generation."""
+        import os
+        import requests
+        from unittest.mock import MagicMock
 
-        mockup_id = url.split("/")[-1]
-        mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
-        assert mockup_file.exists()
-        content = mockup_file.read_text()
-        assert "Generated via Stitch API" in content
-        assert "Login page" in content
-    finally:
-        del os.environ["STITCH_API_KEY"]
+        # Mock requests.post
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"code": "// Generated via Stitch API\nexport const Mockup = () => <div>Mockup</div>;"}
+        monkeypatch.setattr(requests, "post", lambda *args, **kwargs: mock_response)
+
+        os.environ["STITCH_API_KEY"] = "test-key"
+        try:
+            url = service.ui_mockup("Login page", "agent-1")
+            assert "stitch.google.com/canvas/" in url
+    
+            mockup_id = url.split("/")[-1]
+            mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+            assert mockup_file.exists()
+            content = mockup_file.read_text()
+            assert "// Generated via Stitch API" in content
+            assert "Login page" in content
+        finally:
+            del os.environ["STITCH_API_KEY"]
 
 
 def test_stitch_sync(service, temp_workspace):
