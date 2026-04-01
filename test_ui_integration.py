@@ -68,3 +68,4 @@ def test_ui_sync_command(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "Syncing UI code from:" in result.stdout
     assert "123" in result.stdout
+    assert "Code synced successfully" in result.stdout
