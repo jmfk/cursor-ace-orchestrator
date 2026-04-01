@@ -577,7 +577,7 @@ def run(
     console.print(f"Context injected from: [dim]{context_file}[/dim]")
 
     try:
-        process = subprocess.Popen(
+        with subprocess.Popen(
             command,
             shell=True,
             stdout=subprocess.PIPE,
@@ -585,20 +585,22 @@ def run(
             text=True,
             bufsize=1,
             universal_newlines=True,
-        )
-        output_lines = []
-        for line in process.stdout:
-            console.print(line, end="")
-            output_lines.append(line)
-        process.wait()
-        exit_code = process.returncode
-        full_output = "".join(output_lines)
+        ) as process:
+            output_lines = []
+            if process.stdout:
+                for line in process.stdout:
+                    console.print(line, end="")
+                    output_lines.append(line)
+            process.wait()
+            exit_code = process.returncode
+            full_output = "".join(output_lines)
     except Exception as e:
         console.print(f"[red]Error executing command: {e}[/red]")
         exit_code = 1
         full_output = str(e)
 
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    svc.sessions_dir.mkdir(parents=True, exist_ok=True)
     session_file = svc.sessions_dir / f"session_{session_id}.md"
     session_content = f"""# Session {session_id}
 - **Command**: `{command}`
@@ -1086,6 +1088,9 @@ def ralph(
     Alias for 'ace loop'.
     """
     loop(prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, max_spend, model)
+
+
+@app.command()
 def mail_send(
     to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
     sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
@@ -1440,17 +1445,35 @@ def spec_update(
 def subscribe(
     agent_id: str = typer.Argument(..., help="Agent ID to subscribe"),
     path: str = typer.Argument(..., help="Path or module to subscribe to"),
+    priority: str = typer.Option("medium", "--priority", "-p", help="Notification priority (low/medium/high/urgent)"),
+    notify_on_success: bool = typer.Option(True, "--notify-on-success/--no-notify-on-success", help="Notify on success"),
+    notify_on_failure: bool = typer.Option(True, "--notify-on-failure/--no-notify-on-failure", help="Notify on failure"),
 ):
     """Subscribe an agent to changes in a specific module or path."""
-    svc = get_service()
-    success = svc.subscribe(agent_id, path)
+    res = api_call(
+        "POST",
+        "/subscriptions",
+        json={
+            "agent_id": agent_id,
+            "path": path,
+            "priority": priority,
+            "notify_on_success": notify_on_success,
+            "notify_on_failure": notify_on_failure
+        },
+    )
+    if not res:
+        svc = get_service()
+        success = svc.subscribe(agent_id, path, priority, notify_on_success, notify_on_failure)
+    else:
+        success = True
+
     if success:
         console.print(
-            f"Agent [green]{agent_id}[/green] subscribed to [blue]{path}[/blue]"
+            f"Agent [green]{agent_id}[/green] subscribed to [blue]{path}[/blue] with priority [bold]{priority}[/bold]"
         )
     else:
         console.print(
-            f"Agent [green]{agent_id}[/green] is already subscribed to [blue]{path}[/blue]"
+            f"Updated subscription for agent [green]{agent_id}[/green] on [blue]{path}[/blue]"
         )
 
 

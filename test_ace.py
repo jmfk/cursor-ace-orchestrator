@@ -608,3 +608,57 @@ def test_ui_sync(temp_ace_dir, monkeypatch):
     result = runner.invoke(app, ["ui", "sync", url])
     assert result.exit_code == 0
     assert f"Syncing UI code from: {url}" in result.stdout
+
+
+def test_subscriptions_granular(temp_ace_dir, monkeypatch):
+    """Test granular subscription options."""
+    import ace
+    svc = ACEService(temp_ace_dir)
+    monkeypatch.setattr(ace, "service", svc)
+    monkeypatch.setattr(ace, "get_service", lambda: svc)
+    monkeypatch.setattr(ace, "api_call", lambda *args, **kwargs: None)
+
+    from ace import app
+    from typer.testing import CliRunner
+
+    runner = CliRunner()
+
+    # Subscribe with granular options
+    result = runner.invoke(
+        app, 
+        [
+            "subscribe", "agent-a", "src/auth", 
+            "--priority", "high", 
+            "--no-notify-on-success"
+        ]
+    )
+    assert result.exit_code == 0
+    assert "priority high" in result.stdout
+
+    # Verify subscription
+    subs = svc.load_subscriptions()
+    assert len(subs.subscriptions) == 1
+    sub = subs.subscriptions[0]
+    assert sub.agent_id == "agent-a"
+    assert sub.path == "src/auth"
+    assert sub.priority == "high"
+    assert sub.notify_on_success is False
+    assert sub.notify_on_failure is True
+
+    # Test notification logic
+    # Mock send_mail to check if it's called
+    sent_mails = []
+    def mock_send_mail(to_agent, from_agent, subject, body):
+        sent_mails.append({"to": to_agent, "subject": subject})
+
+    monkeypatch.setattr(svc, "send_mail", mock_send_mail)
+
+    # Success notification (should be skipped due to notify_on_success=False)
+    svc.notify_subscribers("src/auth/login.ts", "Success", success=True)
+    assert len(sent_mails) == 0
+
+    # Failure notification (should be sent)
+    svc.notify_subscribers("src/auth/login.ts", "Failure", success=False)
+    assert len(sent_mails) == 1
+    assert sent_mails[0]["to"] == "agent-a"
+    assert "[HIGH] SUBSCRIPTION FAILURE" in sent_mails[0]["subject"]

@@ -141,10 +141,21 @@ class MACPProposal(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class NotificationPriority(str, Enum):
+    """Priority level for notifications."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
 class Subscription(BaseModel):
     """An agent's subscription to a path."""
     agent_id: str
     path: str
+    priority: NotificationPriority = NotificationPriority.MEDIUM
+    notify_on_success: bool = True
+    notify_on_failure: bool = True
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 

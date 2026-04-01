@@ -80,9 +80,12 @@ class SecurityAuditService:
     def _check_secrets(self, path: Path) -> Dict:
         """Scan for potential secrets in a directory."""
         findings = []
-        # Common secret patterns
+        # 1. Secret scanning (simple regex for now)
         patterns = {
-            "Generic API Key": r"(?:key|api|token|secret|password|auth)[-_]?(?:key|api|token|secret|password|auth)?\s*[:=]\s*['\"]([a-zA-Z0-9]{16,})['\"]",
+            "Generic API Key": (
+                r"(?:key|api|token|secret|password|auth)[-_]?(?:key|api|token|secret|password|auth)?\s*[:=]\s*"
+                r"['\"]([a-zA-Z0-9]{16,})['\"]"
+            ),
             "Slack Token": r"xox[baprs]-([a-zA-Z0-9]{10,48})",
             "AWS Access Key": r"AKIA[0-9A-Z]{16}",
         }
@@ -132,12 +135,12 @@ class SecurityAuditService:
                 "status": "failed" if total_vulnerabilities > 0 else "passed",
                 "details": vulnerabilities
             }
-        except Exception as e:
+        except Exception:
             return {
                 "name": "NPM Dependency Audit",
                 "path": str(path.relative_to(self.ace_service.base_path)),
                 "status": "warning",
-                "error": str(e)
+                "error": "NPM audit failed."
             }
 
     def _audit_pip(self, path: Path) -> Dict:
@@ -161,7 +164,7 @@ class SecurityAuditService:
                 "status": "failed" if data else "passed",
                 "details": data
             }
-        except Exception as e:
+        except Exception:
             return {
                 "name": "PIP Dependency Audit",
                 "path": str(path.relative_to(self.ace_service.base_path)),

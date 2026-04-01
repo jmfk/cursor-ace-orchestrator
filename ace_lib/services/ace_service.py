@@ -671,8 +671,8 @@ class ACEService:
                     ]
                 )
             return str(message.content)
-        except Exception as e:
-            return f"Error during reflection: {e}"
+        except Exception:
+            return f"Error during reflection."
 
     def parse_reflection_output(self, reflection_text: str) -> List[Dict]:
         updates = []
@@ -1208,6 +1208,10 @@ class ACEService:
             feedback_status = "SUCCESS" if test_passed else "FAILURE"
             print(f"[RALPH] Test result: {feedback_status}")
 
+            # Notify subscribers of failure if applicable
+            if not test_passed and path:
+                self.notify_subscribers(path, f"RALPH Loop failed for: {prompt}", success=False)
+
             session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             session_file = (
                 self.sessions_dir
@@ -1350,7 +1354,7 @@ class ACEService:
                 print("[RALPH] ✅ Verification successful!")
                 # Notify subscribers of the change
                 if path:
-                    self.notify_subscribers(path, f"RALPH Loop successful for: {prompt}")
+                    self.notify_subscribers(path, f"RALPH Loop successful for: {prompt}", success=True)
                 
                 # Update plan.md if it exists
                 if os.path.exists(plan_file):
@@ -2139,28 +2143,58 @@ type: role
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sub_file = self.ace_dir / "subscriptions.yaml"
         with open(sub_file, "w", encoding="utf-8") as f:
-            yaml.dump(config.model_dump(), f)
+            yaml.dump(config.model_dump(mode="json"), f)
 
-    def subscribe(self, agent_id: str, path: str):
+    def subscribe(
+        self,
+        agent_id: str,
+        path: str,
+        priority: str = "medium",
+        notify_on_success: bool = True,
+        notify_on_failure: bool = True
+    ):
+        from ace_lib.models.schemas import NotificationPriority
         config = self.load_subscriptions()
-        # Avoid duplicates
-        if any(s.agent_id == agent_id and s.path == path for s in config.subscriptions):
-            return False
-        config.subscriptions.append(Subscription(agent_id=agent_id, path=path))
+        # Avoid exact duplicates
+        existing = next(
+            (s for s in config.subscriptions if s.agent_id == agent_id and s.path == path),
+            None
+        )
+        if existing:
+            # Update existing subscription
+            existing.priority = NotificationPriority(priority)
+            existing.notify_on_success = notify_on_success
+            existing.notify_on_failure = notify_on_failure
+        else:
+            config.subscriptions.append(Subscription(
+                agent_id=agent_id,
+                path=path,
+                priority=NotificationPriority(priority),
+                notify_on_success=notify_on_success,
+                notify_on_failure=notify_on_failure
+            ))
         self.save_subscriptions(config)
         return True
 
-    def notify_subscribers(self, changed_path: str, change_description: str):
+    def notify_subscribers(self, changed_path: str, change_description: str, success: bool = True):
         config = self.load_subscriptions()
         for sub in config.subscriptions:
             if changed_path.startswith(sub.path):
+                # Check if notification is desired for this outcome
+                if (success and not sub.notify_on_success) or (not success and not sub.notify_on_failure):
+                    continue
+
+                priority_prefix = f"[{sub.priority.upper()}] " if sub.priority != "medium" else ""
+                status_str = "SUCCESS" if success else "FAILURE"
+                
                 self.send_mail(
                     to_agent=sub.agent_id,
                     from_agent="orchestrator",
-                    subject=f"SUBSCRIPTION NOTIFICATION: {changed_path}",
+                    subject=f"{priority_prefix}SUBSCRIPTION {status_str}: {changed_path}",
                     body=(
-                        f"A module you are subscribed to has changed.\n\n"
+                        f"A module you are subscribed to has changed ({status_str}).\n\n"
                         f"Path: {changed_path}\n"
+                        f"Priority: {sub.priority}\n"
                         f"Change: {change_description}"
                     )
                 )

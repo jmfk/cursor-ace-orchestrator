@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import (
-    Agent, Decision, TokenMode, TaskType, Config, OwnershipConfig, MailMessage
+    Agent, Decision, TokenMode, TaskType, Config, OwnershipConfig, MailMessage, SubscriptionsConfig
 )
 
 # Configure logging
@@ -267,6 +267,22 @@ async def prune_memory(agent_id: Optional[str] = None, threshold: int = 0):
         pruned_count = service.prune_memory(agent, threshold)
         results[agent.id] = pruned_count
     return results
+
+
+@app.get("/subscriptions", response_model=SubscriptionsConfig)
+async def get_subscriptions():
+    return service.load_subscriptions()
+
+
+@app.post("/subscriptions")
+async def subscribe(
+    agent_id: str = Body(...),
+    path: str = Body(...),
+    priority: str = Body("medium"),
+    notify_on_success: bool = Body(True),
+    notify_on_failure: bool = Body(True)
+):
+    return service.subscribe(agent_id, path, priority, notify_on_success, notify_on_failure)
 
 
 if __name__ == "__main__":
