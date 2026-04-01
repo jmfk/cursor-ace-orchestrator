@@ -2200,7 +2200,7 @@ type: role
         return delegations
 
     def synthesize_memories(self, agent_id: str) -> List[Dict]:
-        """Synthesize shared memories from individual experiences (Phase 10.8)."""
+        """Synthesize shared memories from individual experiences (Phase 10.8/10.13)."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
         if not agent:
@@ -2217,19 +2217,33 @@ type: role
         learnings = []
         for match in re.finditer(pattern, content):
             l_type, l_id, helpful, harmful, desc = match.groups()
+            # Phase 10.13 Refinement: Adjust thresholds and weightings
             # Only synthesize highly helpful strategies or common pitfalls
-            if int(helpful) > 5 or int(harmful) > 2:
+            h = int(helpful)
+            m = int(harmful)
+            
+            # Heuristic for synthesis:
+            # 1. High utility: (h - m) > 5
+            # 2. Critical pitfall: m > 3
+            # 3. High frequency: (h + m) > 10
+            if (h - m) > 5 or m > 3 or (h + m) > 10:
                 learnings.append({
                     "type": l_type,
                     "id": l_id,
-                    "helpful": int(helpful),
-                    "harmful": int(harmful),
+                    "helpful": h,
+                    "harmful": m,
                     "description": desc,
-                    "agent_id": agent_id
+                    "agent_id": agent_id,
+                    "utility": h - m
                 })
 
         if not learnings:
             return []
+
+        # Sort by utility to prioritize most important ones for LLM
+        learnings.sort(key=lambda x: x["utility"], reverse=True)
+        # Limit to top 15 to stay within context limits
+        learnings = learnings[:15]
 
         # Use LLM to synthesize these into higher-level patterns
         client = self.get_anthropic_client()
@@ -2244,6 +2258,8 @@ type: role
             f"You are the ACE Memory Synthesizer. Analyze the following learnings from agent {agent_id} "
             "and synthesize them into 1-3 high-level architectural patterns or critical pitfalls.\n\n"
             f"Learnings:\n{learnings_str}\n\n"
+            "Phase 10.13 Refinement: Focus on cross-cutting concerns and reusable patterns. "
+            "Identify if multiple specific strategies point to a single broader principle.\n\n"
             "Format your output as a JSON list of objects with 'type' (str/mis), 'description', and 'justification'.\n"
             "Example: [{\"type\": \"str\", \"description\": \"Use centralized error handling for all API calls\", "
             "\"justification\": \"Multiple instances of [str-001] and [str-005] show this reduces boilerplate.\"}]"

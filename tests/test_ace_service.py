@@ -304,6 +304,43 @@ export const Test = () => <div>Old Test</div>;
     assert diff_file.exists()
 
 
+def test_memory_synthesis(service, monkeypatch):
+    """Test multi-agent memory synthesis refinement (Phase 10.13)."""
+    from unittest.mock import MagicMock
+
+    # Setup agent and playbook with various utility levels
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=10 harmful=0 :: High utility strategy -->
+<!-- [str-002] helpful=2 harmful=0 :: Low utility strategy -->
+<!-- [str-003] helpful=6 harmful=5 :: High frequency, low utility -->
+<!-- [mis-001] helpful=0 harmful=5 :: Critical pitfall -->
+""")
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+
+    # Mock LLM
+    mock_client = MagicMock()
+    mock_message = MagicMock()
+    mock_message.content = [
+        MagicMock(text='[{"type": "str", "description": "Synthesized Pattern", "justification": "Test"}]')
+    ]
+    mock_client.messages.create.return_value = mock_message
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    synthesized = service.synthesize_memories("dev-1")
+
+    assert len(synthesized) == 1
+    assert synthesized[0]["description"] == "Synthesized Pattern"
+
+    # Check shared learnings
+    shared_file = service.ace_dir / "shared-learnings.mdc"
+    assert shared_file.exists()
+    assert "Synthesized Pattern" in shared_file.read_text()
+
+
 def test_ralph_loop_reflection_integration(service, monkeypatch):
     """Test RALPH loop reflection integration."""
     # Mock subprocess.run to simulate agent and test execution
