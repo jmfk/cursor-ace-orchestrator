@@ -934,6 +934,7 @@ class ACEService:
             if agent.responsibilities
             else "None"
         )
+        # Formal SOP for Agent Onboarding
         content = f"""# SOP: Agent Onboarding - {agent.name} ({agent.id})
 - **Role**: {agent.role}
 - **Responsibilities**: {responsibilities}
@@ -941,22 +942,23 @@ class ACEService:
 - **Status**: {agent.status}
 
 ## 1. Context Acquisition
-- [ ] Read `AGENTS.md` to understand the current agent landscape.
-- [ ] Read `.ace/decisions/*.md` for recent architectural decisions.
-- [ ] Read `_global.mdc` for project-wide standards.
+- [ ] **Registry**: Read `AGENTS.md` to understand the current agent landscape.
+- [ ] **Decisions**: Read `.ace/decisions/*.md` for recent architectural decisions.
+- [ ] **Global Standards**: Read `_global.mdc` for project-wide standards.
+- [ ] **Ownership**: Review `ownership.yaml` for assigned modules.
 
 ## 2. Role-Specific Setup
-- [ ] Create/Verify `{agent.memory_file}` exists.
-- [ ] Ensure the playbook contains sections for "Strategier & patterns",
-- [ ] "Kända fallgropar", and "Arkitekturella beslut".
+- [ ] **Playbook**: Create/Verify `{agent.memory_file}` exists.
+- [ ] **Structure**: Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
-- [ ] Review existing codebase in assigned modules: {responsibilities}
-- [ ] Identify initial technical debts and document as [mis-NEW] in playbook.
-- [ ] Propose first strategy improvement as [str-NEW].
+- [ ] **Audit**: Review existing codebase in assigned modules: {responsibilities}
+- [ ] **Debt**: Identify initial technical debts and document as `[mis-NEW]` in playbook.
+- [ ] **Strategy**: Propose first strategy improvement as `[str-NEW]`.
 
 ## 4. Handover & Verification
-- [ ] Send a "Ready" message to the orchestrator via `ace mail-send`.
+- [ ] **Communication**: Send a "Ready" message to the orchestrator via `ace mail-send`.
+- [ ] **Consensus**: Participate in the next `ace debate` to demonstrate alignment.
 """
         onboarding_file.write_text(content)
 
@@ -1015,21 +1017,26 @@ class ACEService:
         """Run PR review SOP for an agent."""
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         review_file = self.ace_dir / f"review_{pr_id}_{agent_id}.md"
+        
+        # Formal SOP for PR Reviews
         content = f"""# SOP: PR Review - {pr_id}
 - **Reviewer**: {agent_id}
 - **Date**: {datetime.now().isoformat()}
 
 ## 1. Strategy Alignment
-- [ ] Does PR follow strategies defined in reviewer's playbook?
-- [ ] Does the PR adhere to global rules in `_global.mdc`?
+- [ ] **Core Principles**: Does the PR follow TypeScript Strict Mode and TDD?
+- [ ] **DRY/YAGNI**: Is the code concise and reusable without over-engineering?
+- [ ] **Playbook Matching**: Does the PR follow strategies defined in reviewer's playbook?
+- [ ] **Global Rules**: Does the PR adhere to global rules in `_global.mdc`?
 
 ## 2. Decision Verification
-- [ ] Does PR conflict with any recent ADRs in `.ace/decisions/`?
+- [ ] **ADR Compliance**: Does PR conflict with any recent ADRs in `.ace/decisions/`?
+- [ ] **Ownership**: Is the code being modified by the correct agent (check `ownership.yaml`)?
 
 ## 3. Learning Extraction
-- [ ] Identify any new successful patterns: [str-NEW]
-- [ ] Identify any new pitfalls or bugs: [mis-NEW]
-- [ ] Identify any architectural choices that should be ADRs: [dec-NEW]
+- [ ] **New Strategies**: Identify any new successful patterns: `[str-NEW] helpful=1 harmful=0 :: <desc>`
+- [ ] **New Pitfalls**: Identify any new pitfalls or bugs: `[mis-NEW] helpful=0 harmful=1 :: <desc>`
+- [ ] **New Decisions**: Identify any architectural choices that should be ADRs: `[dec-NEW] :: <desc>`
 
 ## 4. Conclusion
 - [ ] **Status**: [PENDING/APPROVED/REQUEST_CHANGES]
@@ -1238,6 +1245,9 @@ class ACEService:
                                 flags=re.DOTALL
                             )
                             mockup_file.write_text(new_content)
+                        
+                        # Extract components from synced code
+                        self._extract_stitch_components(mockup_id, ui_code)
                         return ui_code
                 else:
                     print(f"[STITCH] API failed ({response.status_code}). Falling back to local.")

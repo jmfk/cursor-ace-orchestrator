@@ -899,6 +899,49 @@ def loop(
 
 
 @app.command()
+def loop_native(
+    prompt: str = typer.Argument(..., help="The prompt to solve"),
+    test_cmd: str = typer.Option(
+        ..., "--test", "-t", help="Command to run tests"
+    ),
+    max_iterations: int = typer.Option(
+        10, "--max", "-m", help="Maximum number of iterations"
+    ),
+    path: Optional[str] = typer.Option(
+        None, "--path", "-p", help="Path to the file or module"
+    ),
+    agent_id: Optional[str] = typer.Option(
+        None, "--agent", "-a", help="Explicit agent ID"
+    ),
+):
+    """
+    NATIVE RALPH Loop: Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
+    This command runs the loop logic directly in the CLI process.
+    """
+    console.print("🚀 [bold blue]Starting NATIVE RALPH Loop[/bold blue]")
+    console.print(f"Prompt: [italic]{prompt}[/italic]")
+    console.print(f"Test Command: [italic]{test_cmd}[/italic]")
+    console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
+
+    svc = get_service()
+    success, iterations = svc.run_loop(
+        prompt, test_cmd, max_iterations, path, agent_id
+    )
+
+    if success:
+        console.print(
+            f"\n✅ [bold green]NATIVE RALPH Loop completed successfully in "
+            f"{iterations} iterations![/bold green]"
+        )
+    else:
+        console.print(
+            f"\n❌ [bold red]NATIVE RALPH Loop failed after "
+            f"{iterations} iterations.[/bold red]"
+        )
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def mail_send(
     to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
     sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
