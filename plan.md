@@ -40,7 +40,8 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **5.3 FastAPI Backend Implementation**: Create the actual FastAPI app and endpoints.
 - [x] **5.4 Documentation**: Finalize `README.md` and CLI `--help` documentation for all commands.
 
-## Phase 6: Refinement & Missing Features (Completed)
+## Phase 6: Refinement & Advanced Features (Completed)
+- [x] **6.1 Memory Write-back Verification**: Added tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
 - [x] **6.2 RALPH Loop Reflection Integration**: Ensure the loop correctly uses reflection to update memory between iterations.
 - [x] **6.3 Native ace loop**: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
 - [x] **6.4 SOP Logic**: Implement formal instructions/SOPs for agent onboarding and PR reviews.
@@ -49,5 +50,9 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **6.7 Test Coverage Expansion**: Increase test coverage for `ACEService` and API endpoints beyond basic tests.
 - [x] **6.8 Production Readiness**: Add logging and error handling middleware for FastAPI.
 
-## Phase 7: Completed Tasks
-- [x] **6.1 Memory Write-back Verification**: Added tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
+## Phase 7: Final Polish & Maintenance (Pending)
+- [ ] **7.1 Living Specs Implementation**: Fully automate the creation and update of `.ace/specs/` (intent, constraints, implementation, verification) via `ace spec` commands.
+- [ ] **7.2 Cross-Project Learning**: Implement logic to aggregate anonymized learnings in `.ace-meta/cross-project/`.
+- [ ] **7.3 Meta Mode Enhancements**: Refine `.ace-meta/` usage when ACE works on itself.
+- [ ] **7.4 Token Consumption Monitoring**: Add a command to track and report token usage per agent/session.
+- [ ] **7.5 IDE Extension Integration**: Prepare manifest and basic bridge for a Cursor/VSCode extension.

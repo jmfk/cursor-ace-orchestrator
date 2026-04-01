@@ -70,6 +70,18 @@ class OwnershipConfig(BaseModel):
     unowned: List[str] = Field(default_factory=list)
 
 
+class LivingSpec(BaseModel):
+    id: str
+    title: str
+    intent: str
+    constraints: List[str] = Field(default_factory=list)
+    implementation: Optional[str] = None
+    verification: Optional[str] = None
+    status: str = "draft"
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
 class MailMessage(BaseModel):
     id: str
     from_agent: str = Field(..., alias="from")

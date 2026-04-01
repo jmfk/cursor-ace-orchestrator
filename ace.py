@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig
+from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig, LivingSpec
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -118,7 +118,7 @@ def init():
             os.chmod(cred_file, 0o600)
             console.print(f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]")
 
-    for subdir in ["mail", "sessions", "decisions"]:
+    for subdir in ["mail", "sessions", "decisions", "specs"]:
         (svc.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
         console.print(
             f"Created directory: [green]{svc.ace_dir / subdir}[/green]"
@@ -914,6 +914,93 @@ def ui_sync(
     else:
         code = get_service().ui_sync(url)
     console.print(f"Code synced successfully:\n[dim]{code}[/dim]")
+
+
+spec_app = typer.Typer(help="Living Specs management commands")
+app.add_typer(spec_app, name="spec")
+
+
+@spec_app.command("create")
+def spec_create(
+    id: str = typer.Argument(..., help="Spec ID (e.g., auth-v2)"),
+    title: str = typer.Option(..., "--title", "-t", help="Spec title"),
+    intent: str = typer.Option(..., "--intent", "-i", help="Primary intent"),
+    constraints: List[str] = typer.Option(
+        None, "--constraint", "-c", help="Constraints (can be multiple)"
+    ),
+):
+    """Create a new Living Spec."""
+    svc = get_service()
+    spec = svc.create_spec(id, title, intent, constraints)
+    console.print(f"Created Living Spec: [green]{spec.id}[/green]")
+
+
+@spec_app.command("list")
+def spec_list():
+    """List all Living Specs."""
+    svc = get_service()
+    specs = svc.list_specs()
+    if not specs:
+        console.print("No Living Specs found.")
+        return
+
+    table = Table(title="Living Specs")
+    table.add_column("ID", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Status", style="yellow")
+    table.add_column("Updated", style="magenta")
+
+    for spec in specs:
+        table.add_row(spec.id, spec.title, spec.status, spec.updated_at)
+    console.print(table)
+
+
+@spec_app.command("show")
+def spec_show(id: str = typer.Argument(..., help="Spec ID")):
+    """Show details of a Living Spec."""
+    svc = get_service()
+    spec = svc.get_spec(id)
+    if not spec:
+        console.print(f"[red]Spec {id} not found.[/red]")
+        return
+
+    console.print(f"\n[bold]Living Spec: {spec.title} ({spec.id})[/bold]")
+    console.print(f"Status: [yellow]{spec.status}[/yellow]")
+    console.print(f"Updated: [dim]{spec.updated_at}[/dim]")
+    console.print(f"\n[bold]Intent:[/bold]\n{spec.intent}")
+    console.print(f"\n[bold]Constraints:[/bold]")
+    for c in spec.constraints:
+        console.print(f"- {c}")
+    
+    if spec.implementation:
+        console.print(f"\n[bold]Implementation:[/bold]\n{spec.implementation}")
+    if spec.verification:
+        console.print(f"\n[bold]Verification:[/bold]\n{spec.verification}")
+
+
+@spec_app.command("update")
+def spec_update(
+    id: str = typer.Argument(..., help="Spec ID"),
+    status: Optional[str] = typer.Option(None, "--status", "-s"),
+    implementation: Optional[str] = typer.Option(None, "--impl", "-m"),
+    verification: Optional[str] = typer.Option(None, "--verify", "-v"),
+):
+    """Update an existing Living Spec."""
+    svc = get_service()
+    spec = svc.get_spec(id)
+    if not spec:
+        console.print(f"[red]Spec {id} not found.[/red]")
+        return
+
+    if status:
+        spec.status = status
+    if implementation:
+        spec.implementation = implementation
+    if verification:
+        spec.verification = verification
+
+    svc.save_spec(spec)
+    console.print(f"Updated Living Spec: [green]{spec.id}[/green]")
 
 
 if __name__ == "__main__":

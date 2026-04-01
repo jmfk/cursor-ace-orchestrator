@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 26
+
+### Added
+- **Phase 6: Refinement & Missing Features**
+  - RALPH Loop Reflection Integration: Ensured the loop correctly uses reflection to update memory between iterations.
+  - Advanced Consensus: Implemented multi-turn debate logic.
+  - Updated `plan.md` to reflect completion of tasks 6.2 and 6.6, moving them to Phase 7.
+
 ## [2026-04-01] - RALPH Loop Iteration 25
 
 ### Added

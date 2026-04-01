@@ -320,3 +320,32 @@ def test_multi_turn_debate(service, monkeypatch):
     assert len(messages_2) == 2
     assert any(m.subject == "DEBATE INITIATED" for m in messages_1)
     assert any(m.subject == "DEBATE CONSENSUS REACHED" for m in messages_1)
+
+
+def test_living_specs_management(service):
+    """Test creating, listing, and updating Living Specs."""
+    spec = service.create_spec(
+        id="auth-v2",
+        title="Auth V2 Implementation",
+        intent="Upgrade auth to JWT refresh tokens",
+        constraints=["Must use httpOnly cookies", "No localStorage"]
+    )
+    assert spec.id == "auth-v2"
+    assert "Must use httpOnly cookies" in spec.constraints
+
+    specs = service.list_specs()
+    assert len(specs) == 1
+    assert specs[0].id == "auth-v2"
+
+    spec.status = "in_progress"
+    spec.implementation = "Implemented JWT rotation"
+    service.save_spec(spec)
+
+    updated_spec = service.get_spec("auth-v2")
+    assert updated_spec.status == "in_progress"
+    assert updated_spec.implementation == "Implemented JWT rotation"
+
+    # Check if markdown file was created
+    md_file = service.specs_dir / "auth-v2.md"
+    assert md_file.exists()
+    assert "# Living Spec: Auth V2 Implementation" in md_file.read_text()

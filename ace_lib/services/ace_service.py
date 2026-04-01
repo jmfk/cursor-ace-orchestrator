@@ -18,6 +18,7 @@ from ace_lib.models.schemas import (
     TokenMode,
     TaskType,
     MailMessage,
+    LivingSpec,
 )
 
 yaml = YAML()
@@ -32,6 +33,7 @@ class ACEService:
         self.sessions_dir = self.ace_dir / "sessions"
         self.decisions_dir = self.ace_dir / "decisions"
         self.mail_dir = self.ace_dir / "mail"
+        self.specs_dir = self.ace_dir / "specs"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
 
         # Reset any cached data if needed
@@ -1156,3 +1158,62 @@ class ACEService:
         if pruned_count > 0:
             playbook_path.write_text(new_content)
         return pruned_count
+
+    # --- Living Specs Management ---
+
+    def list_specs(self) -> List[LivingSpec]:
+        if not self.specs_dir.exists():
+            return []
+        spec_files = sorted(list(self.specs_dir.glob("*.yaml")))
+        specs = []
+        for f in spec_files:
+            with open(f, "r") as m:
+                data = yaml.load(m)
+                if data:
+                    specs.append(LivingSpec(**data))
+        return specs
+
+    def get_spec(self, spec_id: str) -> Optional[LivingSpec]:
+        spec_file = self.specs_dir / f"{spec_id}.yaml"
+        if not spec_file.exists():
+            return None
+        with open(spec_file, "r") as f:
+            data = yaml.load(f)
+            return LivingSpec(**data) if data else None
+
+    def save_spec(self, spec: LivingSpec):
+        self.specs_dir.mkdir(parents=True, exist_ok=True)
+        spec_file = self.specs_dir / f"{spec.id}.yaml"
+        spec.updated_at = datetime.now().isoformat()
+        with open(spec_file, "w") as f:
+            yaml.dump(spec.model_dump(), f)
+        
+        # Also generate/update a markdown version for visibility
+        md_file = self.specs_dir / f"{spec.id}.md"
+        md_content = f"""# Living Spec: {spec.title} ({spec.id})
+- **Status**: {spec.status}
+- **Created**: {spec.created_at}
+- **Updated**: {spec.updated_at}
+
+## Intent
+{spec.intent}
+
+## Constraints
+"""
+        for c in spec.constraints:
+            md_content += f"- {c}\n"
+        
+        md_content += f"\n## Implementation\n{spec.implementation or 'TBD'}\n"
+        md_content += f"\n## Verification\n{spec.verification or 'TBD'}\n"
+        
+        md_file.write_text(md_content)
+        return spec
+
+    def create_spec(self, id: str, title: str, intent: str, constraints: List[str] = None) -> LivingSpec:
+        spec = LivingSpec(
+            id=id,
+            title=title,
+            intent=intent,
+            constraints=constraints or []
+        )
+        return self.save_spec(spec)
