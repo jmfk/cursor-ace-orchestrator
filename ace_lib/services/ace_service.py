@@ -905,6 +905,7 @@ class ACEService:
 
     # --- RALPH Loop Engine ---
 
+    @profiler.profile
     def run_loop(
         self,
         prompt: str,
