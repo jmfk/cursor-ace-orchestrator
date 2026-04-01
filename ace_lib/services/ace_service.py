@@ -310,6 +310,7 @@ class ACEService:
         path: Optional[str] = None,
         task_type: TaskType = TaskType.IMPLEMENT,
         agent_id: Optional[str] = None,
+        task_description: Optional[str] = None,
     ) -> Tuple[str, Optional[str]]:
         context_parts = []
 
@@ -344,7 +345,7 @@ class ACEService:
 
                     # 2.1 Vectorized Memory Search (Phase 8.1)
                     # If we have a path or task description, search for relevant entries
-                    search_query = path if path else "general tasks"
+                    search_query = task_description if task_description else (path if path else "general tasks")
                     vector_results = self.search_memory(resolved_agent_id, search_query)
                     if vector_results:
                         context_parts.append("### RELEVANT MEMORY (Vector Search)")
@@ -403,7 +404,84 @@ class ACEService:
         if os.getenv("ACE_LOOP_PROMPT"):
             context_parts.append(f"### RALPH LOOP PROMPT\n{os.getenv('ACE_LOOP_PROMPT')}")
 
-        return "\n\n".join(context_parts), resolved_agent_id
+        full_context = "\n\n".join(context_parts)
+        
+        # 8. Adaptive Context Pruning (Phase 10.4)
+        # Estimate complexity and prune if necessary
+        complexity = 1
+        if task_description:
+            # Simple heuristic: longer description -> higher complexity
+            complexity = min(10, max(1, len(task_description) // 100))
+        
+        # Max tokens allowed based on complexity (simplified)
+        # Low complexity = tighter window, High complexity = larger window
+        max_chars = 10000 + (complexity * 5000)
+        
+        if len(full_context) > max_chars:
+            print(f"[PRUNING] Context length ({len(full_context)}) exceeds limit "
+                  f"for complexity {complexity} ({max_chars}). Pruning...")
+            full_context = self.prune_context(full_context, max_chars)
+
+        return full_context, resolved_agent_id
+
+    def prune_context(self, context: str, max_chars: int) -> str:
+        """Prune context by removing less relevant sections or truncating."""
+        # Priority:
+        # 1. Global Rules (Keep)
+        # 2. Agent Playbook (Keep)
+        # 3. Task Framing (Keep)
+        # 4. Recent Decisions (Prune first)
+        # 5. Recent Sessions (Prune second)
+        # 6. Shared Learnings (Prune third)
+        
+        sections = context.split("### ")
+        if not sections:
+            return context[:max_chars]
+            
+        # Reconstruct with priority
+        keep_headers = ["GLOBAL RULES", "AGENT PLAYBOOK", "TASK FRAMING", "RALPH LOOP PROMPT"]
+        
+        new_sections = []
+        # Always keep the first part (if any) before the first ###
+        if not context.startswith("### "):
+            new_sections.append(sections[0])
+            sections = sections[1:]
+        else:
+            # If it starts with ###, sections[0] is empty
+            sections = sections[1:]
+
+        # Separate sections
+        keep_list = []
+        prune_list = []
+        
+        for s in sections:
+            header = s.split("\n")[0].strip()
+            is_keep = False
+            for kh in keep_headers:
+                if kh in header:
+                    keep_list.append("### " + s)
+                    is_keep = True
+                    break
+            if not is_keep:
+                prune_list.append("### " + s)
+        
+        # Start building the pruned context
+        pruned_context = "".join(keep_list)
+        
+        # Add prune_list sections until limit
+        for s in prune_list:
+            if len(pruned_context) + len(s) < max_chars:
+                pruned_context += s
+            else:
+                # Truncate the last section if we have space
+                remaining = max_chars - len(pruned_context)
+                if remaining > 100:
+                    # Subtract length of truncation message to stay under limit
+                    trunc_msg = "\n... [TRUNCATED] ...\n"
+                    pruned_context += s[:remaining - len(trunc_msg)] + trunc_msg
+                break
+                
+        return pruned_context
 
     # --- Reflection Engine ---
 
@@ -993,7 +1071,7 @@ class ACEService:
             # 1. Context Refresh & Build (Phase 4.1)
             os.environ["ACE_LOOP_PROMPT"] = prompt
             context, resolved_agent_id = self.build_context(
-                path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id
+                path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id, task_description=prompt
             )
 
             # 2. Execute (Phase 4.1)
