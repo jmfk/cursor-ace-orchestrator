@@ -21,10 +21,11 @@ async def create_agent(
     id: str = Body(...),
     name: str = Body(...),
     role: str = Body(...),
-    email: Optional[str] = Body(None)
+    email: Optional[str] = Body(None),
+    responsibilities: List[str] = Body(default_factory=list)
 ):
     try:
-        return service.create_agent(id, name, role, email)
+        return service.create_agent(id, name, role, email, responsibilities)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

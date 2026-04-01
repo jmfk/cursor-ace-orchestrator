@@ -103,7 +103,12 @@ class ACEService:
             yaml.dump(config.model_dump(), f)
 
     def create_agent(
-        self, id: str, name: str, role: str, email: Optional[str] = None
+        self,
+        id: str,
+        name: str,
+        role: str,
+        email: Optional[str] = None,
+        responsibilities: Optional[List[str]] = None,
     ) -> Agent:
         config = self.load_agents()
         if any(a.id == id for a in config.agents):
@@ -120,6 +125,7 @@ class ACEService:
             email=email,
             memory_file=memory_file,
             status="active",
+            responsibilities=responsibilities or [],
         )
         config.agents.append(new_agent)
         self.save_agents(config)

@@ -2,7 +2,7 @@
 
 This plan outlines the step-by-step implementation of the Cursor ACE Orchestrator, a Python-based CLI tool designed to provide long-term memory and coordination for coding agents.
 
-## Phase 6: Refinement & Missing Features (Current Focus)
+## Phase 6: Refinement & Missing Features
 - [ ] **6.6 FastAPI Backend Implementation**: Create the actual FastAPI app and endpoints (currently only the service layer exists).
 - [ ] **6.7 Memory Write-back Verification**: Add tests to verify that `update_playbook` correctly handles various markdown structures and edge cases.
 - [ ] **6.8 RALPH Loop Reflection Integration**: Ensure the loop correctly uses reflection to update memory between iterations.

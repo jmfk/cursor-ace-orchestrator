@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 21
+
+### Added
+- **Phase 6: Refinement & Missing Features**
+  - Updated `plan.md` to reflect completion of Phase 6 tasks and moved them to Phase 7.
+  - Verified project state via `ralph_execution.log`.
+
 ## [2026-04-01] - RALPH Loop Iteration 20
 
 ### Added

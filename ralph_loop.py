@@ -5,6 +5,7 @@ import time
 import json
 import hashlib
 import re
+import requests
 from datetime import datetime
 
 # Configuration
@@ -50,8 +51,8 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
         with open(STATS_FILE, "r") as f:
             stats = json.load(f)
 
-        cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M
-                + output_tokens / 1_000_000 * PRICE_OUTPUT_1M)
+    cost = (input_tokens / 1_000_000 * PRICE_INPUT_1M
+            + output_tokens / 1_000_000 * PRICE_OUTPUT_1M)
 
     stats["total_input_tokens"] += input_tokens
     stats["total_output_tokens"] += output_tokens
@@ -113,12 +114,109 @@ def run_cursor_agent(prompt: str):
         return None
 
 
+def generate_commit_message(task_name: str):
+    """Generate a descriptive commit message using direct Gemini API or cursor-agent."""
+    # Check for Gemini API key in multiple possible environment variables
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    # Try to load from .env file if python-dotenv is available (optional)
+    if not api_key:
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        except ImportError:
+            # If dotenv is not installed, we can try a simple manual parse of .env
+            if os.path.exists(".env"):
+                with open(".env", "r") as f:
+                    for line in f:
+                        if line.startswith("GOOGLE_API_KEY=") or line.startswith("GEMINI_API_KEY="):
+                            api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+
+    # Get git diff for context
+    try:
+        diff = subprocess.run(["git", "diff", "--cached"], capture_output=True, text=True).stdout
+        if not diff:
+            diff = subprocess.run(["git", "diff"], capture_output=True, text=True).stdout
+    except Exception:
+        diff = "No diff available"
+
+    prompt = (
+        f"Generate a concise, one-line git commit message for the following task: {task_name}\n\n"
+        f"Git Diff context:\n{diff[:2000]}\n\n"
+        "Output ONLY the commit message string. No JSON, no markdown, no quotes."
+    )
+
+    if api_key:
+        log_message("Generating commit message via direct Gemini API...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            if response.status_code == 200:
+                result = response.json()
+                msg = result['candidates'][0]['content']['parts'][0]['text'].strip()
+                return msg
+            else:
+                log_message(f"⚠️ Direct Gemini API failed (Status {response.status_code}). Falling back to cursor-agent.")
+        except Exception as e:
+            log_message(f"⚠️ Error calling Gemini API: {e}. Falling back to cursor-agent.")
+
+    # Fallback to cursor-agent
+    log_message("Generating commit message via cursor-agent...")
+    commit_prompt = (
+        f"Based on the task '{task_name}' and the current changes, generate a concise, "
+        "descriptive git commit message (one line). Output ONLY the commit message string. "
+        "DO NOT output any JSON, system metadata, or extra text."
+    )
+    msg = run_cursor_agent(commit_prompt)
+
+    # Clean the message
+    if msg:
+        if "{" in msg and "}" in msg:
+            try:
+                msg_match = re.search(r'}(.*)', msg, re.DOTALL)
+                if msg_match and msg_match.group(1).strip():
+                    msg = msg_match.group(1).strip()
+                else:
+                    data = json.loads(msg)
+                    if isinstance(data, dict) and "message" in data:
+                        msg = data["message"]
+            except Exception:
+                pass
+
+        msg = re.sub(r'^.*?commit message:?\s*', '', msg, flags=re.IGNORECASE)
+        msg = msg.strip().split("\n")[0]
+
+    return msg
+
+
 def get_file_content(path: str):
     """Read and return file content if it exists."""
     if os.path.exists(path):
         with open(path, "r") as f:
             return f.read()
     return ""
+
+
+def get_current_task():
+    """Extract the first uncompleted task from plan.md."""
+    plan = get_file_content(PLAN_FILE)
+    if not plan:
+        return "Unknown task"
+
+    for line in plan.splitlines():
+        line = line.strip()
+        if line.startswith("- [ ]"):
+            # Extract task description, removing the checkbox and bold markers if present
+            task = line.replace("- [ ]", "").strip()
+            task = re.sub(r'\*\*(.*?)\*\*:', r'\1', task) # Remove bold markers and colon
+            return task
+    return "No active task found"
 
 
 def get_project_state_hash():
@@ -205,6 +303,10 @@ def main():
         iteration += 1
         log_message(f"=== Iteration {iteration}/{MAX_ITERATIONS} ===")
 
+        # Get current task for context and commit messages
+        current_task = get_current_task()
+        log_message(f"📍 Current Task: {current_task}")
+
         # Step 1: Planning
         plan_content = get_file_content(PLAN_FILE)
         if not plan_content or "[ ]" not in plan_content:
@@ -289,49 +391,11 @@ def main():
             status = subprocess.run(
                 ["git", "status", "--porcelain"], capture_output=True, text=True)
             if status.stdout.strip():
-                # Generate a descriptive commit message using the agent
-                log_message("Generating descriptive commit message...")
-                commit_prompt = (
-                    "Based on the changes made in this iteration, generate a "
-                    "concise, descriptive git commit message (one line). "
-                    "Focus on what was implemented or fixed. Output ONLY the "
-                    "commit message string. DO NOT output any JSON, system "
-                    "metadata, or extra text."
-                )
-                commit_msg = run_cursor_agent(commit_prompt)
-
-                # Clean commit message if it contains JSON or extra text
-                if commit_msg:
-                    # Remove JSON if present
-                    if "{" in commit_msg and "}" in commit_msg:
-                        try:
-                            # Try to find the message outside JSON if it's mixed
-                            msg_match = re.search(
-                                r'}(.*)', commit_msg, re.DOTALL)
-                            if msg_match and msg_match.group(1).strip():
-                                commit_msg = msg_match.group(1).strip()
-                            else:
-                                # If it's pure JSON, it might have a 'message' field
-                                data = json.loads(commit_msg)
-                                if isinstance(data, dict) and "message" in data:
-                                    commit_msg = data["message"]
-                                else:
-                                    commit_msg = ""
-                        except Exception:
-                            commit_msg = ""
-
-                    # Remove common system prefixes if any
-                    commit_msg = re.sub(
-                        r"^.*?commit message:?\s*",
-                        "",
-                        commit_msg,
-                        flags=re.IGNORECASE,
-                    )
-                    commit_msg = commit_msg.strip().split("\n")[0]
+                commit_msg = generate_commit_message(current_task)
 
                 # Final fallback if cleaning resulted in empty string
                 if not commit_msg or len(commit_msg.strip()) < 5:
-                    commit_msg = f"RALPH Loop: Implementation iteration {iteration}"
+                    commit_msg = f"RALPH Loop: Implementation iteration {iteration} - {current_task[:50]}"
 
                 subprocess.run(["git", "add", "."], check=True)
                 subprocess.run(["git", "commit", "-m", commit_msg], check=True)

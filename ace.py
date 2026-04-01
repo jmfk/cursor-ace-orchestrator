@@ -157,12 +157,21 @@ def agent_create(
     email: Optional[str] = typer.Option(
         None, "--email", "-e", help="Agent email"
     ),
+    responsibilities: Optional[List[str]] = typer.Option(
+        None, "--resp", "-p", help="Agent responsibilities"
+    ),
 ):
     """Create a new agent in the registry."""
     res = api_call(
         "POST",
         "/agents",
-        json={"id": id, "name": name, "role": role, "email": email},
+        json={
+            "id": id,
+            "name": name,
+            "role": role,
+            "email": email,
+            "responsibilities": responsibilities or [],
+        },
     )
     if res:
         console.print(
@@ -170,7 +179,9 @@ def agent_create(
         )
     else:
         try:
-            agent = get_service().create_agent(id, name, role, email)
+            agent = get_service().create_agent(
+                id, name, role, email, responsibilities
+            )
             console.print(
                 f"Created agent [green]{agent.name}[/green] (ID: {agent.id})"
             )
