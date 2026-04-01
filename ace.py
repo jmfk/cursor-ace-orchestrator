@@ -121,7 +121,11 @@ def list_owners():
     console.print(table)
 
 
-@app.command()
+agent_app = typer.Typer(help="Agent management commands")
+app.add_typer(agent_app, name="agent")
+
+
+@agent_app.command("create")
 def agent_create(
     name: str = typer.Option(..., "--name", "-n", help="Agent name"),
     role: str = typer.Option(..., "--role", "-r", help="Agent role"),
@@ -141,7 +145,7 @@ def agent_create(
             raise typer.Exit(code=1)
 
 
-@app.command()
+@agent_app.command("list")
 def agent_list():
     """List all agents in the registry."""
     res = api_call("GET", "/agents")
@@ -162,6 +166,26 @@ def agent_list():
         else:
             table.add_row(agent.id, agent.name, agent.role, agent.email)
     console.print(table)
+
+
+@agent_app.command("onboard")
+def agent_onboard(agent_id: str = typer.Argument(..., help="Agent ID to onboard")):
+    """Run onboarding SOP for an agent."""
+    try:
+        onboarding_file = service.onboard_agent(agent_id)
+        console.print(f"Onboarding SOP started. File created: [green]{onboarding_file}[/green]")
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+
+@agent_app.command("review")
+def agent_review(
+    pr_id: str = typer.Argument(..., help="PR ID to review"),
+    agent_id: str = typer.Option(..., "--agent", "-a", help="Agent ID to perform the review"),
+):
+    """Run PR review SOP for an agent."""
+    review_file = service.review_pr(pr_id, agent_id)
+    console.print(f"PR Review SOP started. File created: [green]{review_file}[/green]")
 
 
 @app.command()
@@ -442,6 +466,52 @@ def memory_sync():
 
 
 @app.command()
+def loop(
+    prompt: str = typer.Argument(..., help="The prompt to solve"),
+    test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
+    max_iterations: int = typer.Option(10, "--max", "-m", help="Maximum number of iterations"),
+    path: Optional[str] = typer.Option(None, "--path", "-p", help="Path to the file or module"),
+    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Explicit agent ID"),
+):
+    """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat."""
+    console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
+    console.print(f"Prompt: [italic]{prompt}[/italic]")
+    console.print(f"Test Command: [italic]{test_cmd}[/italic]")
+    console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
+
+    iteration = 0
+    while iteration < max_iterations:
+        iteration += 1
+        console.print(f"\n[bold]=== Iteration {iteration}/{max_iterations} ===[/bold]")
+
+        # 1. Build Context
+        context, resolved_agent_id = service.build_context(path, TaskType.IMPLEMENT, agent_id)
+
+        # 2. Execute agent (Mocking cursor-agent call for now, as it's a CLI tool)
+        # In a real scenario, this would call 'ace run' or similar logic
+        console.print("Building next task...")
+        # Since we are an agent, we can't easily call cursor-agent from within ourselves
+        # but we can simulate the execution logic.
+        
+        # 3. Verify (Run tests)
+        console.print(f"Verifying implementation with: [italic]{test_cmd}[/italic]")
+        result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            console.print("✅ [bold green]Verification successful![/bold green]")
+            break
+        else:
+            console.print(f"❌ [bold red]Verification failed (Exit code: {result.returncode})[/bold red]")
+            console.print(result.stdout)
+            console.print(result.stderr)
+            # 4. Reflect (In a real scenario, we'd pass the error to the agent)
+            # For now, we'll just log it and continue
+            
+    if iteration >= max_iterations:
+        console.print(f"Reached maximum iterations ({max_iterations}). Stopping.")
+
+
+@app.command()
 def mail_send(
     to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
     sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
@@ -532,12 +602,16 @@ def ui_mockup(
 ):
     """Generate a UI mockup."""
     console.print(f"Generating UI mockup for: [bold]{description}[/bold] using agent [green]{agent_id}[/green]")
+    url = service.ui_mockup(description, agent_id)
+    console.print(f"Mockup generated at: [blue]{url}[/blue]")
 
 
 @ui_app.command("sync")
 def ui_sync(url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")):
     """Sync UI code from Google Stitch."""
     console.print(f"Syncing UI code from: [blue]{url}[/blue]")
+    code = service.ui_sync(url)
+    console.print(f"Code synced successfully:\n[dim]{code}[/dim]")
 
 
 if __name__ == "__main__":

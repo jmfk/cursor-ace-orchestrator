@@ -59,17 +59,17 @@ def test_agent_registry(temp_ace_dir):
     runner = CliRunner()
 
     # Create agent
-    result = runner.invoke(app, ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    result = runner.invoke(app, ["agent", "create", "--name", "Test", "--role", "tester", "--id", "test-01"])
     assert result.exit_code == 0
     assert "Created agent Test" in result.stdout
 
     # List agents
-    result = runner.invoke(app, ["agent-list"])
+    result = runner.invoke(app, ["agent", "list"])
     assert "test-01" in result.stdout
     assert "tester" in result.stdout
 
     # Duplicate ID
-    result = runner.invoke(app, ["agent-create", "--name", "Test2", "--role", "tester", "--id", "test-01"])
+    result = runner.invoke(app, ["agent", "create", "--name", "Test2", "--role", "tester", "--id", "test-01"])
     assert result.exit_code == 1
     assert "Error: Agent with ID test-01 already exists." in result.stdout
 
@@ -107,7 +107,7 @@ def test_build_context(temp_ace_dir):
     global_rules.write_text("Global rules content")
 
     # Setup agent and playbook
-    runner.invoke(app, ["agent-create", "--name", "Auth", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(app, ["agent", "create", "--name", "Auth", "--role", "auth", "--id", "auth-01"])
     playbook = rules_dir / "auth.mdc"
     playbook.write_text("Auth playbook content")
 
@@ -296,7 +296,7 @@ def test_memory_prune(temp_ace_dir):
     runner = CliRunner()
 
     # Setup agent and playbook with harmful strategy
-    runner.invoke(app, ["agent-create", "--name", "Test", "--role", "tester", "--id", "test-01"])
+    runner.invoke(app, ["agent", "create", "--name", "Test", "--role", "tester", "--id", "test-01"])
     playbook_path = Path(".cursor/rules/tester.mdc")
     playbook_path.parent.mkdir(parents=True, exist_ok=True)
     playbook_path.write_text("""
@@ -324,7 +324,7 @@ def test_memory_sync(temp_ace_dir):
     runner = CliRunner()
 
     # Setup agents and decisions
-    runner.invoke(app, ["agent-create", "--name", "Auth Agent", "--role", "auth", "--id", "auth-01"])
+    runner.invoke(app, ["agent", "create", "--name", "Auth Agent", "--role", "auth", "--id", "auth-01"])
     runner.invoke(
         app,
         [
@@ -363,8 +363,8 @@ def test_mail_system(temp_ace_dir):
     runner = CliRunner()
 
     # Create agents
-    runner.invoke(app, ["agent-create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
-    runner.invoke(app, ["agent-create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    runner.invoke(app, ["agent", "create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
+    runner.invoke(app, ["agent", "create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
 
     # Send mail
     result = runner.invoke(
@@ -398,8 +398,8 @@ def test_debate(temp_ace_dir):
     runner = CliRunner()
 
     # Create agents
-    runner.invoke(app, ["agent-create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
-    runner.invoke(app, ["agent-create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
+    runner.invoke(app, ["agent", "create", "--name", "Agent A", "--role", "role-a", "--id", "agent-a"])
+    runner.invoke(app, ["agent", "create", "--name", "Agent B", "--role", "role-b", "--id", "agent-b"])
 
     # Initiate debate
     result = runner.invoke(app, ["debate", "--proposal", "Use Python", "--agent", "agent-a", "--agent", "agent-b"])

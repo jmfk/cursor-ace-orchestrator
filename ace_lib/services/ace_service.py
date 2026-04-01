@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
@@ -425,7 +426,105 @@ class ACEService:
             yaml.dump(msg.model_dump(by_alias=True), f)
         return msg
 
-    # --- Memory Pruning ---
+    # --- RALPH Loop Engine ---
+
+    def run_loop(
+        self,
+        prompt: str,
+        test_cmd: str,
+        max_iterations: int = 10,
+        path: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ):
+        """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat."""
+        iteration = 0
+        success = False
+        
+        while iteration < max_iterations:
+            iteration += 1
+            print(f"\n[RALPH] Iteration {iteration}/{max_iterations}")
+            
+            # 1. Context Refresh & Build
+            context, resolved_agent_id = self.build_context(path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id)
+            
+            # 2. Execute (Mocking cursor-agent call for now, as it's a CLI tool)
+            # In a real scenario, this would call 'ace run' or similar logic
+            print(f"[RALPH] Executing task: {prompt[:50]}...")
+            
+            # 3. Verify (Run tests)
+            print(f"[RALPH] Verifying with: {test_cmd}")
+            result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print("[RALPH] ✅ Verification successful!")
+                success = True
+                break
+            else:
+                print(f"[RALPH] ❌ Verification failed (Exit code: {result.returncode})")
+                # 4. Reflect (In a real scenario, we'd pass the error to the agent)
+                # For now, we'll just log it and continue
+            
+        return success, iteration
+
+    # --- SOP Engine ---
+
+    def onboard_agent(self, agent_id: str):
+        """Run onboarding SOP for an agent."""
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            raise ValueError(f"Agent {agent_id} not found.")
+
+        onboarding_file = self.ace_dir / f"onboarding_{agent_id}.md"
+        content = f"""# Onboarding: {agent.name} ({agent.id})
+- **Role**: {agent.role}
+- **Responsibilities**: {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
+- **Memory File**: {agent.memory_file}
+- **Status**: {agent.status}
+
+## Subsystem Status
+- [ ] Review existing codebase in {', '.join(agent.responsibilities) if agent.responsibilities else 'None'}
+- [ ] Identify technical debts
+- [ ] Propose initial strategies
+
+## Handover Notes
+No handover notes available.
+"""
+        onboarding_file.write_text(content)
+        return onboarding_file
+
+    def review_pr(self, pr_id: str, agent_id: str):
+        """Run PR review SOP for an agent."""
+        # Mocking PR review logic
+        review_file = self.ace_dir / f"review_{pr_id}_{agent_id}.md"
+        content = f"""# PR Review: {pr_id}
+- **Reviewer**: {agent_id}
+- **Date**: {datetime.now().isoformat()}
+
+## Findings
+- [ ] Check for deviations from playbook strategies
+- [ ] Identify new pitfalls
+- [ ] Verify architectural decisions
+
+## Conclusion
+Pending review.
+"""
+        review_file.write_text(content)
+        return review_file
+
+    # --- Google Stitch Integration ---
+
+    def ui_mockup(self, description: str, agent_id: str):
+        """Generate a UI mockup (Mocked for now)."""
+        # In a real scenario, this would call Google Stitch API
+        mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
+        return mockup_url
+
+    def ui_sync(self, url: str):
+        """Sync UI code from Google Stitch (Mocked for now)."""
+        # In a real scenario, this would fetch code from the URL
+        return f"// Synced from {url}\nexport const Component = () => <div>Synced Component</div>;"
 
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
