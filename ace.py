@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig, LivingSpec
+from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -85,17 +85,24 @@ def init():
 
     if not google_key:
         console.print("[yellow]GOOGLE_API_KEY not found.[/yellow]")
-        google_key = typer.prompt("Please enter your GOOGLE_API_KEY", hide_input=True)
+        google_key = typer.prompt(
+            "Please enter your GOOGLE_API_KEY", hide_input=True
+        )
         if google_key:
             cred_file.parent.mkdir(parents=True, exist_ok=True)
             # Simple append/update logic
             lines = []
             if cred_file.exists():
-                lines = [line for line in cred_file.read_text().splitlines() if not line.startswith("GOOGLE_API_KEY=")]
+                lines = [
+                    line for line in cred_file.read_text().splitlines()
+                    if not line.startswith("GOOGLE_API_KEY=")
+                ]
             lines.append(f"GOOGLE_API_KEY={google_key}")
             cred_file.write_text("\n".join(lines) + "\n")
             os.chmod(cred_file, 0o600)
-            console.print(f"Saved GOOGLE_API_KEY to [green]{cred_file}[/green]")
+            console.print(
+                f"Saved GOOGLE_API_KEY to [green]{cred_file}[/green]"
+            )
 
     # Check for CURSOR_API_KEY
     cursor_key = os.getenv("CURSOR_API_KEY")
@@ -107,16 +114,23 @@ def init():
 
     if not cursor_key:
         console.print("[yellow]CURSOR_API_KEY not found.[/yellow]")
-        cursor_key = typer.prompt("Please enter your CURSOR_API_KEY", hide_input=True)
+        cursor_key = typer.prompt(
+            "Please enter your CURSOR_API_KEY", hide_input=True
+        )
         if cursor_key:
             cred_file.parent.mkdir(parents=True, exist_ok=True)
             lines = []
             if cred_file.exists():
-                lines = [line for line in cred_file.read_text().splitlines() if not line.startswith("CURSOR_API_KEY=")]
+                lines = [
+                    line for line in cred_file.read_text().splitlines()
+                    if not line.startswith("CURSOR_API_KEY=")
+                ]
             lines.append(f"CURSOR_API_KEY={cursor_key}")
             cred_file.write_text("\n".join(lines) + "\n")
             os.chmod(cred_file, 0o600)
-            console.print(f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]")
+            console.print(
+                f"Saved CURSOR_API_KEY to [green]{cred_file}[/green]"
+            )
 
     for subdir in ["mail", "sessions", "decisions", "specs"]:
         (svc.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
@@ -290,10 +304,15 @@ def agent_review(
     ),
 ):
     """Run PR review SOP for an agent."""
-    res = api_call("POST", f"/pr/{pr_id}/review", json={"agent_id": agent_id})
+    res = api_call(
+        "POST",
+        f"/pr/{pr_id}/review",
+        json={"agent_id": agent_id}
+    )
     if res:
         console.print(
-            f"PR Review SOP started. File created: [green]{res['review_file']}[/green]"
+            f"PR Review SOP started. File created: "
+            f"[green]{res['review_file']}[/green]"
         )
     else:
         review_file = get_service().review_pr(pr_id, agent_id)
@@ -443,7 +462,8 @@ def run(
         else:
             console.print(
                 "[yellow]Skipping reflection: "
-                "ANTHROPIC_API_KEY not set and not in ~/.ace/credentials.[/yellow]"
+                "ANTHROPIC_API_KEY not set and not in "
+                "~/.ace/credentials.[/yellow]"
             )
 
     if exit_code != 0:
@@ -719,7 +739,7 @@ def loop(
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat.
     """
-    console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
+    console.print(f"🚀 [bold blue]Starting RALPH Loop[/bold blue]")
     console.print(f"Prompt: [italic]{prompt}[/italic]")
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
@@ -852,7 +872,8 @@ def debate(
 ):
     """Initiate and mediate a multi-turn debate between multiple agents."""
     console.print(
-        f"🚀 [bold blue]Initiating {turns}-turn debate on proposal:[/bold blue] {proposal}"
+        f"🚀 [bold blue]Initiating {turns}-turn debate on proposal:"
+        f"[/bold blue] {proposal}"
     )
     console.print(f"Participants: {', '.join(agents)}")
 
@@ -973,9 +994,13 @@ def spec_show(id: str = typer.Argument(..., help="Spec ID")):
         console.print(f"- {c}")
     
     if spec.implementation:
-        console.print(f"\n[bold]Implementation:[/bold]\n{spec.implementation}")
+        console.print(
+            f"\n[bold]Implementation:[/bold]\n{spec.implementation}"
+        )
     if spec.verification:
-        console.print(f"\n[bold]Verification:[/bold]\n{spec.verification}")
+        console.print(
+            f"\n[bold]Verification:[/bold]\n{spec.verification}"
+        )
 
 
 @spec_app.command("update")

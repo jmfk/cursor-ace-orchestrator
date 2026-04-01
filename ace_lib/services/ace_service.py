@@ -306,7 +306,10 @@ class ACEService:
                         api_key = line.split("=", 1)[1].strip()
                         break
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable not set and not found in ~/.ace/credentials")
+            raise ValueError(
+                "GOOGLE_API_KEY environment variable not set and "
+                "not found in ~/.ace/credentials"
+            )
         return api_key  # Return key for now, as we use it in subprocess/requests
 
     def get_cursor_key(self):
@@ -908,7 +911,8 @@ class ACEService:
 
 ## 2. Role-Specific Setup
 - [ ] Create/Verify `{agent.memory_file}` exists.
-- [ ] Ensure the playbook contains sections for "Strategier & patterns", "Kända fallgropar", and "Arkitekturella beslut".
+- [ ] Ensure the playbook contains sections for "Strategier & patterns",
+- [ ] "Kända fallgropar", and "Arkitekturella beslut".
 
 ## 3. Initial Task
 - [ ] Review existing codebase in assigned modules: {responsibilities}
