@@ -894,8 +894,10 @@ class ACEService:
                     for update in updates:
                         if test_passed:
                             update["helpful"] = max(update.get("helpful", 0), 1)
+                            update["harmful"] = 0
                         else:
                             update["harmful"] = max(update.get("harmful", 0), 1)
+                            update["helpful"] = 0
 
                     playbook_path = self.cursor_rules_dir / "_global.mdc"
                     if resolved_agent_id:
@@ -1007,6 +1009,7 @@ class ACEService:
                 os.remove(context_file)
 
         return success, iteration
+
 
     # --- Shared Coffee Break Context ---
 
@@ -1301,10 +1304,11 @@ class ACEService:
     def _verify_stitch_mockup(self, mockup_id: str, code: str):
         """Perform visual verification of the mockup using Playwright."""
         try:
-            import playwright  # noqa: F401
+            # We check if playwright is installed by trying to import it
+            import playwright.sync_api  # noqa: F401
             print(f"[STITCH] Running visual verification for {mockup_id}...")
-            # This would normally run a playwright script to render the code
-            # and compare it with the expected design or just check for errors.
+            # In a real implementation, this would start a browser, render the code,
+            # and take a screenshot or check for console errors.
             # For now, we simulate a successful verification.
             verification_file = (
                 self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
@@ -1312,9 +1316,11 @@ class ACEService:
             verification_file.write_text(
                 f"# Visual Verification: {mockup_id}\n"
                 f"Status: PASSED\n"
-                f"Timestamp: {datetime.now().isoformat()}"
+                f"Timestamp: {datetime.now().isoformat()}\n"
+                f"Details: Simulated Playwright verification successful."
             )
         except ImportError:
+            # Playwright not installed, skip verification
             pass
 
     def _generate_mockup_with_agent(self, description: str) -> str:
@@ -1419,6 +1425,7 @@ class ACEService:
             return code_match.group(1)
 
         return f"// Error: No code found in mockup {mockup_id}."
+
 
     def prune_agent_memory(self, agent_id: str, threshold: int = 0) -> int:
         agents_config = self.load_agents()
