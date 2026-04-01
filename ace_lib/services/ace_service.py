@@ -74,7 +74,10 @@ class ACEService:
         collection = client.get_or_create_collection(name=f"playbook_{agent_id}")
 
         # Split playbook into sections or entries
-        pattern = r"<!-- \[(str|mis|dec)-([^\]]+)\]\s+(?:helpful=\d+\s+harmful=\d+\s*)?::\s*(.*?) -->"
+        pattern = (
+            r"<!-- \[(str|mis|dec)-([^\]]+)\]\s+"
+            r"(?:helpful=\d+\s+harmful=\d+\s*)?::\s*(.*?) -->"
+        )
         entries = re.findall(pattern, content)
 
         if not entries:
@@ -343,16 +346,14 @@ class ACEService:
                         f"{playbook_path.read_text()}"
                     )
 
-                    # 2.1 Vectorized Memory Search (Phase 8.1)
-                    # If we have a path or task description, search for relevant entries
-                    search_query = task_description if task_description else (path if path else "general tasks")
-                    vector_results = self.search_memory(resolved_agent_id, search_query)
-                    if vector_results:
-                        context_parts.append("### RELEVANT MEMORY (Vector Search)")
-                        for res in vector_results:
-                            context_parts.append(
-                                f"- [{res['id']}] {res['content']}"
-                            )
+        # 2.1 Vectorized Memory Search (Phase 8.1)
+        # If we have a path or task description, search for relevant entries
+        search_query = task_description if task_description else (path if path else "general tasks")
+        vector_results = self.search_memory(resolved_agent_id, search_query)
+        if vector_results:
+            context_parts.append("### RELEVANT MEMORY (Vector Search)")
+            for res in vector_results:
+                context_parts.append(f"- [{res['id']}] {res['content']}")
 
         # 3. Recent decisions (ADRs)
         if self.decisions_dir.exists():
@@ -401,8 +402,9 @@ class ACEService:
         context_parts.append(f"### TASK FRAMING\n{framing}")
 
         # 7. RALPH Loop Context (if applicable)
-        if os.getenv("ACE_LOOP_PROMPT"):
-            context_parts.append(f"### RALPH LOOP PROMPT\n{os.getenv('ACE_LOOP_PROMPT')}")
+        ralph_prompt = os.getenv("ACE_LOOP_PROMPT")
+        if ralph_prompt:
+            context_parts.append(f"### RALPH LOOP PROMPT\n{ralph_prompt}")
 
         full_context = "\n\n".join(context_parts)
         
@@ -419,8 +421,10 @@ class ACEService:
         max_chars = 10000 + (complexity * 5000)
         
         if len(full_context) > max_chars:
-            print(f"[PRUNING] Context length ({len(full_context)}) exceeds limit "
-                  f"for complexity {complexity} ({max_chars}). Pruning...")
+            print(
+                f"[PRUNING] Context length ({len(full_context)}) exceeds limit "
+                f"for complexity {complexity} ({max_chars}). Pruning..."
+            )
             full_context = self.prune_context(full_context, max_chars)
 
         return full_context, resolved_agent_id
@@ -498,13 +502,12 @@ class ACEService:
             for s in prune_map[ph]:
                 if len(pruned_context) + len(s) < max_chars:
                     pruned_context += s
-                else:
-                    # Truncate the last section if we have space
-                    remaining = max_chars - len(pruned_context)
-                    if remaining > 200:
-                        trunc_msg = "\n... [TRUNCATED] ...\n"
-                        pruned_context += s[:remaining - len(trunc_msg)] + trunc_msg
-                    break
+            # Truncate the last section if we have space
+            remaining = max_chars - len(pruned_context)
+            if remaining > 200:
+                trunc_msg = "\n... [TRUNCATED] ...\n"
+                pruned_context += s[:remaining - len(trunc_msg)] + trunc_msg
+            break
             if len(pruned_context) >= max_chars:
                 break
 
@@ -1269,7 +1272,8 @@ class ACEService:
                 print("[RALPH] Committing changes...")
                 try:
                     status = subprocess.run(
-                        ["git", "status", "--porcelain"], capture_output=True, text=True
+                        ["git", "status", "--porcelain"],
+                        capture_output=True, text=True, check=False
                     )
                     if status.stdout.strip():
                         commit_msg = f"RALPH Loop: {prompt[:50]}"
@@ -1277,10 +1281,13 @@ class ACEService:
                         client = self.get_anthropic_client()
                         if client:
                             try:
-                                diff = subprocess.run(["git", "diff"], capture_output=True, text=True).stdout
+                                diff = subprocess.run(
+                                    ["git", "diff"],
+                                    capture_output=True, text=True, check=False
+                                ).stdout
                                 msg_prompt = (
-                                    "Generate a concise, one-line git commit message for the following task: "
-                                    f"{prompt[:100]}\n\n"
+                                    "Generate a concise, one-line git commit message "
+                                    f"for the following task: {prompt[:100]}\n\n"
                                     f"Git Diff context:\n{diff[:2000]}\n\n"
                                     "Output ONLY the commit message string."
                                 )
@@ -1670,9 +1677,7 @@ type: role
                 page.screenshot(path=str(screenshot_path))
                 browser.close()
 
-            verification_file = (
-                self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
-            )
+            verification_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
             verification_file.write_text(
                 f"# Visual Verification: {mockup_id}\n"
                 f"Status: PASSED\n"
@@ -1686,9 +1691,7 @@ type: role
             pass
         except Exception as e:
             print(f"[STITCH] Visual verification failed: {e}")
-            verification_file = (
-                self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
-            )
+            verification_file = self.ace_dir / "ui_mockups" / f"{mockup_id}_verified.md"
             verification_file.write_text(
                 f"# Visual Verification: {mockup_id}\n"
                 f"Status: FAILED\n"
@@ -1936,7 +1939,7 @@ type: role
         target_dir.mkdir(parents=True, exist_ok=True)
         export_file = target_dir / f"learnings_{self.base_path.name}_{agent_id}.yaml"
         with open(export_file, "w", encoding="utf-8") as f:
-            yaml.dump([learning.model_dump() for learning in learnings], f)
+            yaml.dump([learning.model_dump(mode="json") for learning in learnings], f)
         
         return learnings
 
@@ -1949,6 +1952,12 @@ type: role
             data = yaml.load(f)
             if not data:
                 return 0
+            
+            # Phase 10.10: Advanced synchronization logic
+            # 1. Filter out low-value learnings (harmful > helpful)
+            # 2. Anonymize project-specific paths/names if possible
+            # 3. Avoid duplicates by comparing descriptions
+            
             learnings = [CrossProjectLearning(**learning) for learning in data]
 
         agents_config = self.load_agents()
@@ -1960,20 +1969,40 @@ type: role
         if not playbook_path.exists():
             return 0
 
+        existing_content = playbook_path.read_text(encoding="utf-8")
+        
         updates = []
+        import_count = 0
         for learning in learnings:
+            # 1. Filter low-value
+            if learning.harmful > learning.helpful:
+                continue
+            
+            # 3. Anonymize/Clean description (Phase 10.10)
+            # Replace potential project names or local paths with generic placeholders
+            clean_desc = learning.description
+            # Simple heuristic: replace /Users/... or C:\... with <PATH>
+            clean_desc = re.sub(r'(/Users/\w+|[A-Z]:\\[\w\\]+)', '<PATH>', clean_desc)
+            
+            full_import_desc = f"[X-PROJ from {learning.source_project}] {clean_desc}"
+            
+            # 2. Check for duplicates
+            if full_import_desc in existing_content:
+                continue
+            
             updates.append({
                 "type": learning.type,
                 "id": "NEW",
                 "helpful": learning.helpful,
                 "harmful": learning.harmful,
-                "description": f"[X-PROJ from {learning.source_project}] {learning.description}"
+                "description": full_import_desc
             })
+            import_count += 1
 
         if updates:
             self.update_playbook(playbook_path, updates)
         
-        return len(updates)
+        return import_count
 
     # --- Subscriptions ---
 
