@@ -19,10 +19,12 @@ STATE_HISTORY_FILE = "ralph_state_history.json"
 DEFAULT_PRD = "PRD-01 - Cursor-ace-orchestrator-prd.md"
 STAGNATION_THRESHOLD = 2  # Number of iterations with same state before alert
 MAX_CONSECUTIVE_FAILURES = 3  # Max LLM failures before circuit breaker trips
+QUIT_ON_RATE_LIMIT = True  # If True, stop the loop on rate limit detection
 
 # Global State
 LLM_CIRCUIT_BREAKER_TRIPPED = False
 CONSECUTIVE_FAILURES = 0
+PAID_ACCOUNT_REQUIRED = False
 
 # NOTE: This script is a temporary bootstrapping tool.
 # Once the core ACE Orchestrator is built, this script should be
@@ -77,10 +79,14 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
 
 def run_cursor_agent(prompt: str):
     """Runs cursor-agent in non-interactive mode and tracks usage."""
-    global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES
+    global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
 
     if LLM_CIRCUIT_BREAKER_TRIPPED:
         log_message("🚫 Circuit breaker is TRIPPED. Skipping LLM call.")
+        return None
+    
+    if PAID_ACCOUNT_REQUIRED:
+        log_message("🚫 Paid account required. Skipping LLM call.")
         return None
 
     start_time = time.time()
@@ -108,10 +114,15 @@ def run_cursor_agent(prompt: str):
 
         if result.returncode != 0:
             CONSECUTIVE_FAILURES += 1
+            error_output = result.stdout + result.stderr
             log_message(
                 f"❌ Cursor Agent failed with Exit Code {result.returncode} "
                 f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
             
+            if "429" in error_output or "RESOURCE_EXHAUSTED" in error_output or "rate limit" in error_output.lower():
+                PAID_ACCOUNT_REQUIRED = True
+                log_message("🚨 Detected rate limit from Cursor Agent (429/RESOURCE_EXHAUSTED).")
+
             if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
                 log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
@@ -144,7 +155,7 @@ def run_cursor_agent(prompt: str):
 
 def generate_commit_message(task_name: str):
     """Generate a descriptive commit message using direct Gemini API or cursor-agent."""
-    global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES
+    global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
 
     # Check for Gemini API key in multiple possible environment variables
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -180,7 +191,7 @@ def generate_commit_message(task_name: str):
         "Output ONLY the commit message string. No JSON, no markdown, no quotes."
     )
 
-    if api_key and not LLM_CIRCUIT_BREAKER_TRIPPED:
+    if api_key and not LLM_CIRCUIT_BREAKER_TRIPPED and not PAID_ACCOUNT_REQUIRED:
         log_message("Generating commit message via direct Gemini API...")
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"gemini-2.5-flash:generateContent?key={api_key}")
@@ -199,9 +210,14 @@ def generate_commit_message(task_name: str):
                 return msg
             else:
                 CONSECUTIVE_FAILURES += 1
+                error_text = response.text
                 log_message(f"⚠️ Direct Gemini API failed (Status "
-                            f"{response.status_code}). Error: {response.text} "
+                            f"{response.status_code}). Error: {error_text} "
                             f"(Consecutive failures: {CONSECUTIVE_FAILURES})")
+                
+                if response.status_code == 429 or "RESOURCE_EXHAUSTED" in error_text:
+                    PAID_ACCOUNT_REQUIRED = True
+                    log_message("🚨 Detected Free Tier rate limit (429/RESOURCE_EXHAUSTED).")
                 
                 if CONSECUTIVE_FAILURES >= MAX_CONSECUTIVE_FAILURES:
                     LLM_CIRCUIT_BREAKER_TRIPPED = True
@@ -367,6 +383,10 @@ def main():
 
     iteration = 0
     while True:
+        if PAID_ACCOUNT_REQUIRED and QUIT_ON_RATE_LIMIT:
+            log_message("🚨 STOPPED: Gemini API Free Tier quota exceeded. Please upgrade to a paid plan or wait for the quota to reset.")
+            break
+
         current_cost = get_total_cost()
         if current_cost >= MAX_SPEND_USD:
             log_message(f"Reached maximum spending limit (${MAX_SPEND_USD}). Stopping.")

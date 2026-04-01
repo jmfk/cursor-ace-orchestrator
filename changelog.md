@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 38
+
+### Added
+- **Phase 7: Future Directions**
+  - Vectorized Memory: Replaced flat `.mdc` with embedding-based search for large playbooks using a vector database.
+  - Updated `plan.md` to mark task 7.1 as completed.
+
 ## [2026-04-01] - RALPH Loop Iteration 37
 
 ### Added
