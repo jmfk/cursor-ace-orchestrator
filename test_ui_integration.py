@@ -40,6 +40,9 @@ def test_ui_mockup_command(tmp_path, monkeypatch):
     assert "Generating UI mockup" in result.stdout
     assert "Create a login page" in result.stdout
     assert "ui-agent-01" in result.stdout
+    assert "Generating UI mockup" in result.stdout
+    assert "Create a login page" in result.stdout
+    assert "ui-agent-01" in result.stdout
 
 
 def test_ui_sync_command(tmp_path, monkeypatch):

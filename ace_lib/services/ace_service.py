@@ -1509,7 +1509,9 @@ class ACEService:
                     
                     if not ui_code:
                         # Fallback if code missing in response
-                        ui_code = self._generate_mockup_with_agent(description)
+                        ui_code = self._generate_mockup_with_agent(
+                            description
+                        )
                 else:
                     print(f"[STITCH] API failed ({response.status_code}). Falling back to agent.")
                     ui_code = self._generate_mockup_with_agent(description)

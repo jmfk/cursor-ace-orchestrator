@@ -160,7 +160,7 @@ def api_call(method: str, endpoint: str, **kwargs):
     """Make an API call, fallback to local service if API is unavailable."""
     try:
         url = f"{API_BASE_URL}{endpoint}"
-        response = requests.request(method, url, timeout=0.1, **kwargs)
+        response = requests.request(method, url, timeout=0.5, **kwargs)
         if response.status_code == 200:
             return response.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
@@ -986,9 +986,10 @@ def loop(
                     break
 
     # Use the service to run the loop
-    success, iterations = svc.run_loop(
-        prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file
-    )
+    with console.status("[bold green]Running RALPH Loop..."):
+        success, iterations = svc.run_loop(
+            prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file
+        )
 
     if success:
         console.print(

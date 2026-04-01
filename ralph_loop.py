@@ -44,7 +44,6 @@ PAID_ACCOUNT_REQUIRED = False
 
 def load_config(config_path="ralph.yaml"):
     """Load configuration from YAML file and override defaults."""
-    global CONFIG
     if os.path.exists(config_path):
         try:
             with open(config_path, "r") as f:
@@ -212,25 +211,32 @@ def generate_commit_message(task_name: str):
         data = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            if response.status_code == 200:
-                result = response.json()
-                msg = (result['candidates'][0]['content']['parts'][0]['text'].strip())
-                CONSECUTIVE_FAILURES = 0 
-                return msg
-            else:
-                CONSECUTIVE_FAILURES += 1
-                error_text = response.text
-                log_message(f"⚠️ Direct Gemini API failed (Status {response.status_code}). Error: {error_text}")
-                
-                if response.status_code == 429 or "RESOURCE_EXHAUSTED" in error_text:
-                    PAID_ACCOUNT_REQUIRED = True
-                
-                if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
-                    LLM_CIRCUIT_BREAKER_TRIPPED = True
-                log_message("Falling back to iteration-based message.")
-        except Exception as e:
+    try:
+        response = requests.post(
+            url, headers=headers, json=data, timeout=30
+        )
+        if response.status_code == 200:
+            result = response.json()
+            msg = (
+                result['candidates'][0]['content']['parts'][0]['text']
+                .strip()
+            )
+            return msg
+        else:
+            CONSECUTIVE_FAILURES += 1
+            error_text = response.text
+            log_message(
+                f"⚠️ Direct Gemini API failed (Status {response.status_code}). "
+                f"Error: {error_text}"
+            )
+            
+            if response.status_code == 429 or "RESOURCE_EXHAUSTED" in error_text:
+                PAID_ACCOUNT_REQUIRED = True
+            
+            if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
+                LLM_CIRCUIT_BREAKER_TRIPPED = True
+            log_message("Falling back to iteration-based message.")
+    except Exception as e:
             CONSECUTIVE_FAILURES += 1
             log_message(f"⚠️ Error calling Gemini API: {e}.")
             if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
@@ -406,7 +412,11 @@ def main():
         # Step 4: Commit
         log_message("Step 4: Committing...")
         try:
-            status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True
+            )
             if status.stdout.strip():
                 commit_msg = generate_commit_message(current_task)
                 subprocess.run(["git", "add", "."], check=True)
