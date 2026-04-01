@@ -96,8 +96,8 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.17 Cross-Project Learning Export Refinement**: Refine the logic for exporting and importing anonymized learnings between projects.
 - [x] **10.18 Automated Security Audit Integration**: Integrate automated security checks into the RALPH loop for agent-owned modules.
 - [x] **10.19 Agent Subscription Notification System**: Enhance the agent subscription system with more granular notification options.
-- [ ] **10.20 Performance Profiling Dashboard**: Create a web-based dashboard for visualizing performance profiling data.
-- [ ] **10.21 Adaptive Memory Archival Logic**: Refine the logic for automatic archival of low-utility memories.
+- [x] **10.20 Performance Profiling Dashboard**: Create a web-based dashboard for visualizing performance profiling data.
+- [x] **10.21 Adaptive Memory Archival Logic**: Refine the logic for automatic archival of low-utility memories.
 - [ ] **10.22 Multi-Agent Debate Mediation Refinement**: Further optimize the LLM-referee logic for multi-agent debates.
 - [ ] **10.23 Living Specs Automation Refinement**: Enhance the automation of living specs updates based on implementation changes.
 - [ ] **10.24 ACE Self-Audit Enhancements**: Implement more comprehensive self-audit capabilities for the ACE codebase.

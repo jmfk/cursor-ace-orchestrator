@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 93
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.21 (Adaptive Memory Archival Logic) as completed in `plan.md`.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
+## [2026-04-02] - RALPH Loop Iteration 92
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.20 (Performance Profiling Dashboard) as completed in `plan.md`.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 91
 
 ### Updated

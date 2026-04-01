@@ -131,13 +131,13 @@ class ACEService:
             collection_name = f"playbook_{agent_id.replace('-', '_')}"
             collection = client.get_collection(name=collection_name)
             
-            # Use metadata filtering to exclude low-utility entries if needed
-            results = collection.query(
-                query_texts=[query],
-                n_results=min(n_results, 10),
-                # Example of metadata filtering (could be made configurable)
-                # where={"helpful": {"$gt": 0}} 
-            )
+        # Use metadata filtering to exclude low-utility entries if needed
+        results = collection.query(
+            query_texts=[query],
+            n_results=min(n_results, 10),
+            # Example of metadata filtering (could be made configurable)
+            # where={"helpful": {"$gt": 0}}
+        )
 
             formatted_results = []
             if results["ids"] and results["ids"][0]:
@@ -475,7 +475,7 @@ class ACEService:
         # Reconstruct with priority
         keep_headers = ["GLOBAL RULES", "AGENT PLAYBOOK", "TASK FRAMING", "RALPH LOOP PROMPT"]
         prune_priority = ["RECENT DECISIONS", "RECENT SESSIONS", "SHARED LEARNINGS", "RELEVANT MEMORY"]
-        
+
         new_sections = []
         # Always keep the first part (if any) before the first ###
         if not context.startswith("### "):
@@ -489,7 +489,7 @@ class ACEService:
         keep_list = []
         prune_map = {header: [] for header in prune_priority}
         other_list = []
-        
+
         for s in sections:
             header_line = s.split("\n")[0].strip()
             is_keep = False
@@ -507,13 +507,13 @@ class ACEService:
                     prune_map[ph].append("### " + s)
                     is_prune = True
                     break
-            
+
             if not is_prune:
                 other_list.append("### " + s)
         
         # Start building the pruned context
         pruned_context = "".join(new_sections) + "".join(keep_list)
-        
+
         # Add other sections first (not in prune priority but not in keep)
         for s in other_list:
             if len(pruned_context) + len(s) < max_chars:
@@ -673,7 +673,7 @@ class ACEService:
                 )
             return str(message.content)
         except Exception:
-            return f"Error during reflection."
+            return "Error during reflection."
 
     def parse_reflection_output(self, reflection_text: str) -> List[Dict]:
         updates = []
@@ -768,7 +768,7 @@ class ACEService:
         # Phase 8.1: Re-index playbook after update
         if agent_id:
             self.index_playbook(agent_id)
-            
+
         return True
 
     # --- ADR Management ---
@@ -1021,7 +1021,7 @@ class ACEService:
 
             for aid in participants:
                 self.send_mail(aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus)
-                
+
             return consensus
         except Exception as e:
             return f"Error: {e}"
@@ -1110,6 +1110,9 @@ class ACEService:
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
         plan_file = plan_file or "plan.md"
 
+        print(f"[RALPH] Using PRD: {prd_path}")
+        print(f"[RALPH] Using Plan: {plan_file}")
+
         # Initial state hash for stagnation detection
         while iteration < max_iterations:
             if total_cost >= max_spend:
@@ -1119,18 +1122,23 @@ class ACEService:
             iteration += 1
             print(f"\n[RALPH] Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f})")
 
-            # 0. Initial State Analysis (if it's the first iteration and we have a plan file)
+            # 1. Initial State Analysis (if it's the first iteration and we have a plan file)
             if iteration == 1 and os.path.exists(prd_path) and os.path.exists(plan_file):
                 print(f"[RALPH] Step 0: Analyzing current project state against {prd_path}...")
                 plan_content = Path(plan_file).read_text(encoding="utf-8")
+                prd_content = Path(prd_path).read_text(encoding="utf-8")
                 analysis_prompt = (
-                    f"Analyze the current codebase and project structure relative to {prd_path}. "
+                    f"Analyze the current codebase and project structure relative to the PRD:\n{prd_content}\n\n"
                     f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
-                    f"1. Identify implemented features. 2. Identify missing parts. 3. Update '{plan_file}'."
+                    f"1. Identify implemented features. 2. Identify missing parts. 3. Update '{plan_file}' and 'changelog.md' with the current status. "
+                    "Focus on identifying the very next actionable task."
                 )
-                # We use the prompt for the first iteration if it was just "analyze"
-                if "analyze" in prompt.lower() and len(prompt) < 50:
+                # If the prompt is just "analyze", we use the analysis prompt
+                if prompt.lower().strip() == "analyze":
                     prompt = analysis_prompt
+                else:
+                    # Otherwise we prepend the analysis to the prompt for the first iteration
+                    prompt = f"{analysis_prompt}\n\nThen, proceed with the following task: {prompt}"
 
             # 1. Context Refresh & Build (Phase 4.1)
             os.environ["ACE_LOOP_PROMPT"] = prompt
@@ -1147,7 +1155,7 @@ class ACEService:
                 env["GOOGLE_API_KEY"] = self.get_google_client()
             except ValueError:
                 pass
-            
+
             cursor_key = self.get_cursor_key()
             if cursor_key:
                 env["CURSOR_API_KEY"] = cursor_key
@@ -1174,7 +1182,7 @@ class ACEService:
             output_tokens = len(agent_proc.stdout.split()) * 1.3
             cost = (input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40)
             total_cost += cost
-            
+
             self.log_token_usage(TokenUsage(
                 agent_id=resolved_agent_id or "unknown",
                 session_id=f"loop_{iteration}",
@@ -1356,7 +1364,7 @@ class ACEService:
                 # Notify subscribers of the change
                 if path:
                     self.notify_subscribers(path, f"RALPH Loop successful for: {prompt}", success=True)
-                
+
                 # Update plan.md if it exists
                 if os.path.exists(plan_file):
                     print(f"[RALPH] Updating {plan_file}...")
@@ -1400,7 +1408,7 @@ class ACEService:
         """Sync learnings from all agents into shared-learnings.mdc."""
         shared_file = self.ace_dir / "shared-learnings.mdc"
         agents_config = self.load_agents()
-        
+
         all_learnings = []
         for agent in agents_config.agents:
             playbook_path = self.base_path / agent.memory_file
@@ -1819,18 +1827,18 @@ type: role
                         )
                         diff_file.write_text("\n".join(diff))
 
-            # Update local mockup file with synced code
-            content = (
-                f"# UI Mockup (Synced): {mockup_id}\n"
-                f"- **URL**: {url}\n"
-                f"- **Status**: Synced\n"
-                f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
-                f"## Design & Code\n"
-                f"```tsx\n{ui_code}\n```\n"
-            )
-            mockup_file.write_text(content, encoding="utf-8")
-            
-            # Extract components from synced code
+        # Update local mockup file with synced code
+        content = (
+            f"# UI Mockup (Synced): {mockup_id}\n"
+            f"- **URL**: {url}\n"
+            f"- **Status**: Synced\n"
+            f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+            f"## Design & Code\n"
+            f"```tsx\n{ui_code}\n```\n"
+        )
+        mockup_file.write_text(content, encoding="utf-8")
+
+        # Extract components from synced code
             self._extract_stitch_components(mockup_id, ui_code)
             return ui_code
 
@@ -1887,17 +1895,18 @@ type: role
             return match.group(0)
 
         new_content = re.sub(pattern, prune_match, content)
+        # Phase 8.1: Re-index if we pruned anything
         if pruned_count > 0:
             playbook_path.write_text(new_content, encoding="utf-8")
-            
+
             # Re-index if we pruned anything
             self.index_playbook(agent.id)
-            
+
         return pruned_count
 
     def adaptive_memory_prune(self, agent_id: str, usage_threshold: int = 5) -> int:
         """
-        Automatically archive low-utility memories based on usage frequency (Phase 10.12).
+        Automatically archive low-utility memories based on usage frequency (Phase 10.12/10.21).
         Utility is calculated as (helpful - harmful).
         If utility < usage_threshold and the memory hasn't been 'helpful' recently, it's archived.
         """
@@ -1911,18 +1920,20 @@ type: role
             return 0
 
         content = playbook_path.read_text(encoding="utf-8")
-        
-        # We'll use a more advanced heuristic here.
-        # Memories with high 'harmful' counts are pruned immediately.
-        # Memories with low 'helpful' counts that haven't been updated in a while are archived.
+
+        # Phase 10.21 Refinement: Enhanced heuristic for archival
+        # 1. Strategies (str) with negative utility are archived.
+        # 2. Strategies with low utility (< usage_threshold) are archived if they have any harmful counts.
+        # 3. Pitfalls (mis) are only archived if they have extremely high helpful counts (meaning they are no longer relevant or too obvious).
+        # 4. Decisions (dec) are never archived via this logic as they are historical records.
         
         pattern = (
             r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)"
             r"\s*::\s*(.*?) -->"
         )
-        
+
         pruned_count = 0
-        
+
         def adaptive_prune_match(match):
             nonlocal pruned_count
             l_type = match.group(1)
@@ -1931,28 +1942,22 @@ type: role
 
             utility = helpful - harmful
 
-            # Heuristic:
-            # 1. If harmful > helpful, it's definitely low utility.
-            # 2. If it's a strategy (str) and utility is very low (< -2), prune.
-            # 3. If it's a pitfall (mis) and it hasn't been seen (harmful is low),
-            #    we might keep it anyway as a warning, but if helpful is high (meaning we avoided it),
-            #    it's high utility.
-            
-            should_prune = False
+            should_archive = False
             if l_type == "str":
-                if utility < -1: # More harmful than helpful
-                    should_prune = True
+                if utility < 0: # More harmful than helpful
+                    should_archive = True
                 elif helpful < usage_threshold and harmful > 0:
                     # Low usage and has caused some harm
-                    should_prune = True
+                    should_archive = True
+                elif helpful == 0 and harmful == 0:
+                    # Never used
+                    should_archive = True
             elif l_type == "mis":
-                if utility < -5: # Very high harmful count compared to helpful (avoidance)
-                    # This means we keep hitting the same pitfall despite knowing it.
-                    # Maybe the description is bad or it's too common.
-                    # We don't prune pitfalls as easily because they are warnings.
-                    pass
+                # Pitfalls are archived if they are "solved" or too obvious
+                if helpful > 20 and harmful == 0:
+                    should_archive = True
             
-            if should_prune:
+            if should_archive:
                 pruned_count += 1
                 return f"<!-- [ARCHIVED] {match.group(0)} -->"
             
@@ -1962,7 +1967,7 @@ type: role
         if pruned_count > 0:
             playbook_path.write_text(new_content, encoding="utf-8")
             self.index_playbook(agent.id)
-            
+
         return pruned_count
 
     # --- Living Specs Management ---
@@ -1993,7 +1998,7 @@ type: role
         spec.updated_at = datetime.now().isoformat()
         with open(spec_file, "w", encoding="utf-8") as f:
             yaml.dump(spec.model_dump(), f)
-        
+
         # Also generate/update a markdown version for visibility
         md_file = self.specs_dir / f"{spec.id}.md"
         md_content = f"""# Living Spec: {spec.title} ({spec.id})
@@ -2071,15 +2076,15 @@ type: role
 
         with open(source_file, "r", encoding="utf-8") as f:
             data = yaml.load(f)
-            if not data:
-                return 0
-            
-            # Phase 10.10: Advanced synchronization logic
-            # 1. Filter out low-value learnings (harmful > helpful)
-            # 2. Anonymize project-specific paths/names if possible
-            # 3. Avoid duplicates by comparing descriptions
-            
-            learnings = [CrossProjectLearning(**learning) for learning in data]
+        if not data:
+            return 0
+
+        # Phase 10.10: Advanced synchronization logic
+        # 1. Filter out low-value learnings (harmful > helpful)
+        # 2. Anonymize project-specific paths/names if possible
+        # 3. Avoid duplicates by comparing descriptions
+
+        learnings = [CrossProjectLearning(**learning) for learning in data]
 
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
@@ -2091,7 +2096,7 @@ type: role
             return 0
 
         existing_content = playbook_path.read_text(encoding="utf-8")
-        
+
         updates = []
         import_count = 0
         for learning in learnings:

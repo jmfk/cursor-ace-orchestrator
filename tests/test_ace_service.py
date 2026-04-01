@@ -634,7 +634,7 @@ def test_adaptive_context_pruning(service):
 
 
 def test_adaptive_memory_pruning(service):
-    """Test adaptive memory pruning logic (Phase 10.12)."""
+    """Test adaptive memory pruning logic (Phase 10.12/10.21)."""
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     playbook_path = service.cursor_rules_dir / "developer.mdc"
     playbook_path.write_text("""# Developer Playbook
@@ -642,7 +642,9 @@ def test_adaptive_memory_pruning(service):
 <!-- [str-001] helpful=1 harmful=5 :: Harmful strategy -->
 <!-- [str-002] helpful=5 harmful=1 :: Helpful strategy -->
 <!-- [str-003] helpful=2 harmful=3 :: Low utility strategy -->
+<!-- [str-004] helpful=0 harmful=0 :: Never used strategy -->
 <!-- [mis-001] helpful=1 harmful=10 :: Very common pitfall (keep) -->
+<!-- [mis-002] helpful=25 harmful=0 :: Solved/Obvious pitfall (archive) -->
 """)
 
     service.create_agent(id="dev-1", name="Dev 1", role="developer")
@@ -650,9 +652,11 @@ def test_adaptive_memory_pruning(service):
     # Adaptive prune
     pruned_count = service.adaptive_memory_prune("dev-1", usage_threshold=5)
 
-    assert pruned_count == 2 # str-001 and str-003 should be pruned
+    assert pruned_count == 4 # str-001, str-003, str-004, and mis-002 should be pruned
     content = playbook_path.read_text()
     assert "[ARCHIVED] <!-- [str-001]" in content
     assert "[ARCHIVED] <!-- [str-003]" in content
+    assert "[ARCHIVED] <!-- [str-004]" in content
+    assert "[ARCHIVED] <!-- [mis-002]" in content
     assert "<!-- [str-002]" in content
-    assert "<!-- [mis-001]" in content # Pitfalls are kept
+    assert "<!-- [mis-001]" in content # Common pitfalls are kept
