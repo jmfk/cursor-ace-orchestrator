@@ -30,7 +30,7 @@ class ReflectionEngine:
 
     def parse_output(self, text: str) -> ReflectionResult:
         """Parse structured reflection output."""
-        result = ReflectionResult()
+        result = ReflectionResult(entries=[])
 
         # Find all matches for strategies
         for match in re.finditer(self.STR_PATTERN, text):

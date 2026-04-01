@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-01] - RALPH Loop Iteration 40
+
+### Added
+- **Phase 7: Future Directions**
+  - Updated `plan.md` to mark task 7.2 as completed and ensure the list is sorted.
+  - Recorded completion of IDE Extension Integration in `changelog.md`.
+
 ## [2026-04-01] - RALPH Loop Iteration 39
 
 ### Added
