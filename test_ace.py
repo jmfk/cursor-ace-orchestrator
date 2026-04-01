@@ -370,6 +370,7 @@ def test_memory_prune(temp_ace_dir, monkeypatch):
             "--id", "test-01"
         ]
     )
+
     playbook_path = Path(".cursor/rules/tester.mdc")
     playbook_path.parent.mkdir(parents=True, exist_ok=True)
     playbook_path.write_text("""
@@ -625,13 +626,14 @@ def test_subscriptions_granular(temp_ace_dir, monkeypatch):
 
     # Subscribe with granular options
     result = runner.invoke(
-        app, 
+        app,
         [
-            "subscribe", "agent-a", "src/auth", 
-            "--priority", "high", 
+            "subscribe", "agent-a", "src/auth",
+            "--priority", "high",
             "--no-notify-on-success"
         ]
     )
+
     assert result.exit_code == 0
     assert "priority high" in result.stdout
 

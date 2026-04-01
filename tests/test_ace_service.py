@@ -660,3 +660,38 @@ def test_adaptive_memory_pruning(service):
     assert "[ARCHIVED] <!-- [mis-002]" in content
     assert "<!-- [str-002]" in content
     assert "<!-- [mis-001]" in content # Common pitfalls are kept
+
+
+def test_living_spec_automation(service, monkeypatch):
+    """Test Living Spec automation refinement (Phase 10.23)."""
+    from unittest.mock import MagicMock
+
+    # Setup spec
+    spec = service.create_spec(
+        id="test-spec",
+        title="Test Spec",
+        intent="Test Intent",
+        constraints=["Constraint 1"]
+    )
+
+    # Mock LLM
+    mock_client = MagicMock()
+    mock_message = MagicMock()
+    mock_message.content = [
+        MagicMock(text='{"implementation": "Implemented feature X", "verification": "Passed all tests", "status": "verified"}')
+    ]
+    mock_client.messages.create.return_value = mock_message
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: mock_client)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Automate update
+    updated_spec = service.automate_spec_update("test-spec", "Session output data")
+
+    assert updated_spec.implementation == "Implemented feature X"
+    assert updated_spec.verification == "Passed all tests"
+    assert updated_spec.status == "verified"
+
+    # Check markdown file
+    md_file = service.specs_dir / "test-spec.md"
+    assert md_file.exists()
+    assert "Implemented feature X" in md_file.read_text()

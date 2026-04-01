@@ -130,14 +130,14 @@ class ACEService:
             # We use a more robust collection naming and retrieval
             collection_name = f"playbook_{agent_id.replace('-', '_')}"
             collection = client.get_collection(name=collection_name)
-            
-        # Use metadata filtering to exclude low-utility entries if needed
-        results = collection.query(
-            query_texts=[query],
-            n_results=min(n_results, 10),
-            # Example of metadata filtering (could be made configurable)
-            # where={"helpful": {"$gt": 0}}
-        )
+
+            # Use metadata filtering to exclude low-utility entries if needed
+            results = collection.query(
+                query_texts=[query],
+                n_results=min(n_results, 10),
+                # Example of metadata filtering (could be made configurable)
+                # where={"helpful": {"$gt": 0}}
+            )
 
             formatted_results = []
             if results["ids"] and results["ids"][0]:
@@ -1099,6 +1099,7 @@ class ACEService:
         plan_file: Optional[str] = None,
         max_spend: float = 20.0,
         model: str = "gemini-3-flash",
+        spec_id: Optional[str] = None,
     ):
         """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 4.1)."""
         iteration = 0
@@ -1112,6 +1113,8 @@ class ACEService:
 
         print(f"[RALPH] Using PRD: {prd_path}")
         print(f"[RALPH] Using Plan: {plan_file}")
+        if spec_id:
+            print(f"[RALPH] Using Living Spec: {spec_id}")
 
         # Initial state hash for stagnation detection
         while iteration < max_iterations:
@@ -1127,10 +1130,23 @@ class ACEService:
                 print(f"[RALPH] Step 0: Analyzing current project state against {prd_path}...")
                 plan_content = Path(plan_file).read_text(encoding="utf-8")
                 prd_content = Path(prd_path).read_text(encoding="utf-8")
+                
+                spec_context = ""
+                if spec_id:
+                    spec = self.get_spec(spec_id)
+                    if spec:
+                        spec_context = (
+                            f"\n\nTarget Living Spec ({spec_id}):\n"
+                            f"Intent: {spec.intent}\n"
+                            f"Constraints: {', '.join(spec.constraints)}\n"
+                        )
+
                 analysis_prompt = (
                     f"Analyze the current codebase and project structure relative to the PRD:\n{prd_content}\n\n"
                     f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
-                    f"1. Identify implemented features. 2. Identify missing parts. 3. Update '{plan_file}' and 'changelog.md' with the current status. "
+                    f"{spec_context}"
+                    "1. Identify implemented features. 2. Identify missing parts. "
+                    f"3. Update '{plan_file}' and 'changelog.md' with the current status. "
                     "Focus on identifying the very next actionable task."
                 )
                 # If the prompt is just "analyze", we use the analysis prompt
@@ -1145,6 +1161,14 @@ class ACEService:
             context, resolved_agent_id = self.build_context(
                 path=path, task_type=TaskType.IMPLEMENT, agent_id=agent_id, task_description=prompt
             )
+
+            if spec_id:
+                spec = self.get_spec(spec_id)
+                if spec:
+                    context = (
+                        f"### TARGET LIVING SPEC ({spec_id})\n{spec.intent}\n\n"
+                        f"Constraints: {', '.join(spec.constraints)}\n\n{context}"
+                    )
 
             # 2. Execute (Phase 4.1)
             print(f"[RALPH] Executing task: {prompt[:50]}...")
@@ -1375,6 +1399,11 @@ class ACEService:
                         f"cursor-agent --print --model {model} --force --trust \"{update_plan_prompt}\"",
                         shell=True, env=env
                     )
+
+                # Update Living Spec if applicable (Phase 10.23)
+                if spec_id:
+                    print(f"[RALPH] Automating Living Spec update for {spec_id}...")
+                    self.automate_spec_update(spec_id, agent_proc.stdout)
 
                 success = True
                 break
@@ -1827,18 +1856,18 @@ type: role
                         )
                         diff_file.write_text("\n".join(diff))
 
-        # Update local mockup file with synced code
-        content = (
-            f"# UI Mockup (Synced): {mockup_id}\n"
-            f"- **URL**: {url}\n"
-            f"- **Status**: Synced\n"
-            f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
-            f"## Design & Code\n"
-            f"```tsx\n{ui_code}\n```\n"
-        )
-        mockup_file.write_text(content, encoding="utf-8")
+            # Update local mockup file with synced code
+            content = (
+                f"# UI Mockup (Synced): {mockup_id}\n"
+                f"- **URL**: {url}\n"
+                f"- **Status**: Synced\n"
+                f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+                f"## Design & Code\n"
+                f"```tsx\n{ui_code}\n```\n"
+            )
+            mockup_file.write_text(content, encoding="utf-8")
 
-        # Extract components from synced code
+            # Extract components from synced code
             self._extract_stitch_components(mockup_id, ui_code)
             return ui_code
 
@@ -1924,7 +1953,8 @@ type: role
         # Phase 10.21 Refinement: Enhanced heuristic for archival
         # 1. Strategies (str) with negative utility are archived.
         # 2. Strategies with low utility (< usage_threshold) are archived if they have any harmful counts.
-        # 3. Pitfalls (mis) are only archived if they have extremely high helpful counts (meaning they are no longer relevant or too obvious).
+        # 3. Pitfalls (mis) are only archived if they have extremely high helpful counts
+        #    (meaning they are no longer relevant or too obvious).
         # 4. Decisions (dec) are never archived via this logic as they are historical records.
         
         pattern = (
@@ -2013,11 +2043,58 @@ type: role
 """
         for c in spec.constraints:
             md_content += f"- {c}\n"
-        
+
         md_content += f"\n## Implementation\n{spec.implementation or 'TBD'}\n"
         md_content += f"\n## Verification\n{spec.verification or 'TBD'}\n"
-        
+
         md_file.write_text(md_content, encoding="utf-8")
+        return spec
+
+    def automate_spec_update(self, spec_id: str, session_output: str) -> Optional[LivingSpec]:
+        """Automatically update a living spec based on session output (Phase 10.23)."""
+        spec = self.get_spec(spec_id)
+        if not spec:
+            return None
+
+        client = self.get_anthropic_client()
+        if not client:
+            return spec
+
+        prompt = (
+            "You are an ACE Spec Automator. Your task is to update a Living Spec based on the "
+            "implementation results from a coding session.\n\n"
+            f"Current Spec ({spec.id}):\n"
+            f"Intent: {spec.intent}\n"
+            f"Constraints: {', '.join(spec.constraints)}\n"
+            f"Current Implementation: {spec.implementation or 'None'}\n"
+            f"Current Verification: {spec.verification or 'None'}\n\n"
+            f"Session Output:\n{session_output}\n\n"
+            "Extract the actual technical implementation details and verification results. "
+            "Format your output as a JSON object with 'implementation', 'verification', and 'status' (draft/implemented/verified).\n"
+            "Example: {\"implementation\": \"Added auth middleware in /src/middleware/auth.ts\", \"verification\": \"All 5 tests passed in test_auth.py\", \"status\": \"verified\"}"
+        )
+
+        try:
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            import json
+            content = "".join([b.text for b in message.content if hasattr(b, "text")])
+            json_match = re.search(r"\{.*\}", content, re.DOTALL)
+            if json_match:
+                updates = json.loads(json_match.group(0))
+                if "implementation" in updates:
+                    spec.implementation = updates["implementation"]
+                if "verification" in updates:
+                    spec.verification = updates["verification"]
+                if "status" in updates:
+                    spec.status = updates["status"]
+                return self.save_spec(spec)
+        except Exception as e:
+            print(f"Error automating spec update: {e}")
+
         return spec
 
     def create_spec(self, id: str, title: str, intent: str, constraints: List[str] = None) -> LivingSpec:
@@ -2127,7 +2204,7 @@ type: role
 
         if updates:
             self.update_playbook(playbook_path, updates)
-        
+
         return import_count
 
     # --- Subscriptions ---
@@ -2211,7 +2288,7 @@ type: role
         log_file = Path(".ace/profiling.jsonl")
         if not log_file.exists():
             return []
-        
+
         logs = []
         with open(log_file, "r") as f:
             for line in f:
@@ -2263,7 +2340,7 @@ type: role
         """Delegate sub-tasks to existing or new sub-agents."""
         delegations = {}
         agents_config = self.load_agents()
-        
+
         for task in subtasks:
             # Simple delegation logic: find an agent whose role matches keywords in the description
             # or assign to a new sub-agent if complexity is high.
@@ -2308,7 +2385,7 @@ type: role
             return []
 
         content = playbook_path.read_text(encoding="utf-8")
-        
+
         # Extract strategies and pitfalls
         pattern = r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)\s*::\s*(.*?) -->"
         learnings = []
@@ -2318,7 +2395,7 @@ type: role
             # Only synthesize highly helpful strategies or common pitfalls
             h = int(helpful)
             m = int(harmful)
-            
+
             # Heuristic for synthesis:
             # 1. High utility: (h - m) > 5
             # 2. Critical pitfall: m > 3
@@ -2378,7 +2455,7 @@ type: role
                 return synthesized
         except Exception as e:
             print(f"Error synthesizing memories: {e}")
-            
+
         return learnings
 
     def _add_to_shared_learnings(self, synthesized: List[Dict], agent_id: str):
@@ -2390,7 +2467,7 @@ type: role
                 "# Shared ACE Learnings\n\n## Strategier & patterns\n"
             )
             shared_file.write_text(header, encoding="utf-8")
-        
+
         content = shared_file.read_text(encoding="utf-8")
         for s in synthesized:
             l_type = s.get("type", "str")
@@ -2426,7 +2503,7 @@ type: role
         """Log token usage for a session."""
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         usage_file = self.ace_dir / "token_usage.yaml"
-        
+
         usages = []
         if usage_file.exists():
             with open(usage_file, "r", encoding="utf-8") as f:

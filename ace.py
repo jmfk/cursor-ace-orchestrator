@@ -59,7 +59,7 @@ def meta_self_audit():
     console.print("🚀 [bold blue]Starting ACE Self-Audit[/bold blue]")
     svc = get_service()
     agents_config = svc.load_agents()
-    
+
     for agent in agents_config.agents:
         console.print(f"Auditing agent: [green]{agent.id}[/green]")
         audit_file = svc.audit_agent(agent.id)
@@ -115,7 +115,7 @@ def token_stats(
     """Track and report token usage per agent/session."""
     svc = get_service()
     usages = svc.get_token_report(agent_id)
-    
+
     if not usages:
         console.print("No token usage data found.")
         return
@@ -128,7 +128,7 @@ def token_stats(
     table.add_column("Total", style="bold yellow")
     table.add_column("Cost ($)", style="magenta")
     table.add_column("Timestamp", style="dim")
-    
+
     total_tokens = 0
     total_cost = 0.0
     
@@ -845,7 +845,7 @@ def memory_synthesize(
     svc = get_service()
     with console.status(f"[bold green]Synthesizing memories for {agent_id}..."):
         synthesized = svc.synthesize_memories(agent_id)
-    
+
     if not synthesized:
         console.print(f"No significant memories found to synthesize for [blue]{agent_id}[/blue].")
         return
@@ -854,7 +854,7 @@ def memory_synthesize(
     table.add_column("Type", style="yellow")
     table.add_column("Description", style="green")
     table.add_column("Justification", style="dim")
-    
+
     for s in synthesized:
         table.add_row(
             s.get("type", "unknown"),
@@ -991,6 +991,9 @@ def loop(
     model: str = typer.Option(
         "gemini-3-flash", "--model", help="LLM model to use"
     ),
+    spec_id: Optional[str] = typer.Option(
+        None, "--spec", help="Living Spec ID to target and automate"
+    ),
 ):
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
@@ -1000,9 +1003,11 @@ def loop(
     console.print(f"Test Command: [italic]{test_cmd}[/italic]")
     console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
     console.print(f"Max Spend: [bold]${max_spend}[/bold]")
+    if spec_id:
+        console.print(f"Living Spec: [bold]{spec_id}[/bold]")
 
     svc = get_service()
-    
+
     # Check for API keys
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if not anthropic_key:
@@ -1014,7 +1019,7 @@ def loop(
                     anthropic_key = line.split("=", 1)[1].strip()
                     os.environ["ANTHROPIC_API_KEY"] = anthropic_key
                     break
-    
+
     if not anthropic_key:
         console.print(
             "[yellow]Warning: ANTHROPIC_API_KEY not set. "
@@ -1044,7 +1049,8 @@ def loop(
             prd_path=prd,
             plan_file=plan_file,
             max_spend=max_spend,
-            model=model
+            model=model,
+            spec_id=spec_id
         )
 
     if success:
@@ -1090,11 +1096,14 @@ def ralph(
     model: str = typer.Option(
         "gemini-3-flash", "--model", help="LLM model to use"
     ),
+    spec_id: Optional[str] = typer.Option(
+        None, "--spec", help="Living Spec ID to target and automate"
+    ),
 ):
     """
     Alias for 'ace loop'.
     """
-    loop(prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, max_spend, model)
+    loop(prompt, test_cmd, max_iterations, path, agent_id, git_commit, prd, plan_file, max_spend, model, spec_id)
 
 
 @app.command()
@@ -1498,7 +1507,7 @@ def task_delegate(
 
     with console.status("[bold green]Analyzing and decomposing..."):
         subtasks = svc.decompose_task(task_description, agent_id)
-    
+
     if not subtasks:
         console.print("[red]Failed to decompose task.[/red]")
         return
