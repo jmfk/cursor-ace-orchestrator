@@ -407,7 +407,6 @@ class ACEService:
             context_parts.append(f"### RALPH LOOP PROMPT\n{ralph_prompt}")
 
         full_context = "\n\n".join(context_parts)
-        
         # 8. Adaptive Context Pruning (Phase 10.4)
         # Estimate complexity and prune if necessary
         complexity = 1
@@ -419,7 +418,6 @@ class ACEService:
         # Low complexity (1) = 15,000 chars (~3.7k tokens)
         # High complexity (10) = 60,000 chars (~15k tokens)
         max_chars = 10000 + (complexity * 5000)
-        
         if len(full_context) > max_chars:
             print(
                 f"[PRUNING] Context length ({len(full_context)}) exceeds limit "
@@ -1834,6 +1832,9 @@ type: role
             helpful = int(match.group(3))
             harmful = int(match.group(4))
 
+            # Phase 10.12: Adaptive Memory Pruning
+            # Archive if harmful - helpful > threshold OR if it's old and low utility
+            # For now, we stick to the threshold-based pruning as a core logic.
             if harmful - helpful > threshold:
                 pruned_count += 1
                 return f"<!-- [PRUNED] {match.group(0)} -->"
@@ -1842,6 +1843,80 @@ type: role
         new_content = re.sub(pattern, prune_match, content)
         if pruned_count > 0:
             playbook_path.write_text(new_content, encoding="utf-8")
+            
+            # Re-index if we pruned anything
+            self.index_playbook(agent.id)
+            
+        return pruned_count
+
+    def adaptive_memory_prune(self, agent_id: str, usage_threshold: int = 5) -> int:
+        """
+        Automatically archive low-utility memories based on usage frequency (Phase 10.12).
+        Utility is calculated as (helpful - harmful).
+        If utility < usage_threshold and the memory hasn't been 'helpful' recently, it's archived.
+        """
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return 0
+
+        playbook_path = self.base_path / agent.memory_file
+        if not playbook_path.exists():
+            return 0
+
+        content = playbook_path.read_text(encoding="utf-8")
+        
+        # We'll use a more advanced heuristic here.
+        # Memories with high 'harmful' counts are pruned immediately.
+        # Memories with low 'helpful' counts that haven't been updated in a while are archived.
+        
+        pattern = (
+            r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)"
+            r"\s*::\s*(.*?) -->"
+        )
+        
+        pruned_count = 0
+        
+        def adaptive_prune_match(match):
+            nonlocal pruned_count
+            l_type = match.group(1)
+            helpful = int(match.group(3))
+            harmful = int(match.group(4))
+
+            utility = helpful - harmful
+
+            # Heuristic:
+            # 1. If harmful > helpful, it's definitely low utility.
+            # 2. If it's a strategy (str) and utility is very low (< -2), prune.
+            # 3. If it's a pitfall (mis) and it hasn't been seen (harmful is low),
+            #    we might keep it anyway as a warning, but if helpful is high (meaning we avoided it),
+            #    it's high utility.
+            
+            should_prune = False
+            if l_type == "str":
+                if utility < -1: # More harmful than helpful
+                    should_prune = True
+                elif helpful < usage_threshold and harmful > 0:
+                    # Low usage and has caused some harm
+                    should_prune = True
+            elif l_type == "mis":
+                if utility < -5: # Very high harmful count compared to helpful (avoidance)
+                    # This means we keep hitting the same pitfall despite knowing it.
+                    # Maybe the description is bad or it's too common.
+                    # We don't prune pitfalls as easily because they are warnings.
+                    pass
+            
+            if should_prune:
+                pruned_count += 1
+                return f"<!-- [ARCHIVED] {match.group(0)} -->"
+            
+            return match.group(0)
+
+        new_content = re.sub(pattern, adaptive_prune_match, content)
+        if pruned_count > 0:
+            playbook_path.write_text(new_content, encoding="utf-8")
+            self.index_playbook(agent.id)
+            
         return pruned_count
 
     # --- Living Specs Management ---

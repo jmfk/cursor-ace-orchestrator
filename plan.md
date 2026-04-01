@@ -87,4 +87,5 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.8 Cross-Agent Memory Synthesis**: Implement logic for agents to synthesize shared memories from individual experiences.
 - [x] **10.9 Advanced Multi-Agent Coordination Refinement**: Further optimize hierarchical agent structures and task delegation.
 - [x] **10.10 Cross-Project Memory Sync Refinement**: Implement advanced logic for synchronizing memories across different project environments.
-- [ ] **10.11 Performance Profiling & Optimization**: Analyze and optimize core service methods using the profiler.
+- [x] **10.11 Performance Profiling & Optimization**: Analyze and optimize core service methods using the profiler.
+- [x] **10.12 Adaptive Memory Pruning**: Implement logic for automatic archival of low-utility memories based on usage frequency.

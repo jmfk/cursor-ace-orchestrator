@@ -54,7 +54,7 @@ def test_onboarding_sop(service):
     content = onboarding_file.read_text()
     assert "SOP: Agent Onboarding - Developer 1 (dev-1)" in content
     assert "## 1. Context Acquisition" in content
-    
+
     # Check if memory file was created
     memory_file = service.base_path / ".cursor/rules/developer.mdc"
     assert memory_file.exists()
@@ -115,7 +115,7 @@ def test_decision_management(service):
     assert decisions[0].title == "Use FastAPI"
 
 
-def test_context_building(service, temp_workspace):
+def test_context_building(service):
     """Test building context for an agent."""
     # Setup global rules
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
@@ -154,7 +154,7 @@ def test_reflection_parsing(service):
     assert updates[2]["type"] == "dec"
 
 
-def test_playbook_update(service, temp_workspace):
+def test_playbook_update(service):
     """Test updating a playbook with new learnings."""
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     playbook_path = service.cursor_rules_dir / "developer.mdc"
@@ -191,7 +191,7 @@ def test_playbook_update(service, temp_workspace):
     assert "New pitfall" in content
 
 
-def test_memory_pruning(service, temp_workspace):
+def test_memory_pruning(service):
     """Test pruning harmful strategies from memory."""
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     playbook_path = service.cursor_rules_dir / "developer.mdc"
@@ -211,7 +211,7 @@ def test_memory_pruning(service, temp_workspace):
     assert "<!-- [str-002]" in content
 
 
-def test_stitch_mockup(service, temp_workspace, monkeypatch):
+def test_stitch_mockup(service, monkeypatch):
     """Test Google Stitch mockup generation."""
     from ace_lib.stitch import stitch_engine
 
@@ -261,7 +261,7 @@ def test_stitch_mockup(service, temp_workspace, monkeypatch):
     assert comp_file.exists()
 
 
-def test_stitch_sync(service, temp_workspace, monkeypatch):
+def test_stitch_sync(service, monkeypatch):
     """Test Google Stitch code sync."""
     from ace_lib.stitch import stitch_engine
 
@@ -304,7 +304,7 @@ export const Test = () => <div>Old Test</div>;
     assert diff_file.exists()
 
 
-def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch):
+def test_ralph_loop_reflection_integration(service, monkeypatch):
     """Test RALPH loop reflection integration."""
     # Mock subprocess.run to simulate agent and test execution
     import subprocess
@@ -347,7 +347,7 @@ def test_ralph_loop_reflection_integration(service, temp_workspace, monkeypatch)
     monkeypatch.setattr(subprocess, "run", mock_run)
 
     # Create dummy plan.md
-    plan_path = temp_workspace / "plan.md"
+    plan_path = service.base_path / "plan.md"
     plan_path.write_text("# Plan")
 
     success, iterations = service.run_loop(
@@ -503,7 +503,7 @@ def test_token_usage_logging(service):
     assert report[0].total_tokens == 150
 
 
-def test_vector_memory(service, temp_workspace):
+def test_vector_memory(service):
     """Test vectorized memory (ChromaDB)."""
     # Setup agent and playbook
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
@@ -560,7 +560,7 @@ def test_onboarding_sop_with_parent(service):
     assert "- **Parent Agent**: parent" in content
 
 
-def test_adaptive_context_pruning(service, temp_workspace):
+def test_adaptive_context_pruning(service):
     """Test adaptive context pruning."""
     # Setup global rules
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
@@ -594,3 +594,28 @@ def test_adaptive_context_pruning(service, temp_workspace):
     assert "GLOBAL RULES" in context
     assert "AGENT PLAYBOOK" in context
     assert "[TRUNCATED]" in context or len(context) < 15000
+
+
+def test_adaptive_memory_pruning(service):
+    """Test adaptive memory pruning logic (Phase 10.12)."""
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=5 :: Harmful strategy -->
+<!-- [str-002] helpful=5 harmful=1 :: Helpful strategy -->
+<!-- [str-003] helpful=2 harmful=3 :: Low utility strategy -->
+<!-- [mis-001] helpful=1 harmful=10 :: Very common pitfall (keep) -->
+""")
+
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+
+    # Adaptive prune
+    pruned_count = service.adaptive_memory_prune("dev-1", usage_threshold=5)
+
+    assert pruned_count == 2 # str-001 and str-003 should be pruned
+    content = playbook_path.read_text()
+    assert "[ARCHIVED] <!-- [str-001]" in content
+    assert "[ARCHIVED] <!-- [str-003]" in content
+    assert "<!-- [str-002]" in content
+    assert "<!-- [mis-001]" in content # Pitfalls are kept
