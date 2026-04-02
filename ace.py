@@ -624,7 +624,7 @@ def run(
     #    (Already completed in previous steps)
 
     # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
-    #    (Refactored ace.py and ace_service.py to use run_agent_task for better integration)
+    #    (Refactored ace.py and ace_service.py to use run_loop for better integration)
 
     # 3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.
     #    (Implemented in ace_lib/sop/sop_engine.py and ACEService)
