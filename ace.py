@@ -915,57 +915,195 @@ def memory_sync():
     console.print("Updated [green]AGENTS.md[/green]")
 
 
-@app.command()
-def loop(
-    prompt: str = typer.Argument(..., help="The prompt to solve"),
-    test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
-    max_iterations: int = typer.Option(
-        10, "--max", "-m", help="Maximum number of iterations"
-    ),
-    path: Optional[str] = typer.Option(
-        None, "--path", "-p", help="Path to the file or module"
-    ),
-    agent_id: Optional[str] = typer.Option(
-        None, "--agent", "-a", help="Explicit agent ID"
-    ),
-    git_commit: bool = typer.Option(
-        False, "--git-commit", "-g", help="Automatically commit on success"
-    ),
-    prd: Optional[str] = typer.Option(None, "--prd", help="Path to the PRD file"),
-    plan_file: Optional[str] = typer.Option(
-        None, "--plan", help="Path to the plan file"
-    ),
-    max_spend: float = typer.Option(20.0, "--max-spend", help="Maximum spend in USD"),
-    model: str = typer.Option("gemini-3-flash", "--model", help="LLM model to use"),
-    spec_id: Optional[str] = typer.Option(
-        None, "--spec", help="Living Spec ID to target and automate"
-    ),
-):
-    """
-    Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
-    """
-    console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
-    svc = get_service()
-    
-    success, iterations = svc.run_loop(
-        prompt=prompt,
-        test_cmd=test_cmd,
-        max_iterations=max_iterations,
-        path=path,
-        agent_id=agent_id,
-        git_commit=git_commit,
-        prd_path=prd,
-        plan_file=plan_file,
-        max_spend=max_spend,
-        model=model,
-        spec_id=spec_id,
-    )
-    
-    if success:
-        console.print(f"\n✅ [bold green]RALPH Loop completed successfully in {iterations} iterations![/bold green]")
-    else:
-        console.print(f"\n❌ [bold red]RALPH Loop failed after {iterations} iterations.[/bold red]")
-        raise typer.Exit(code=1)
+    @app.command()
+    def loop(
+        prompt: str = typer.Argument(..., help="The prompt to solve"),
+        test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
+        max_iterations: int = typer.Option(
+            10, "--max", "-m", help="Maximum number of iterations"
+        ),
+        path: Optional[str] = typer.Option(
+            None, "--path", "-p", help="Path to the file or module"
+        ),
+        agent_id: Optional[str] = typer.Option(
+            None, "--agent", "-a", help="Explicit agent ID"
+        ),
+        git_commit: bool = typer.Option(
+            False, "--git-commit", "-g", help="Automatically commit on success"
+        ),
+        prd: Optional[str] = typer.Option(None, "--prd", help="Path to the PRD file"),
+        plan_file: Optional[str] = typer.Option(
+            None, "--plan", help="Path to the plan file"
+        ),
+        max_spend: float = typer.Option(20.0, "--max-spend", help="Maximum spend in USD"),
+        model: str = typer.Option("gemini-3-flash", "--model", help="LLM model to use"),
+        spec_id: Optional[str] = typer.Option(
+            None, "--spec", help="Living Spec ID to target and automate"
+        ),
+    ):
+        """
+        Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
+        """
+        console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
+        svc = get_service()
+        
+        # Phase 4.1: Native RALPH Loop implementation in ace.py
+        iteration = 0
+        success = False
+        state_history = []
+        total_cost = 0.0
+
+        # Use provided PRD and plan file or defaults
+        prd_path = prd or "PRD-01 - Cursor-ace-orchestrator-prd.md"
+        plan_file = plan_file or "plan.md"
+
+        console.print(f"[RALPH] Using PRD: [blue]{prd_path}[/blue]")
+        console.print(f"[RALPH] Using Plan: [blue]{plan_file}[/blue]")
+        if spec_id:
+            console.print(f"[RALPH] Using Living Spec: [blue]{spec_id}[/blue]")
+
+        while iteration < max_iterations:
+            if total_cost >= max_spend:
+                console.print(f"[RALPH] [yellow]Reached maximum spending limit (${max_spend}). Stopping.[/yellow]")
+                break
+
+            iteration += 1
+            console.print(f"\n[RALPH] [bold]Iteration {iteration}/{max_iterations}[/bold] (Cost: ${total_cost:.4f})")
+
+            # 1. Initial State Analysis (Step 0)
+            if iteration == 1 and os.path.exists(prd_path) and os.path.exists(plan_file):
+                console.print(f"[RALPH] Step 0: Analyzing current project state against [blue]{prd_path}[/blue]...")
+                plan_content = Path(plan_file).read_text(encoding="utf-8")
+                prd_content = Path(prd_path).read_text(encoding="utf-8")
+
+                spec_context = ""
+                if spec_id:
+                    spec = svc.get_spec(spec_id)
+                    if spec:
+                        spec_context = f"\n\nTarget Living Spec ({spec_id}):\nIntent: {spec.intent}\nConstraints: {', '.join(spec.constraints)}\n"
+
+                analysis_prompt = (
+                    f"Analyze the current codebase and project structure relative to the PRD:\n{prd_content}\n\n"
+                    f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
+                    f"{spec_context}"
+                    "1. Identify implemented features. 2. Identify missing parts. "
+                    f"3. Update '{plan_file}' and 'changelog.md' with the current status. "
+                    "Focus on identifying the very next actionable task."
+                )
+                
+                if prompt.lower().strip() == "analyze":
+                    current_prompt = analysis_prompt
+                else:
+                    current_prompt = f"{analysis_prompt}\n\nThen, proceed with the following task: {prompt}"
+            else:
+                current_prompt = prompt
+
+            # 2. Context Refresh & Build
+            os.environ["ACE_LOOP_PROMPT"] = current_prompt
+            context, resolved_agent_id = svc.build_context(
+                path=path,
+                task_type=TaskType.IMPLEMENT,
+                agent_id=agent_id,
+                task_description=current_prompt,
+            )
+
+            # 3. Execute
+            console.print(f"[RALPH] Executing task: [dim]{current_prompt[:100]}...[/dim]")
+            
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+                tmp.write(context)
+                context_file = tmp.name
+
+            env = os.environ.copy()
+            cursor_key = svc.get_cursor_key()
+            if cursor_key:
+                env["CURSOR_API_KEY"] = cursor_key
+
+            agent_cmd = f'cursor-agent --print --model {model} --force --trust --context-file {context_file} "{current_prompt}"'
+            
+            try:
+                agent_proc = subprocess.run(agent_cmd, shell=True, capture_output=True, text=True, env=env)
+                
+                # Simulated cost tracking
+                input_tokens = len(current_prompt.split()) * 1.3
+                output_tokens = len(agent_proc.stdout.split()) * 1.3
+                cost = (input_tokens / 1_000_000 * 0.10) + (output_tokens / 1_000_000 * 0.40)
+                total_cost += cost
+
+                svc.log_token_usage(TokenUsage(
+                    agent_id=resolved_agent_id or "unknown",
+                    session_id=f"loop_{iteration}",
+                    prompt_tokens=int(input_tokens),
+                    completion_tokens=int(output_tokens),
+                    total_tokens=int(input_tokens + output_tokens),
+                    cost=cost
+                ))
+
+                # 4. Verify
+                console.print(f"[RALPH] Verifying with: [cyan]{test_cmd}[/cyan]")
+                test_result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
+                test_passed = test_result.returncode == 0
+                
+                # 5. Log Session
+                session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                session_file = svc.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
+                session_content = f"""# Session Loop {session_id} (Iteration {iteration})
+- **Prompt**: `{current_prompt}`
+- **Test Command**: `{test_cmd}`
+- **Agent ID**: `{resolved_agent_id}`
+- **Status**: {"SUCCESS" if test_passed else "FAILURE"}
+- **Cost**: ${cost:.4f}
+
+## Agent Output
+{agent_proc.stdout}
+
+## Test Output
+{test_result.stdout}
+{test_result.stderr}
+"""
+                session_file.write_text(session_content, encoding="utf-8")
+
+                # 6. Reflect
+                if svc.get_anthropic_client():
+                    console.print(f"[RALPH] Reflecting on iteration {iteration}...")
+                    reflection_input = f"STATUS: {'SUCCESS' if test_passed else 'FAILURE'}\nAGENT OUTPUT:\n{agent_proc.stdout}\nTEST OUTPUT:\n{test_result.stdout}"
+                    reflection_text = svc.reflect_on_session(reflection_input)
+                    updates = svc.parse_reflection_output(reflection_text)
+                    
+                    if updates:
+                        for u in updates:
+                            if test_passed:
+                                u["helpful"], u["harmful"] = 1, 0
+                            else:
+                                u["helpful"], u["harmful"] = 0, 1
+                        
+                        playbook_path = svc.cursor_rules_dir / "_global.mdc"
+                        if resolved_agent_id:
+                            agents = svc.load_agents()
+                            agent_obj = next((a for a in agents.agents if a.id == resolved_agent_id), None)
+                            if agent_obj:
+                                playbook_path = Path(agent_obj.memory_file)
+                        svc.update_playbook(playbook_path, updates)
+
+                if test_passed:
+                    console.print(f"[RALPH] [green]Iteration {iteration} successful![/green]")
+                    if git_commit:
+                        subprocess.run("git add . && git commit -m 'RALPH Loop success'", shell=True)
+                    success = True
+                    break
+                else:
+                    console.print(f"[RALPH] [red]Iteration {iteration} failed. Retrying...[/red]")
+                    prompt = f"Previous attempt failed. Test output:\n{test_result.stdout}\n{test_result.stderr}\n\nOriginal task: {prompt}"
+
+            finally:
+                if os.path.exists(context_file):
+                    os.remove(context_file)
+
+        if success:
+            console.print(f"\n✅ [bold green]RALPH Loop completed successfully in {iteration} iterations![/bold green]")
+        else:
+            console.print(f"\n❌ [bold red]RALPH Loop failed after {iteration} iterations.[/bold red]")
+            raise typer.Exit(code=1)
 
 
 
