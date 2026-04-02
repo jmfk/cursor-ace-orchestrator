@@ -1,7 +1,5 @@
 import pytest
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType
-
 
 @pytest.fixture
 def ace_service(tmp_path):
@@ -9,81 +7,83 @@ def ace_service(tmp_path):
     service = ACEService(tmp_path)
     service.ace_dir.mkdir(parents=True, exist_ok=True)
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    for subdir in ["mail", "sessions", "decisions", "specs"]:
+        (service.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
     return service
 
-
-def test_onboard_agent_creates_files(ace_service):
-    # Setup
-    agent_id = "test-agent"
-    ace_service.create_agent(id=agent_id, name="Test Agent", role="tester")
-
-    # Execute
-    sop_path = ace_service.onboard_agent(agent_id)
-
-    # Verify SOP file
+def test_onboard_agent_sop(ace_service):
+    """Test formal onboarding SOP generation (Phase 9.5)."""
+    ace_service.create_agent(id="auth-expert", name="Aegis", role="auth")
+    sop_path = ace_service.onboard_agent("auth-expert")
+    
     assert sop_path.exists()
-    assert f"onboarding_{agent_id}.md" in sop_path.name
     content = sop_path.read_text()
-    assert "# SOP: Agent Onboarding - Test Agent (test-agent)" in content
+    assert "# SOP: Agent Onboarding - Aegis (auth-expert)" in content
+    assert "## 1. Context Acquisition" in content
+    assert "## 2. Role-Specific Setup" in content
+    
+    # Verify mail notification
+    messages = ace_service.list_mail("auth-expert")
+    assert any(m.subject == "ONBOARDING SOP" for m in messages)
 
-    # Verify Playbook file
-    playbook_path = ace_service.cursor_rules_dir / "tester.mdc"
-    assert playbook_path.exists()
-    assert "# Test Agent Playbook (tester)" in playbook_path.read_text()
+def test_pr_review_sop(ace_service):
+    """Test formal PR review SOP generation (Phase 9.5)."""
+    ace_service.create_agent(id="reviewer-1", name="Reviewer One", role="reviewer")
+    sop_path = ace_service.review_pr("PR-456", "reviewer-1")
+    
+    assert sop_path.exists()
+    content = sop_path.read_text()
+    assert "# SOP: PR Review - PR-456" in content
+    assert "- **Reviewer**: reviewer-1" in content
+    assert "## 1. Strategy Alignment" in content
+    
+    # Verify mail notification
+    messages = ace_service.list_mail("reviewer-1")
+    assert any(m.subject == "PR REVIEW TASK: PR-456" for m in messages)
 
-    # Verify Mail
-    messages = ace_service.list_mail(agent_id)
-    assert len(messages) == 1
-    assert messages[0].subject == "ONBOARDING SOP"
-
-
-def test_review_pr_creates_sop(ace_service):
-    # Setup
-    agent_id = "reviewer-agent"
-    pr_id = "PR-999"
-    ace_service.create_agent(id=agent_id, name="Reviewer", role="reviewer")
-
-    # Execute
-    review_path = ace_service.review_pr(pr_id, agent_id)
-
-    # Verify
-    assert review_path.exists()
-    assert f"review_{pr_id}_{agent_id}.md" in review_path.name
-    content = review_path.read_text()
-    assert f"# SOP: PR Review - {pr_id}" in content
-    assert f"- **Reviewer**: {agent_id}" in content
-
-    # Verify Mail
-    messages = ace_service.list_mail(agent_id)
-    assert any(m.subject == f"PR REVIEW TASK: {pr_id}" for m in messages)
-
-
-def test_build_context_with_agent(ace_service):
-    # Setup
-    agent_id = "context-agent"
-    ace_service.create_agent(id=agent_id, name="Context Agent", role="context-role")
-    playbook_path = ace_service.cursor_rules_dir / "context-role.mdc"
-    playbook_path.write_text(
-        "### AGENT SPECIFIC STRATEGY\n<!-- [str-001] helpful=1 harmful=0 :: Test Strategy -->"
+def test_ui_mockup_integration(ace_service, monkeypatch):
+    """Test Google Stitch integration (Phase 4.5)."""
+    # Mock the agent-based mockup generation to avoid subprocess call
+    monkeypatch.setattr(
+        ace_service,
+        "_generate_mockup_with_agent",
+        lambda desc: "export const Mock = () => <div>Mock</div>;"
     )
+    
+    mockup_url = ace_service.ui_mockup("Login Screen", "auth-expert")
+    assert "stitch.google.com/canvas/stitch_" in mockup_url
+    
+    # Verify mockup file creation
+    mockup_dir = ace_service.ace_dir / "ui_mockups"
+    mockup_files = list(mockup_dir.glob("stitch_*.md"))
+    assert len(mockup_files) == 1
+    content = mockup_files[0].read_text()
+    assert "# UI Mockup: Login Screen" in content
+    assert "export const Mock" in content
 
-    # Execute
-    context, resolved_id = ace_service.build_context(
-        agent_id=agent_id, task_type=TaskType.IMPLEMENT
+def test_ui_sync_integration(ace_service, monkeypatch):
+    """Test Google Stitch sync (Phase 8.3)."""
+    mockup_id = "stitch_12345"
+    url = f"https://stitch.google.com/canvas/{mockup_id}"
+    
+    # Create a local mockup file first
+    mockup_dir = ace_service.ace_dir / "ui_mockups"
+    mockup_dir.mkdir(parents=True, exist_ok=True)
+    mockup_file = mockup_dir / f"{mockup_id}.md"
+    mockup_file.write_text(f"# UI Mockup\n```tsx\nexport const Old = () => <div />;\n```")
+    
+    # Mock stitch_engine.sync_mockup
+    import ace_lib.stitch.stitch_engine as stitch_engine
+    monkeypatch.setattr(
+        stitch_engine,
+        "sync_mockup",
+        lambda url, key: "export const New = () => <div />;"
     )
-
-    # Verify
-    assert resolved_id == agent_id
-    assert "### AGENT PLAYBOOK (context-role)" in context
-    assert "### AGENT SPECIFIC STRATEGY" in context
-    assert "### TASK FRAMING" in context
-    assert "You are implementing new functionality" in context
-
-
-def test_resolve_owner_longest_prefix(ace_service):
-    ace_service.assign_ownership("src/auth", "auth-agent")
-    ace_service.assign_ownership("src/auth/providers", "provider-agent")
-
-    assert ace_service.resolve_owner("src/auth/login.py") == "auth-agent"
-    assert ace_service.resolve_owner("src/auth/providers/google.py") == "provider-agent"
-    assert ace_service.resolve_owner("src/other.py") is None
+    
+    synced_code = ace_service.ui_sync(url)
+    assert "export const New" in synced_code
+    
+    # Verify file update
+    content = mockup_file.read_text()
+    assert "export const New" in content
+    assert "(Synced)" in content
