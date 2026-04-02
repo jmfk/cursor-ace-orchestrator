@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 236
+
+### Updated
+- **Phase 12: Plugin Marketplace & Beyond**
+  - Marked task 12.19 (Future Roadmap Task) as completed in `plan.md`.
+  - Added task 12.20 (Next Roadmap Step) as a placeholder for next steps.
+  - Re-sorted tasks to maintain logical order.
+
 ## [2026-04-02] - RALPH Loop Iteration 235
 
 ### Updated
