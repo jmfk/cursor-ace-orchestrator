@@ -1027,50 +1027,6 @@ def loop(
 
 
 @app.command()
-def ralph(
-    prompt: str = typer.Argument(..., help="The prompt to solve"),
-    test_cmd: str = typer.Option(..., "--test", "-t", help="Command to run tests"),
-    max_iterations: int = typer.Option(
-        10, "--max", "-m", help="Maximum number of iterations"
-    ),
-    path: Optional[str] = typer.Option(
-        None, "--path", "-p", help="Path to the file or module"
-    ),
-    agent_id: Optional[str] = typer.Option(
-        None, "--agent", "-a", help="Explicit agent ID"
-    ),
-    git_commit: bool = typer.Option(
-        False, "--git-commit", "-g", help="Automatically commit on success"
-    ),
-    prd: Optional[str] = typer.Option(None, "--prd", help="Path to the PRD file"),
-    plan_file: Optional[str] = typer.Option(
-        None, "--plan", help="Path to the plan file"
-    ),
-    max_spend: float = typer.Option(20.0, "--max-spend", help="Maximum spend in USD"),
-    model: str = typer.Option("gemini-3-flash", "--model", help="LLM model to use"),
-    spec_id: Optional[str] = typer.Option(
-        None, "--spec", help="Living Spec ID to target and automate"
-    ),
-):
-    """
-    Alias for 'ace loop'.
-    """
-    return loop(
-        prompt,
-        test_cmd,
-        max_iterations,
-        path,
-        agent_id,
-        git_commit,
-        prd,
-        plan_file,
-        max_spend,
-        model,
-        spec_id,
-    )
-
-
-@app.command()
 def mail_send(
     to: str = typer.Option(..., "--to", "-t", help="Recipient agent ID"),
     sender: str = typer.Option(..., "--from", "-f", help="Sender agent ID"),
@@ -1507,7 +1463,7 @@ def task_delegate(
 
 
 @app.command("loop")
-def ace_loop(
+def ace_loop_command(
     prompt: str = typer.Argument(..., help="The task for the RALPH loop"),
     test_cmd: str = typer.Option(..., "--test", "-t", help="The test command to verify"),
     max_iterations: int = typer.Option(10, "--max-iter", "-m", help="Max iterations"),
@@ -1521,30 +1477,19 @@ def ace_loop(
     spec_id: Optional[str] = typer.Option(None, "--spec", help="Living Spec ID"),
 ):
     """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 4.1)."""
-    console.print(f"🚀 [bold blue]Starting RALPH Loop:[/bold blue] {prompt}")
-    svc = get_service()
-    success, iterations = svc.run_loop(
+    return loop(
         prompt=prompt,
         test_cmd=test_cmd,
         max_iterations=max_iterations,
         path=path,
         agent_id=agent_id,
         git_commit=git_commit,
-        prd_path=prd_path,
+        prd=prd_path,
         plan_file=plan_file,
         max_spend=max_spend,
         model=model,
         spec_id=spec_id,
     )
-
-    if success:
-        console.print(
-            f"\n[bold green]RALPH Loop completed successfully in {iterations} iterations.[/bold green]"
-        )
-    else:
-        console.print(
-            f"\n[bold red]RALPH Loop stopped after {iterations} iterations without success.[/bold red]"
-        )
 
 
 if __name__ == "__main__":
