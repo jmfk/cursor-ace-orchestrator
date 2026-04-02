@@ -1,7 +1,5 @@
 import pytest
-from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType
 
 @pytest.fixture
 def temp_workspace(tmp_path):
@@ -19,9 +17,9 @@ def test_onboarding_sop_generation(service, temp_workspace):
     """Test Phase 9.5: Formal onboarding SOP generation."""
     agent_id = "auth-expert"
     service.create_agent(
-        id=agent_id, 
-        name="Aegis", 
-        role="auth", 
+        id=agent_id,
+        name="Aegis",
+        role="auth",
         responsibilities=["src/auth"]
     )
     
