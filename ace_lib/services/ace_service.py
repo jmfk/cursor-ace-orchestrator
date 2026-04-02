@@ -610,12 +610,13 @@ class ACEService:
             for s in prune_map[ph]:
                 if len(pruned_context) + len(s) < max_chars:
                     pruned_context += s
-            # Truncate the last section if we have space
-            remaining = max_chars - len(pruned_context)
-            if remaining > 200:
-                trunc_msg = "\n... [TRUNCATED] ...\n"
-                pruned_context += s[: remaining - len(trunc_msg)] + trunc_msg
-            break
+                else:
+                    # Truncate the last section if we have space
+                    remaining = max_chars - len(pruned_context)
+                    if remaining > 200:
+                        trunc_msg = "\n... [TRUNCATED] ...\n"
+                        pruned_context += s[: remaining - len(trunc_msg)] + trunc_msg
+                    break
             if len(pruned_context) >= max_chars:
                 break
 
