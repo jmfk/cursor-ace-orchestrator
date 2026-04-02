@@ -70,7 +70,7 @@ def test_ui_sync_integration(ace_service, monkeypatch):
     mockup_dir = ace_service.ace_dir / "ui_mockups"
     mockup_dir.mkdir(parents=True, exist_ok=True)
     mockup_file = mockup_dir / f"{mockup_id}.md"
-    mockup_file.write_text(f"# UI Mockup\n```tsx\nexport const Old = () => <div />;\n```")
+    mockup_file.write_text("# UI Mockup\n```tsx\nexport const Old = () => <div />;\n```")
     
     # Mock stitch_engine.sync_mockup
     import ace_lib.stitch.stitch_engine as stitch_engine
