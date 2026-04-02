@@ -1528,6 +1528,7 @@ class ACEService:
         onboarding_file = sop_dir / f"onboarding_{agent_id}.md"
         from ace_lib.sop import sop_engine
 
+        # Phase 9.5: Formal onboarding SOP generation
         content = sop_engine.generate_onboarding_sop(
             agent_id=agent.id,
             name=agent.name,
@@ -1585,6 +1586,7 @@ type: role
         review_file = sop_dir / f"review_{pr_id}_{agent_id}.md"
         from ace_lib.sop import sop_engine
 
+        # Phase 9.5: Formal PR review SOP generation
         content = sop_engine.generate_pr_review_sop(pr_id, agent_id)
         review_file.write_text(content, encoding="utf-8")
 
@@ -1845,6 +1847,7 @@ type: role
 
         from ace_lib.stitch.stitch_engine import generate_mockup, extract_components
 
+        # Phase 4.5: Connect CLI stubs to actual API or code extraction logic
         mockup_url, ui_code = generate_mockup(description, agent_id, api_key)
         mockup_id = mockup_url.split("/")[-1]
 
@@ -1991,6 +1994,7 @@ type: role
 
         from ace_lib.stitch import stitch_engine
 
+        # Phase 8.3: Bi-directional sync between Stitch and ACE with visual diffing
         ui_code = stitch_engine.sync_mockup(url, api_key)
         if ui_code:
             # Perform visual diffing if we have an existing mockup (PRD-01 / Phase 8.3)

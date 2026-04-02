@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 105
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.35 (Future Roadmap Task) as completed in `plan.md`.
+  - Added task 10.36 (Next Roadmap Step) as a placeholder for next steps.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 104
 
 ### Updated
