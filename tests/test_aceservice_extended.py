@@ -91,7 +91,7 @@ def test_ui_mockup_generation_fallback(ace_service, monkeypatch):
 
     # Mock the agent command execution
     class MockProcess:
-        stdout = "```tsx\nexport const MyComponent = () => <div>Hello</div>;\n```"
+        stdout = "```tsx\nexport const App = () => <div>Hello</div>;\n```"
         returncode = 0
 
     def mock_run(*args, **kwargs):

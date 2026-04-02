@@ -971,6 +971,8 @@ def loop(
     
     iteration = 0
     success = False
+    state_history = []
+    import hashlib
     
     while iteration < max_iterations:
         iteration += 1
@@ -979,6 +981,25 @@ def loop(
         # 1. Context Refresh
         context, resolved_agent_id = svc.build_context(path, TaskType.IMPLEMENT, agent_id, prompt)
         
+        # Stagnation detection (Phase 10.4)
+        try:
+            status_out = subprocess.run(
+                ["git", "status", "--porcelain"], capture_output=True, text=True
+            ).stdout
+            state_hash = hashlib.sha256(status_out.encode()).hexdigest()
+            if len(state_history) >= 3 and all(h == state_hash for h in state_history[-3:]):
+                console.print("[yellow]⚠️ Stagnation detected! State has not changed for 3 iterations.[/yellow]")
+                prompt = (
+                    f"STAGNATION DETECTED. You are stuck in the same state. "
+                    "Analyze why and try a different approach.\n\n"
+                    f"{prompt}"
+                )
+                # Re-build context with stagnation warning
+                context, resolved_agent_id = svc.build_context(path, TaskType.IMPLEMENT, agent_id, prompt)
+            state_history.append(state_hash)
+        except Exception:
+            pass
+
         # 2. Execute
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
             tmp.write(context)
@@ -1003,7 +1024,7 @@ def loop(
             console.print(output)
         except Exception as e:
             console.print(f"[red]Execution error: {e}[/red]")
-            break
+            continue
             
         # 3. Verify (Tests)
         console.print(f"Verifying with: [italic]{test_cmd}[/italic]")
@@ -1036,6 +1057,29 @@ def loop(
         if success:
             if git_commit:
                 subprocess.run("git add . && git commit -m 'RALPH Loop success'", shell=True)
+            
+            # Update plan.md and changelog.md if they exist (Phase 6.7)
+            if plan_file and os.path.exists(plan_file):
+                console.print(f"Updating {plan_file}...")
+                update_plan_prompt = (
+                    f"Update '{plan_file}' and 'changelog.md' based on the "
+                    f"successful completion of: {prompt[:100]}"
+                )
+                # Use cursor-agent to update the plan
+                cursor_update_cmd = [
+                    "cursor-agent",
+                    "--api-key", cursor_key or "",
+                    "--model", model,
+                    "--trust",
+                    f'"{update_plan_prompt}"'
+                ]
+                subprocess.run(" ".join(cursor_update_cmd), shell=True)
+
+            # Update Living Spec if applicable (Phase 10.23)
+            if spec_id:
+                console.print(f"Automating Living Spec update for {spec_id}...")
+                svc.automate_spec_update(spec_id, output)
+
             break
             
     if success:
