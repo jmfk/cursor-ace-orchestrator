@@ -64,13 +64,13 @@ def mock_ace_env(tmp_path):
     ace_dir.mkdir()
     (ace_dir / "decisions").mkdir()
     (ace_dir / "sessions").mkdir()
-    (tmp_path / ".cursor" / "rules").mkdir(parents=True)
+    (tmp_path / "rules").mkdir(parents=True)
 
     # Create AGENTS.md
     (tmp_path / "AGENTS.md").write_text("Global Rule: Always use type hints.")
 
     # Create Agent Playbook
-    playbook = tmp_path / ".cursor" / "rules" / "coder.mdc"
+    playbook = tmp_path / "rules" / "coder.mdc"
     playbook.write_text("Playbook: Prefer composition over inheritance.")
 
     # Create an ADR
@@ -89,7 +89,7 @@ def ace_service(mock_ace_env):
     service = ACEService(base_path=mock_ace_env)
     # Mock load_agents to return a dummy config
     service.load_agents = MagicMock(return_value=MagicMock(agents=[
-        Agent(id="agent-001", name="Coder", role="Senior Dev", email="c@ace.ai", memory_file=".cursor/rules/coder.mdc")
+        Agent(id="agent-001", name="Coder", role="Senior Dev", email="c@ace.ai", memory_file="rules/coder.mdc")
     ]))
     return service
 
@@ -140,5 +140,3 @@ def test_context_builder_handles_missing_files(tmp_path):
     assert "INSTRUCTION: Implement" in context
     assert "Task" in context
     assert "GLOBAL RULES" not in context # Should not be present if file missing
-"
-}
