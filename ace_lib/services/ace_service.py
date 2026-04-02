@@ -1125,6 +1125,29 @@ class ACEService:
         agent_id: Optional[str] = None,
     ) -> bool:
         """Execute an agent command with ACE context and return success/failure."""
+        # --- RBAC Check (Phase 10.2) ---
+        if agent_id:
+            agents_config = self.load_agents()
+            agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+            if agent:
+                # 1. Path Restriction
+                if agent.allowed_paths and path:
+                    is_allowed = False
+                    for allowed_path in agent.allowed_paths:
+                        if path.startswith(allowed_path):
+                            is_allowed = True
+                            break
+                    if not is_allowed:
+                        print(f"[RBAC] Access Denied: Agent {agent_id} is not allowed to modify {path}")
+                        return False
+
+                # 2. Command Restriction
+                if agent.forbidden_commands:
+                    for forbidden in agent.forbidden_commands:
+                        if forbidden in command:
+                            print(f"[RBAC] Access Denied: Agent {agent_id} is forbidden from running '{forbidden}'")
+                            return False
+
         context, resolved_agent_id = self.build_context(path, task_type, agent_id)
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:

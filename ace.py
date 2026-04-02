@@ -632,6 +632,9 @@ def run(
     # 4. Google Stitch Integration: Connect the CLI stubs to actual API or code extraction logic.
     #    (Completed: Bi-directional sync and component extraction implemented in ace_lib/stitch/stitch_engine.py)
 
+    # 5. RBAC for Agents: Implement fine-grained Role-Based Access Control for agent operations.
+    #    (Completed: Path and command restrictions implemented in ACEService.run_agent_task)
+
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
