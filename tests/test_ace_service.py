@@ -1,9 +1,5 @@
 import pytest
-from pathlib import Path
-import os
-import shutil
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import Agent, AgentsConfig, TokenMode, TaskType
 
 @pytest.fixture
 def temp_workspace(tmp_path):
