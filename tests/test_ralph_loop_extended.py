@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import TaskType
 
@@ -39,7 +38,6 @@ def test_ralph_loop_stagnation_detection(service, monkeypatch):
 
     # We need to capture the prompt passed to build_context to see if it contains STAGNATION
     prompts_captured = []
-    original_build_context = service.build_context
     
     def mock_build_context(path=None, task_type=TaskType.IMPLEMENT, agent_id=None, task_description=None):
         if task_description:
