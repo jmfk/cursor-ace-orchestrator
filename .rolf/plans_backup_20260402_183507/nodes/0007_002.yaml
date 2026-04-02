@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:50.507565'
+depth: 1
+description: ''
+id: '0007_002'
+parent_id: '0007'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**7.2 Google Stitch Visual Verification**: Implement E2E tests (Playwright)
+  to validate that implemented code matches Stitch mockups.'

@@ -10,7 +10,7 @@ Initialize the `.ace/` and `.ace-local/` directories and set up credentials.
 - Prompts for: `GOOGLE_API_KEY`, `CURSOR_API_KEY`.
 
 ### `ace loop`
-Run the **RALPH Cycle** (Reasoning, Action, Learning, Progress, Halt) for a specific prompt.
+Run the **ROLF Cycle** (Reasoning, Action, Learning, Progress, Halt) for a specific prompt.
 - **Arguments**: `PROMPT` (The task to solve).
 - **Options**:
   - `--test`, `-t`: Command to run tests (e.g., `pytest`).

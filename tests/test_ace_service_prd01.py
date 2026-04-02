@@ -45,7 +45,7 @@ def test_review_pr_sop_full(service, temp_workspace):
     assert "PR REVIEW TASK: PR-999" in messages[0].subject
 
 def test_run_loop_integration(service, temp_workspace, monkeypatch):
-    """Verify RALPH loop integration with context, execution, and reflection."""
+    """Verify ROLF loop integration with context, execution, and reflection."""
     # Mock subprocess.run for cursor-agent and test_cmd
     def mock_run(cmd, shell=True, capture_output=True, text=True, env=None, **kwargs):
         mock_res = MagicMock()

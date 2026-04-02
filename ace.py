@@ -998,7 +998,7 @@ def loop(
     """
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
     """
-    console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
+    console.print("🚀 [bold blue]Starting ROLF Loop[/bold blue]")
     svc = get_service()
 
     # Phase 4.1: Native ace loop integration
@@ -1017,11 +1017,11 @@ def loop(
     )
 
     if success:
-        msg = f"\n✅ [bold green]RALPH Loop completed in {iterations} iterations![/bold green]"
+        msg = f"\n✅ [bold green]ROLF Loop completed in {iterations} iterations![/bold green]"
         console.print(msg)
     else:
         console.print(
-            f"\n❌ [bold red]RALPH Loop failed after {iterations} iterations.[/bold red]"
+            f"\n❌ [bold red]ROLF Loop failed after {iterations} iterations.[/bold red]"
         )
         raise typer.Exit(code=1)
 

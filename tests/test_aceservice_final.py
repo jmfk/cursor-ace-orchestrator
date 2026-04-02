@@ -103,8 +103,8 @@ def test_decision_records(service):
     assert decisions[0].id == "ADR-001"
 
 @patch("subprocess.run")
-def test_ralph_loop_success(mock_run, service, temp_workspace):
-    """Test successful RALPH loop execution."""
+def test_rolf_loop_success(mock_run, service, temp_workspace):
+    """Test successful ROLF loop execution."""
     # Mock successful agent run
     mock_agent_res = MagicMock()
     mock_agent_res.returncode = 0

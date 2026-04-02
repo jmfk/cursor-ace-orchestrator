@@ -31,7 +31,7 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 3. Implementera en **write-back-loop** där agenten uppdaterar sin egen kontext efter varje task
 4. Tillhandahålla ett **ownership registry** som mappar kodmoduler till dedikerade **Agent Teams**
 5. Bygga en **context builder** som komponerar rätt kontext-slice per anrop
-6. Implementera en **iterativ loop-motor (`ace loop`)** som kör agenten tills tester passerar (RALPH-style)
+6. Implementera en **iterativ loop-motor (`ace loop`)** som kör agenten tills tester passerar (ROLF-style)
 7. Möjliggöra **Multi-Agent Consensus** där agenter kan debattera arkitektoniska beslut innan de fastställs
 8. Implementera ett **Internal Messaging System (Agent Mail)** för asynkron kommunikation mellan agenter
 9. Använda **Standard Operating Procedures (SOPs)** för att styra agent-interaktioner och arbetsflöden
@@ -54,7 +54,7 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 │         ▼                  ▼                    ▼           │
 │  ┌─────────────┐    ┌───────────────┐   ┌────────────────┐  │
 │  │ Agent Teams │◀──▶│  Loop Engine  │◀──┤  .mdc / memory │  │
-│  │ (SOP-driven)│    │ (RALPH Cycle) │   │    (store)     │  │
+│  │ (SOP-driven)│    │ (ROLF Cycle) │   │    (store)     │  │
 │  └──────┬──────┘    └───────┬───────┘   └────────────────┘  │
 │         │                  │                               │
 │         ▼                  ▼                               │
@@ -91,7 +91,7 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 
 **Playbook** — Agentens ackumulerade kunskaps-dokument. Lever i `.cursor/rules/<role>.mdc`. Uppdateras inkrementellt, aldrig skrivs om från scratch.
 
-**RALPH Loop (Reasoning, Action, Learning, Progress, Halt)** — En iterativ cykel där agenten:
+**ROLF Loop (Reasoning, Action, Learning, Progress, Halt)** — En iterativ cykel där agenten:
 
 1. **Reason:** Analyserar task och befintlig kontext.
 2. **Action:** Utför kodändringar.
@@ -364,7 +364,7 @@ ace run "implementera refresh token rotation" --file src/auth/token.ts
 # 5. Uppdaterar .ace/sessions/ och .cursor/rules/auth.mdc
 ```
 
-### 6.5 Loop Engine (RALPH Motor)
+### 6.5 Loop Engine (ROLF Motor)
 
 **Ansvar:** Hantera den iterativa processen där agenten försöker lösa en task genom flera försök.
 
@@ -503,7 +503,7 @@ ace run "<prompt>" --file <target>          # Auto-resolve agent
 ace run "<prompt>" --agent <agent-id>       # Explicit agent
 ace run "<prompt>" --task-type review       # Explicit task type
 
-# Iterativ loop (RALPH)
+# Iterativ loop (ROLF)
 ace loop "<prompt>" --test <test_cmd>       # Kör tills testet passerar
 ace loop "<prompt>" --max 5                 # Begränsa iterationer
 
@@ -670,7 +670,7 @@ Vektoriserat minne** — Ersätt flat `.mdc` med embedding-sökning för stora p
 
 **Agentic feedback loop** — Agenten flaggar automatiskt när en task lyckas/misslyckas baserat på test-output, inte bara subjektiv reflektion. Kopplar write-back till CI/CD.
 
-**RALPH-integration** — ACE Orchestrator kan fungera som memory-lager under ett RALPH-loop system där Cursor Agent är executor.
+**ROLF-integration** — ACE Orchestrator kan fungera som memory-lager under ett ROLF-loop system där Cursor Agent är executor.
 
 ---
 

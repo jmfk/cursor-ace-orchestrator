@@ -35,8 +35,8 @@ class PlanNode:
         }
 
 class PlanTree:
-    """Manages the hierarchical plan tree stored in .ralph/plans/."""
-    def __init__(self, prd_path: str, base_dir: str = ".ralph/plans", max_depth: int = 4):
+    """Manages the hierarchical plan tree stored in .rolf/plans/."""
+    def __init__(self, prd_path: str, base_dir: str = ".rolf/plans", max_depth: int = 4):
         self.prd_path = prd_path
         self.base_dir = Path(base_dir)
         self.nodes_dir = self.base_dir / "nodes"
@@ -205,7 +205,7 @@ class PlanTree:
         return ancestors
 
     @classmethod
-    def load_or_create(cls, prd_path: str, base_dir: str = ".ralph/plans") -> 'PlanTree':
+    def load_or_create(cls, prd_path: str, base_dir: str = ".rolf/plans") -> 'PlanTree':
         return cls(prd_path, base_dir)
 
     def ingest_flat_plan(self, md_content: str):

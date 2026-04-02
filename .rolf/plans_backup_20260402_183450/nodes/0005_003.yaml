@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:37.516392'
+depth: 1
+description: ''
+id: '0005_003'
+parent_id: '0005'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**5.3 FastAPI Backend Implementation**: Create `ace_api/main.py` with endpoints
+  for all core ACE functionalities.'

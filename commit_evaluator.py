@@ -21,10 +21,10 @@ class CommitEvaluator:
 
     # Files to exclude from diff analysis
     EXCLUDED_FILES = {
-        "ralph_execution.log",
-        "ralph_loop.py",
-        "ralph_state_history.json",
-        "ralph_stats.json",
+        "rolf_execution.log",
+        "rolf_loop.py",
+        "rolf_state_history.json",
+        "rolf_stats.json",
         "plan.md",
         "changelog.md"
     }
@@ -71,7 +71,7 @@ class CommitEvaluator:
             if match:
                 return match.group(1).upper()
         
-        features = ["auth", "api", "ui", "db", "stitch", "ralph", "ace", "memory", "consensus"]
+        features = ["auth", "api", "ui", "db", "stitch", "rolf", "ace", "memory", "consensus"]
         for feat in features:
             if feat in subject.lower():
                 return f"FEAT:{feat.upper()}"

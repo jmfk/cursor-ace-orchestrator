@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:07.234078'
+depth: 1
+description: ''
+id: 0010_019
+parent_id: '0010'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**10.18 Automated Security Audit Integration**: Integrate automated security
+  checks into the RALPH loop for agent-owned modules.'

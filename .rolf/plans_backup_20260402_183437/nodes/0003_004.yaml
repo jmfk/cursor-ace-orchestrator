@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:26.117146'
+depth: 1
+description: ''
+id: '0003_004'
+parent_id: '0003'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**3.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy
+  counters based on task success/failure in RALPH loop.'

@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:33:30.133854'
+depth: 1
+description: ''
+id: '0004_002'
+parent_id: '0004'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**4.2 Agent Mail System**: Implement the internal messaging system in `.ace/mail/`
+  with `inbox/` and `sent/` per agent using YAML storage.'

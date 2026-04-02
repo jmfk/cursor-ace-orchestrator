@@ -1,9 +1,9 @@
-.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm full-report comprehensive test
+.PHONY: build-ace install build-exe install-exe help install-rolf build-rolf-exe install-rolf-exe eval eval-llm report report-llm full-report comprehensive test
 
 help:
 	@echo "Cursor ACE Orchestrator - Development Commands"
-	@echo "  make ralph    Run the RALPH loop to iteratively build the system"
-	@echo "  make install      Install the 'ace' and 'ralph' commands locally (editable)"
+	@echo "  make rolf --help    Run the ROLF loop to iteratively build the system"
+	@echo "  make install      Install the 'ace' and 'rolf' commands locally (editable)"
 	@echo "  make eval         Evaluate recent git commits using heuristics"
 	@echo "  make eval-llm     Evaluate recent git commits using Gemini Flash (limit 5)"
 	@echo "  make report       Generate a markdown report with commit value graphs"
@@ -12,8 +12,8 @@ help:
 	@echo "  make comprehensive Generate a comprehensive report (Time-series + Milestones + Commits)"
 	@echo "  make test         Run all tests in the tests/ directory (including SQE tests)"
 
-ralph:
-	python3 ralph_loop.py
+rolf:
+	python3 rolf_loop.py
 
 install:
 	pip install .

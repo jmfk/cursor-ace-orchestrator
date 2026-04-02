@@ -2,13 +2,13 @@
 
 ## 1. Implementation Summary
 
-Based on the analysis of the codebase relative to **PRD-01**, the Cursor ACE Orchestrator is approximately **95% implemented**. The core architecture, including the Ownership Registry, Context Builder, Write-back Pipeline, RALPH Loop, and Multi-Agent Coordination, is fully functional and integrated into a CLI and a FastAPI service.
+Based on the analysis of the codebase relative to **PRD-01**, the Cursor ACE Orchestrator is approximately **95% implemented**. The core architecture, including the Ownership Registry, Context Builder, Write-back Pipeline, ROLF Loop, and Multi-Agent Coordination, is fully functional and integrated into a CLI and a FastAPI service.
 
 ### Key Features Implemented:
 - **Ownership Registry (100%)**: `ace own`, `ace who`, and `ace list-owners` manage module-to-agent mapping with longest-prefix matching.
 - **Context Builder (100%)**: `ace build-context` dynamically composes context from global rules, agent playbooks, recent ADRs, and session history.
 - **Write-back Pipeline (100%)**: Automatic reflection using Claude API to extract learnings (`[str-XXX]`, `[mis-XXX]`, `[dec-XXX]`) and update `.mdc` playbooks.
-- **RALPH Loop Engine (100%)**: `ace loop` implements the iterative Reasoning-Action-Learning-Progress-Halt cycle with automated testing and memory updates.
+- **ROLF Loop Engine (100%)**: `ace loop` implements the iterative Reasoning-Action-Learning-Progress-Halt cycle with automated testing and memory updates.
 - **Agent Mail System (100%)**: Internal messaging between agents stored in `.ace/mail/` for coordination and debate.
 - **SOP Engine (100%)**: Standard Operating Procedures for onboarding, PR reviews, and audits.
 - **API & Future Readiness (100%)**: A FastAPI backend (`ace_api/`) and a CLI-to-API bridge (`ace.py`) are fully implemented.

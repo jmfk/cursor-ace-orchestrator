@@ -1,4 +1,4 @@
-from ralph_loop import generate_commit_message, run_cursor_agent
+from rolf_loop import generate_commit_message, run_cursor_agent
 
 
 def test_direct_gemini_api():
@@ -25,6 +25,6 @@ def test_cursor_agent_call():
 
 
 if __name__ == "__main__":
-    # Ensure we are in the right directory to find .env and ralph_loop
+    # Ensure we are in the right directory to find .env and rolf_loop
     test_direct_gemini_api()
     test_cursor_agent_call()

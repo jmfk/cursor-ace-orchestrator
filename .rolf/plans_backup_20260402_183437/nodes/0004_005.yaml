@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:26.120469'
+depth: 1
+description: ''
+id: '0004_005'
+parent_id: '0004'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**4.5 Google Stitch Integration**: Implement `ace ui mockup` and `ace ui sync`
+  to interface with Google Labs design tools (API + Agent fallback).'

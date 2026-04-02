@@ -26,10 +26,10 @@ class CommitAnalyzer:
     """
 
     EXCLUDED_FILES = {
-        "ralph_execution.log",
-        "ralph_loop.py",
-        "ralph_state_history.json",
-        "ralph_stats.json"
+        "rolf_execution.log",
+        "rolf_loop.py",
+        "rolf_state_history.json",
+        "rolf_stats.json"
     }
 
     # Cost configuration (USD per 1M tokens)

@@ -15,7 +15,7 @@ Requires-Dist: uvicorn
 
 # ACE: Automated Coding Environment Orchestrator
 
-ACE is a modular, event-driven orchestration layer for specialized coding agents. It implements the **RALPH Cycle** (Reasoning, Action, Learning, Progress, Halt) to manage complex development tasks autonomously.
+ACE is a modular, event-driven orchestration layer for specialized coding agents. It implements the **ROLF Cycle** (Reasoning, Action, Learning, Progress, Halt) to manage complex development tasks autonomously.
 
 ## 🚀 Vision
 ACE transforms the standard coding experience into a **Multi-Agent System (MAS)** where specialized agents own specific parts of your codebase, learn from every interaction, and collaborate through formal protocols.
@@ -45,7 +45,7 @@ make install
    ```
    This sets up the `.ace/` directory and prompts for necessary API keys.
 
-2. **Run a RALPH Loop**:
+2. **Run a ROLF Loop**:
    ```bash
    ace loop "Implement a new feature X" --test "pytest tests/test_x.py"
    ```
@@ -58,7 +58,7 @@ make install
 
 ## 🧠 Core Concepts
 
-### 1. The RALPH Cycle
+### 1. The ROLF Cycle
 Every task follows a structured loop:
 - **Reasoning**: Analyze the prompt and build context.
 - **Action**: Execute coding tasks via agents.

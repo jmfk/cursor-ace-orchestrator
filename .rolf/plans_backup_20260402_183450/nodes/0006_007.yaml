@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:37.519654'
+depth: 1
+description: ''
+id: '0006_007'
+parent_id: '0006'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**6.7 Agentic Feedback Loop**: Automate success/failure flagging in RALPH
+  loop based on test-output, connecting write-back to CI/CD.'

@@ -276,7 +276,7 @@ d0438f58 [ 5.57] |
 | `a7e095e3` | **19.89** | Roadmap: Define Phase 10 advanced features | Files: 8, Changes: 1560 |
 | `01c0aa79` | **15.63** | chore: Add 10.37 roadmap placeholder | Files: 5, Changes: 2063 |
 | `a7d02b56` | **8.27** | Add 10.35 future roadmap task placeholder | Files: 1, Changes: 433 |
-| `f728433d` | **10.68** | fix: resolve linting errors and update RALPH loop logic | Files: 2, Changes: 388 |
+| `f728433d` | **10.68** | fix: resolve linting errors and update ROLF loop logic | Files: 2, Changes: 388 |
 | `df2507e2` | **8.76** | Complete 10.34; add 10.35 as next roadmap placeholder | Files: 1, Changes: 240 |
 | `3426f6c0` | **13.08** | 10.34 Define next advanced features for Phase 10 | Files: 4, Changes: 618 |
 | `dcc9d87a` | **13.07** | Define next advanced features for Phase 10 | Files: 4, Changes: 611 |
@@ -290,12 +290,12 @@ d0438f58 [ 5.57] |
 | `46e5634a` | **16.1** | Implement comprehensive self-audit capabilities for ACE | Files: 6, Changes: 1576 |
 | `cd8bdc7a` | **9.82** | Refine LLM-referee logic for multi-agent debate mediation. | Files: 3, Changes: 456 |
 | `b4af5603` | **40.49** | 10.23: Enhance Living Specs automation for implementation changes | Files: 27, Changes: 3110 |
-| `0b673762` | **12.85** | Refine Living Specs automation in RALPH loop. | Files: 5, Changes: 470 |
+| `0b673762` | **12.85** | Refine Living Specs automation in ROLF loop. | Files: 5, Changes: 470 |
 | `688bbafe` | **9.83** | Refine adaptive memory archival logic | Files: 3, Changes: 462 |
 | `efcf4d15` | **2.5** | feat: Implement performance profiling dashboard | Files: 0, Changes: 0 |
 | `f387ec2c` | **18.84** | feat: Implement web-based performance profiling dashboard | Files: 8, Changes: 1470 |
 | `3fb3c662` | **17.73** | Enhance agent subscription notifications with granular options | Files: 8, Changes: 734 |
-| `e557b4a1` | **12.08** | Integrate automated security checks into RALPH loop for agent-owned modules. | Files: 5, Changes: 615 |
+| `e557b4a1` | **12.08** | Integrate automated security checks into ROLF loop for agent-owned modules. | Files: 5, Changes: 615 |
 | `30ffaa3a` | **7.96** | Refine cross-project anonymized learning export/import logic. | Files: 2, Changes: 302 |
 | `31b3f1bb` | **6.41** | Monitor and visualize real-time context window usage | Files: 1, Changes: 285 |
 | `45b6dbe9` | **9.77** | Optimize distributed vector store performance and reliability. | Files: 2, Changes: 432 |
@@ -324,13 +324,13 @@ d0438f58 [ 5.57] |
 | `979d5e7f` | **9.44** | 9.7: Next task placeholder | Files: 3, Changes: 293 |
 | `d8bb2ca4` | **1.0** | docs: Update changelog & plan for task 9.6 (Google Stitch) completion | Files: 0, Changes: 0 |
 | `3a67182a` | **13.48** | feat(stitch): Connect CLI stubs to integration logic | Files: 5, Changes: 975 |
-| `1ae5623d` | **4.51** | Enhance Makefile to support building and installing 'ralph' executable. Added new targets for 'build-ralph-exe' and 'install-ralph-exe' along with updated help messages for clarity. | Files: 1, Changes: 17 |
-| `13d67c14` | **4.0** | Install ralph | Files: 2, Changes: 9 |
+| `1ae5623d` | **4.51** | Enhance Makefile to support building and installing 'rolf' executable. Added new targets for 'build-rolf-exe' and 'install-rolf-exe' along with updated help messages for clarity. | Files: 1, Changes: 17 |
+| `13d67c14` | **4.0** | Install rolf | Files: 2, Changes: 9 |
 | `17e62391` | **8.98** | Feat: Advanced multi-agent consensus with complex debates, voting, and HITL escalation UI. | Files: 2, Changes: 550 |
 | `62d36b87` | **5.18** | Security: Sandbox agent execution for 9.2 hardening | Files: 1, Changes: 68 |
 | `17a3e5eb` | **9.69** | Add native IDE extension for ACE Orchestrator GUI. | Files: 2, Changes: 394 |
 | `615781fe` | **6.16** | fix: mock agents in UI sync integration test | Files: 1, Changes: 11 |
-| `70557911` | **5.9** | feat: Add ACEService unit tests, integrate RALPH loop, and establish core SOPs | Files: 1, Changes: 88 |
+| `70557911` | **5.9** | feat: Add ACEService unit tests, integrate ROLF loop, and establish core SOPs | Files: 1, Changes: 88 |
 | `8d04f6f3` | **8.55** | Implement Cursor/VSCode extension for ACE Orchestrator UI | Files: 1, Changes: 592 |
 | `76f7a149` | **5.72** | Update profiling data | Files: 1, Changes: 128 |
 | `57120ae5` | **9.22** | Implement robust MACP for larger agent teams | Files: 2, Changes: 227 |
@@ -338,10 +338,10 @@ d0438f58 [ 5.57] |
 | `77406acd` | **17.25** | feat: Enhance multi-agent consensus with advanced debate, voting, and HIL UI | Files: 7, Changes: 1333 |
 | `35db69c4` | **8.64** | Vectorize memory: Replace flat MDC with vector DB search for large playbooks. | Files: 3, Changes: 371 |
 | `e4b06e1a` | **11.0** | Update profiling logs | Files: 4, Changes: 317 |
-| `aebed122` | **10.51** | feat: enhance SOPs, Google Stitch integration, and native RALPH loop | Files: 3, Changes: 179 |
+| `aebed122` | **10.51** | feat: enhance SOPs, Google Stitch integration, and native ROLF loop | Files: 3, Changes: 179 |
 | `31c2882f` | **7.09** | Update profiling log. | Files: 2, Changes: 110 |
 | `85ab69c2` | **8.69** | Feat: Add advanced multi-agent debate formats, voting, and HIL UI | Files: 2, Changes: 123 |
-| `098d9cc2` | **10.96** | Feat: Native RALPH loop, formal SOPs, and expanded TDD coverage | Files: 3, Changes: 300 |
+| `098d9cc2` | **10.96** | Feat: Native ROLF loop, formal SOPs, and expanded TDD coverage | Files: 3, Changes: 300 |
 | `ab683348` | **4.51** | Feat: `ace subscribe` for agent module/dependency change notifications via Agent Mail | Files: 1, Changes: 17 |
 | `fab51e69` | **13.78** | Implement ace spec sync for living specification alignment | Files: 5, Changes: 245 |
 | `5ec95387` | **8.57** | 7.6: Implement explicit multi-agent sign-off consensus for change finalization | Files: 2, Changes: 340 |
@@ -353,8 +353,8 @@ d0438f58 [ 5.57] |
 | `9c1f6de2` | **8.69** | Integrate native Cursor/VSCode extension for ACE Orchestrator GUI | Files: 3, Changes: 123 |
 | `ec0e0cea` | **8.34** | Advanced multi-agent consensus: support complex debates, voting, and HITL UI. | Files: 3, Changes: 261 |
 | `eb481515` | **5.77** | Integrate native Cursor/VSCode extension for ACE Orchestrator GUI | Files: 1, Changes: 136 |
-| `46556e4c` | **25.04** | feat: enhance ralph_loop with rate limit handling and paid account detection | Files: 2068, Changes: 117475 |
-| `acbce26b` | **10.8** | RALPH Loop: Task 7.1 Vectorized Memory Replace flat `.mdc` with emb | Files: 6, Changes: 249 |
+| `46556e4c` | **25.04** | feat: enhance rolf_loop with rate limit handling and paid account detection | Files: 2068, Changes: 117475 |
+| `acbce26b` | **10.8** | ROLF Loop: Task 7.1 Vectorized Memory Replace flat `.mdc` with emb | Files: 6, Changes: 249 |
 | `3fca8919` | **7.56** | (one line). Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"339a7ad7-9d05-4e34-be77-41b05d867834"} | Files: 3, Changes: 336 |
 | `0492e0ad` | **10.21** | (one line). Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"2cc47b7b-a02d-4b22-a361-5777bae3133d"} | Files: 6, Changes: 319 |
 | `af79571c` | **9.31** | (one line). Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"20ab187e-e125-4013-9cf1-0a3e86868840"} | Files: 5, Changes: 252 |
@@ -371,9 +371,9 @@ d0438f58 [ 5.57] |
 | `dc178543` | **11.14** | Refactor: Remove unused LivingSpec import and format API key setup | Files: 6, Changes: 65 |
 | `0227d7a0` | **14.58** | Implement Living Specs automation and CLI commands. | Files: 7, Changes: 193 |
 | `cc82ff60` | **18.14** | Implement multi-turn debate logic | Files: 12, Changes: 207 |
-| `9d55b68e` | **13.61** | RALPH: Integrate loop reflection for memory updates. | Files: 9, Changes: 112 |
-| `998fc44d` | **2.5** | Add API key handling and .env loading to ralph_loop.py | Files: 0, Changes: 0 |
-| `efdaf478` | **11.16** | update ralph_loop.py to use gemini-2.5-flash and add credential management to ace.py | Files: 4, Changes: 214 |
+| `9d55b68e` | **13.61** | ROLF: Integrate loop reflection for memory updates. | Files: 9, Changes: 112 |
+| `998fc44d` | **2.5** | Add API key handling and .env loading to rolf_loop.py | Files: 0, Changes: 0 |
+| `efdaf478` | **11.16** | update rolf_loop.py to use gemini-2.5-flash and add credential management to ace.py | Files: 4, Changes: 214 |
 | `2fdc9db9` | **7.64** | (one line). Focus on what was implemented or fixed. Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"8031e99c-e8e7-404d-bb0d-a18a6db9bf2e"} | Files: 2, Changes: 116 |
 | `338b110d` | **14.18** | (one line). Focus on what was implemented or fixed. Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"7e201fe4-773f-4690-a284-84641f4b7891"} | Files: 10, Changes: 21 |
 | `de413847` | **8.32** | Implement Phase 6.7: Memory Write-back Verification and refine tests. | Files: 2, Changes: 80 |
@@ -386,42 +386,42 @@ d0438f58 [ 5.57] |
 | `89ceeb52` | **19.83** | (one line). Focus on what was implemented or fixed. Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"b8702aea-24f4-4d5d-9c70-a088facc95a5"} | Files: 17, Changes: 459 |
 | `63f9354b` | **13.27** | (one line). Focus on what was implemented or fixed. Output ONLY the commit message string. DO NOT output any JSON, system metadata, or extra text."}]},"session_id":"3a8b5752-642c-4f9f-886b-59be8854fc53"} | Files: 6, Changes: 767 |
 | `06895fcb` | **12.34** | Implement native ace loop, SOP audit, and debate mediation logic | Files: 5, Changes: 147 |
-| `6924d3e4` | **8.86** | Refine implementation and fix NameError in ralph_loop.py | Files: 3, Changes: 26 |
-| `39640fbc` | **16.33** | Enhance RALPH Loop with PRD awareness and stagnation detection | Files: 16, Changes: 116717 |
+| `6924d3e4` | **8.86** | Refine implementation and fix NameError in rolf_loop.py | Files: 3, Changes: 26 |
+| `39640fbc` | **16.33** | Enhance ROLF Loop with PRD awareness and stagnation detection | Files: 16, Changes: 116717 |
 | `9c2dbab9` | **3.91** | Add install-exe step to Makefile to build and install binary to /usr/local/bin | Files: 1, Changes: 8 |
 | `b016c08d` | **4.0** | Add build-exe step to Makefile for self-contained executable using PyInstaller | Files: 1, Changes: 9 |
 | `52660cbf` | **6.56** | Add pyproject.toml and make install step for 'ace' command | Files: 2, Changes: 33 |
 | `27d6bd94` | **6.36** | chore: complete PRD-01 implementation and generate final analysis | Files: 1, Changes: 37 |
 | `0edf3a8e` | **17.88** | {"type":"system","subtype":"init","apiKeySource":"login","cwd":"/Users/jmfk/code/ACE","session_id":"5d091050-8d00-47e6-86fc-bee0e840d288","model":"Gemini 3 Flash","permissionMode":"default"} | Files: 14, Changes: 867 |
-| `b59b6f05` | **9.87** | feat: implement native RALPH loop and enhance Google Stitch integration | Files: 4, Changes: 152 |
+| `b59b6f05` | **9.87** | feat: implement native ROLF loop and enhance Google Stitch integration | Files: 4, Changes: 152 |
 | `3805c916` | **0.0** | {"type":"system","subtype":"init","apiKeySource":"login","cwd":"/Users/jmfk/code/ACE","session_id":"15944f0e-ab46-4ce7-83e5-8cdc198b610e","model":"Gemini 3 Flash","permissionMode":"default"} | Files: 0, Changes: 0 |
 | `b4ecd366` | **17.14** | fix: resolve linting issues and align CLI with API | Files: 10, Changes: 209 |
 | `6e264341` | **15.03** | {"type":"system","subtype":"init","apiKeySource":"login","cwd":"/Users/jmfk/code/ACE","session_id":"946b738d-1144-4165-af0e-0cdca33a8595","model":"Gemini 3 Flash","permissionMode":"default"} | Files: 10, Changes: 325 |
-| `772e396e` | **2.5** | improve ralph_loop.py commit messages | Files: 0, Changes: 0 |
-| `dcbfef48` | **1.0** | update ralph_loop.py with startup analysis and final report | Files: 0, Changes: 0 |
-| `5cb50da6` | **51.07** | RALPH Loop: Implementation iteration 4 | Files: 44, Changes: 6114 |
-| `c5643613` | **1013.38** | RALPH Loop: Implementation iteration 4 | Files: 1001, Changes: 274486 |
-| `7df4a2df` | **37.17** | RALPH Loop: Implementation iteration 6 | Files: 24, Changes: 684 |
-| `2fa7ad5d` | **104.83** | RALPH Loop: Implementation iteration 3 | Files: 103, Changes: 4613 |
-| `d58eb60a` | **15.3** | RALPH Loop: Implementation iteration 5 | Files: 7, Changes: 141 |
-| `d73d68bc` | **10.95** | RALPH Loop: Implementation iteration 2 | Files: 4, Changes: 166 |
-| `82c3d485` | **13.8** | RALPH Loop: Implementation iteration 3 | Files: 6, Changes: 447 |
-| `1aeeeeeb` | **2.5** | RALPH Loop: Implementation iteration 4 | Files: 0, Changes: 0 |
-| `0e5fe85d` | **13.67** | RALPH Loop: Implementation iteration 2 | Files: 6, Changes: 384 |
-| `09ad69b5` | **16.05** | RALPH Loop: Implementation iteration 3 | Files: 8, Changes: 594 |
-| `796921a4` | **16.0** | RALPH Loop: Implementation iteration 2 | Files: 8, Changes: 559 |
-| `aeecc163` | **2.5** | RALPH Loop: Implementation iteration 1 | Files: 0, Changes: 0 |
-| `a9216999` | **2.5** | RALPH Loop: Implementation iteration 1 | Files: 0, Changes: 0 |
-| `1f081b94` | **2017.07** | RALPH Loop: Implementation iteration 1 | Files: 4282, Changes: 610201 |
-| `5d8f244b` | **0.0** | Enhance ralph_loop.py with detailed error logging and exit code handling | Files: 0, Changes: 0 |
-| `739b226e` | **1.5** | Fix ralph_loop.py: Update cursor-agent command structure and improve Git handling | Files: 0, Changes: 0 |
+| `772e396e` | **2.5** | improve rolf_loop.py commit messages | Files: 0, Changes: 0 |
+| `dcbfef48` | **1.0** | update rolf_loop.py with startup analysis and final report | Files: 0, Changes: 0 |
+| `5cb50da6` | **51.07** | ROLF Loop: Implementation iteration 4 | Files: 44, Changes: 6114 |
+| `c5643613` | **1013.38** | ROLF Loop: Implementation iteration 4 | Files: 1001, Changes: 274486 |
+| `7df4a2df` | **37.17** | ROLF Loop: Implementation iteration 6 | Files: 24, Changes: 684 |
+| `2fa7ad5d` | **104.83** | ROLF Loop: Implementation iteration 3 | Files: 103, Changes: 4613 |
+| `d58eb60a` | **15.3** | ROLF Loop: Implementation iteration 5 | Files: 7, Changes: 141 |
+| `d73d68bc` | **10.95** | ROLF Loop: Implementation iteration 2 | Files: 4, Changes: 166 |
+| `82c3d485` | **13.8** | ROLF Loop: Implementation iteration 3 | Files: 6, Changes: 447 |
+| `1aeeeeeb` | **2.5** | ROLF Loop: Implementation iteration 4 | Files: 0, Changes: 0 |
+| `0e5fe85d` | **13.67** | ROLF Loop: Implementation iteration 2 | Files: 6, Changes: 384 |
+| `09ad69b5` | **16.05** | ROLF Loop: Implementation iteration 3 | Files: 8, Changes: 594 |
+| `796921a4` | **16.0** | ROLF Loop: Implementation iteration 2 | Files: 8, Changes: 559 |
+| `aeecc163` | **2.5** | ROLF Loop: Implementation iteration 1 | Files: 0, Changes: 0 |
+| `a9216999` | **2.5** | ROLF Loop: Implementation iteration 1 | Files: 0, Changes: 0 |
+| `1f081b94` | **2017.07** | ROLF Loop: Implementation iteration 1 | Files: 4282, Changes: 610201 |
+| `5d8f244b` | **0.0** | Enhance rolf_loop.py with detailed error logging and exit code handling | Files: 0, Changes: 0 |
+| `739b226e` | **1.5** | Fix rolf_loop.py: Update cursor-agent command structure and improve Git handling | Files: 0, Changes: 0 |
 | `b80896d3` | **1.0** | Final documentation sync and self-hosting notes | Files: 0, Changes: 0 |
 | `a0c97d4c` | **4.3** | Document bootstrapping vs self-hosting phase | Files: 1, Changes: 19 |
-| `4c6579d6` | **2.5** | Add token usage, cost tracking, and execution logging to RALPH loop | Files: 0, Changes: 0 |
-| `0bc1e69a` | **4.91** | Add Makefile with build-ace command to run RALPH loop | Files: 1, Changes: 8 |
+| `4c6579d6` | **2.5** | Add token usage, cost tracking, and execution logging to ROLF loop | Files: 0, Changes: 0 |
+| `0bc1e69a` | **4.91** | Add Makefile with build-ace command to run ROLF loop | Files: 1, Changes: 8 |
 | `8a82bdc1` | **7.19** | Add ARCHITECTURE.md outlining system design and data flow | Files: 1, Changes: 98 |
 | `9b4bbc99` | **1.7** | gitversion | Files: 1, Changes: 3 |
-| `a08fa81b` | **2.5** | Add RALPH loop orchestrator script | Files: 0, Changes: 0 |
+| `a08fa81b` | **2.5** | Add ROLF loop orchestrator script | Files: 0, Changes: 0 |
 | `2966a0a9` | **4.88** | Integrate Google Stitch for AI-driven UI/UX design and mockup orchestration | Files: 3, Changes: 30 |
 | `4d356356` | **4.8** | Update PRD-02 and SPECS.md with SOPs, Token Management, and new file locations | Files: 2, Changes: 62 |
 | `d0438f58` | **5.57** | Update PRD-01 and Workflow with SOPs, Agent Teams, QA, Subscriptions, and Token Management | Files: 2, Changes: 152 |

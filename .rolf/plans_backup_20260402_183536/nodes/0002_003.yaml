@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:22.141920'
+depth: 1
+description: ''
+id: '0002_003'
+parent_id: '0002'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**2.3 Executor Wrapper**: Implement `ace run` to wrap `cursor-agent`. Capture
+  output, exit codes, and log to sessions.'

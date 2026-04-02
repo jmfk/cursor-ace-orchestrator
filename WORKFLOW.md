@@ -31,7 +31,7 @@ When a user runs `ace run "task"` or `ace loop "task"`, the orchestrator:
 3. **Composes Prompt**: Wraps the user task with a "Task Frame" (e.g., `implement`, `debug`, `review`) and the gathered context.
 4. **Token Management**: Applies context pruning based on the selected Token Mode (Low, Medium, High).
 
-### Phase B: Execution (RALPH Cycle)
+### Phase B: Execution (ROLF Cycle)
 - **Execute**: The orchestrator invokes the `cursor-agent` in headless mode.
 - **Verify (TDD)**: If running via `ace loop`, the orchestrator executes the specified test command (e.g., `npm test`).
 - **Analyze**: If tests fail, a reflection prompt analyzes the failure to update the memory for the next iteration.

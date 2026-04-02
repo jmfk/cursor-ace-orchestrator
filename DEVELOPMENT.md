@@ -10,8 +10,8 @@ This document provides information for contributors and developers working on th
   - `planner/`: Hierarchical task planning and decomposition.
   - `models/schemas.py`: Pydantic models for configuration, agents, and data.
   - `utils/`: Shared utilities (profiler, etc.).
-- `ralph_loop.py`: The bootstrapping script for the RALPH cycle.
-- `ralph.yaml`: Configuration for the RALPH loop.
+- `rolf_loop.py`: The bootstrapping script for the ROLF cycle.
+- `rolf.yaml`: Configuration for the ROLF loop.
 - `analyze_commits.py`: Utility for evaluating git commits using LLMs.
 - `Makefile`: Development commands for building, installing, and reporting.
 - `.ace/`: (Created after `ace init`) Central database for agents, mail, and sessions.
@@ -40,8 +40,8 @@ make build-exe
 # Install 'ace' binary to /usr/local/bin
 make install-exe
 
-# Build 'ralph' (the bootstrapping loop) executable
-make build-ralph-exe
+# Build 'rolf' (the bootstrapping loop) executable
+make build-rolf-exe
 ```
 
 ## 📈 Performance & Evaluation

@@ -14,8 +14,8 @@ def service(temp_workspace):
     """Initialize ACEService in a temporary workspace."""
     return ACEService(base_path=temp_workspace)
 
-def test_ralph_loop_integration(service, monkeypatch):
-    """Test the RALPH loop integration (Phase 4.1)."""
+def test_rolf_loop_integration(service, monkeypatch):
+    """Test the ROLF loop integration (Phase 4.1)."""
     # Mock the run_agent_task and reflect_on_session
     monkeypatch.setattr(service, "run_agent_task", lambda *args, **kwargs: True)
     monkeypatch.setattr(service, "reflect_on_session", lambda *args, **kwargs: "No new learnings.")

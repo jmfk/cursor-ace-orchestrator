@@ -89,7 +89,7 @@ class HierarchicalPlanner:
         
         # Get the last few lines of the log
         log_content = ""
-        log_file = "ralph_execution.log"
+        log_file = "rolf_execution.log"
         if os.path.exists(log_file):
             try:
                 with open(log_file, "r") as f:
@@ -99,7 +99,7 @@ class HierarchicalPlanner:
                 log_content = "Could not read log file."
         
         prompt = (
-            f"The RALPH hierarchical planner has STAGNATED and is exiting.\n"
+            f"The ROLF hierarchical planner has STAGNATED and is exiting.\n"
             f"Reason: {reason}\n\n"
             f"Current Node State:\n{node_info}\n\n"
             f"Last 50 lines of Execution Log:\n{log_content}\n\n"
@@ -299,7 +299,7 @@ class HierarchicalPlanner:
         if diff_result.is_meaningful:
             # After execution, we'd normally verify and commit
             # For the purpose of this orchestration, we mark it complete
-            # The actual ralph_loop will handle the git/stats part
+            # The actual rolf_loop will handle the git/stats part
             self.tree.mark_complete(node.id)
             print(f"Completed node {node.id} ({len(diff_result.source_files_changed)} source files changed)")
         else:

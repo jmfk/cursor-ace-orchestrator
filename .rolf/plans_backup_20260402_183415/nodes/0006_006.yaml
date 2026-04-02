@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:33:30.139901'
+depth: 1
+description: ''
+id: '0006_006'
+parent_id: '0006'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**6.6 Security Audit SOP**: Implement `ace agent security-audit` to perform
+  security checks on agent-owned modules.'

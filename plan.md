@@ -22,13 +22,13 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **3.1 Reflection Engine**: Implement the LLM reflection prompt (using Claude) to extract learnings (`[str-XXX]`, `[mis-XXX]`, `[dec-XXX]`) from agent output.
 - [x] **3.2 Delta Update Parser**: Create logic to parse structured reflection output and handle ID assignment for new entries.
 - [x] **3.3 Playbook Updater**: Implement safe, incremental updates to `.mdc` files that preserve existing structure and frontmatter.
-- [x] **3.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy counters based on task success/failure in RALPH loop.
+- [x] **3.4 Helpful/Harmful Counters**: Implement logic to increment/decrement strategy counters based on task success/failure in ROLF loop.
 - [x] **3.5 ADR Management**: Implement `ace decision add` and `ace decision list` to manage Architectural Decision Records in `.ace/decisions/`.
 - [x] **3.6 Memory Pruning**: Implement `ace memory prune` to archive or remove "harmful" strategies (harmful - helpful > threshold).
 - [x] **3.7 Global Memory Sync**: Implement `ace memory sync` to keep `AGENTS.md` in sync with the Agent Registry and recent Decisions.
 
-## Phase 4: RALPH Loop & Coordination (Completed)
-- [x] **4.1 RALPH Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Update Playbook -> Repeat.
+## Phase 4: ROLF Loop & Coordination (Completed)
+- [x] **4.1 ROLF Loop Engine**: Implement `ace loop` to iteratively run: Context Refresh -> Execute -> Verify (Tests) -> Reflect -> Update Playbook -> Repeat.
 - [x] **4.2 Agent Mail System**: Implement the internal messaging system in `.ace/mail/` with `inbox/` and `sent/` per agent using YAML storage.
 - [x] **4.3 Consensus Protocol**: Implement `ace debate` where agents exchange perspectives via Mail, mediated by an LLM-referee with escalation support.
 - [x] **4.4 SOP Engine**: Implement Standard Operating Procedures for `onboarding`, `audit`, `pr-review`, and `security-audit`.
@@ -47,7 +47,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **6.4 Token Consumption Monitoring**: Implement `ace token-stats` to track and report token usage and costs per agent/session.
 - [x] **6.5 Multi-Turn Debate**: Support multi-turn debate logic in `ace debate` with LLM mediation and consensus reporting.
 - [x] **6.6 Security Audit SOP**: Implement `ace agent security-audit` to perform security checks on agent-owned modules.
-- [x] **6.7 Agentic Feedback Loop**: Automate success/failure flagging in RALPH loop based on test-output, connecting write-back to CI/CD.
+- [x] **6.7 Agentic Feedback Loop**: Automate success/failure flagging in ROLF loop based on test-output, connecting write-back to CI/CD.
 
 ## Phase 7: Optimization & Integration (Completed)
 - [x] **7.1 Shared "Coffee Break" Context**: Implement a shared `.ace/shared-learnings.mdc` for cross-pollination of general architectural patterns.
@@ -94,7 +94,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.15 Hierarchical Agent Task Decomposition**: Implement advanced task decomposition logic for hierarchical agent structures.
 - [x] **10.16 Real-time Context Window Monitoring**: Implement real-time monitoring and visualization of context window usage.
 - [x] **10.17 Cross-Project Learning Export Refinement**: Refine the logic for exporting and importing anonymized learnings between projects.
-- [x] **10.18 Automated Security Audit Integration**: Integrate automated security checks into the RALPH loop for agent-owned modules.
+- [x] **10.18 Automated Security Audit Integration**: Integrate automated security checks into the ROLF loop for agent-owned modules.
 - [x] **10.19 Agent Subscription Notification System**: Enhance the agent subscription system with more granular notification options.
 - [x] **10.20 Performance Profiling Dashboard**: Create a web-based dashboard for visualizing performance profiling data.
 - [x] **10.21 Adaptive Memory Archival Logic**: Refine the logic for automatic archival of low-utility memories.
@@ -108,7 +108,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.29 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.30 Next Roadmap Step**: Continue with advanced coordination and memory features.
 - [x] **10.31 Future Roadmap Task**: Placeholder for the next task in the roadmap.
-- [x] **10.32 Next Roadmap Step**: Implement unit tests for ACEService, integrate RALPH loop, and finalize SOP/Stitch logic.
+- [x] **10.32 Next Roadmap Step**: Implement unit tests for ACEService, integrate ROLF loop, and finalize SOP/Stitch logic.
 - [x] **10.33 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.34 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.35 Future Roadmap Task**: Placeholder for the next task in the roadmap.
@@ -122,21 +122,21 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.43 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.44 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.45 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
-- [x] **10.46 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 10.46).
+- [x] **10.46 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 10.46).
 - [x] **10.47 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.48 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.49 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.50 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.51 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.52 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
-- [x] **10.53 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 10.53).
+- [x] **10.53 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 10.53).
 - [x] **10.54 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.55 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.56 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.57 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.58 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.59 Future Roadmap Task**: Placeholder for the next task in the roadmap.
-- [x] **10.60 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 10.60).
+- [x] **10.60 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 10.60).
 - [x] **10.61 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.62 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.63 RBAC for Agents**: Implement fine-grained Role-Based Access Control for agent operations (Phase 10.2).
@@ -147,7 +147,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.68 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.69 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.70 Future Roadmap Task**: Placeholder for the next task in the roadmap.
-- [x] **10.71 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 10.71).
+- [x] **10.71 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 10.71).
 - [x] **10.72 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.73 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.74 Future Roadmap Task**: Placeholder for the next task in the roadmap.
@@ -156,9 +156,9 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **10.77 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.78 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.79 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
-- [x] **10.80 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 10.80).
+- [x] **10.80 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 10.80).
 - [x] **10.81 Future Roadmap Task**: Placeholder for the next task in the roadmap.
-- [x] **10.82 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 10.82).
+- [x] **10.82 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 10.82).
 - [x] **10.83 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **10.84 Next Roadmap Step**: Define the next set of advanced features for Phase 10.
 - [x] **10.85 Future Roadmap Task**: Implement RBAC for Agents and finalize core Phase 10 features.
@@ -173,7 +173,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **11.4 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.5 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **11.6 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
-- [x] **11.7 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 11.7).
+- [x] **11.7 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 11.7).
 - [x] **11.8 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.8 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **11.9 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
@@ -186,16 +186,16 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **11.16 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.17 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **11.18 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
-- [x] **11.19 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration (Phase 11.19).
+- [x] **11.19 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration (Phase 11.19).
 - [x] **11.20 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.21 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **11.22 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.23 Future Roadmap Task**: Placeholder for the next task in the roadmap.
 - [x] **11.24 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
-- [x] **11.25 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration.
+- [x] **11.25 Future Roadmap Task**: Implement TDD infrastructure, native ROLF loop, formal SOPs, and Google Stitch integration.
 - [x] **11.26 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.27 Future Roadmap Task**: Placeholder for the next task in the roadmap.
-- [x] **11.28 Next Roadmap Step**: Establish the 'tests/' directory and write unit tests for ACEService, integrate RALPH loop into 'ace.py', implement formal SOPs, and connect Google Stitch stubs.
+- [x] **11.28 Next Roadmap Step**: Establish the 'tests/' directory and write unit tests for ACEService, integrate ROLF loop into 'ace.py', implement formal SOPs, and connect Google Stitch stubs.
 - [x] **11.29 Future Roadmap Task**: Define the next set of advanced features for Phase 11.
 - [x] **11.30 Next Roadmap Step**: Finalize Phase 11 and prepare for Phase 12.
 - [x] **11.31 Future Roadmap Task**: Placeholder for the next task in the roadmap.
@@ -205,13 +205,13 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **11.35 Future Roadmap Task**: Placeholder for next steps.
 - [x] **11.36 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
 - [x] **11.37 Future Roadmap Task**: Placeholder for next steps.
-- [x] **11.38 Next Roadmap Step**: Establish the 'tests/' directory and write unit tests for ACEService, integrate RALPH loop, and finalize SOP/Stitch logic.
+- [x] **11.38 Next Roadmap Step**: Establish the 'tests/' directory and write unit tests for ACEService, integrate ROLF loop, and finalize SOP/Stitch logic.
 - [x] **11.39 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
 - [x] **11.40 Future Roadmap Task**: Placeholder for next steps.
 - [x] **11.41 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
 - [x] **11.42 Future Roadmap Task**: Placeholder for next steps.
 - [x] **11.43 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
-- [x] **11.44 Future Roadmap Task**: Establish the 'tests/' directory and write unit tests for ACEService, integrate RALPH loop, and finalize SOP/Stitch logic.
+- [x] **11.44 Future Roadmap Task**: Establish the 'tests/' directory and write unit tests for ACEService, integrate ROLF loop, and finalize SOP/Stitch logic.
 - [x] **11.45 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
 - [x] **11.46 Future Roadmap Task**: Placeholder for next steps.
 - [x] **11.47 Next Roadmap Step**: Define the next set of advanced features for Phase 12.

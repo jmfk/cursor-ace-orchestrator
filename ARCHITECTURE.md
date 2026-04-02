@@ -10,7 +10,7 @@ ACE Orchestrator is designed as a modular, event-driven orchestration layer that
 - **Contextual Specialization**: Agents only see the context relevant to their assigned subsystem.
 - **Memory Persistence**: Long-term memory is stored in `.mdc` files and updated via a reflection loop.
 - **SOP-Driven**: All major workflows (onboarding, reviews, consensus) follow Standard Operating Procedures.
-- **Iterative Problem Solving**: Uses the **RALPH Cycle** (Reasoning, Action, Learning, Progress, Halt) to solve tasks.
+- **Iterative Problem Solving**: Uses the **ROLF Cycle** (Reasoning, Action, Learning, Progress, Halt) to solve tasks.
 
 ---
 
@@ -37,7 +37,7 @@ The core engine, built in Python, managing the lifecycle of tasks and agents.
 
 ---
 
-## 3. Data Flow (The RALPH Loop)
+## 3. Data Flow (The ROLF Loop)
 
 ```mermaid
 sequence_diagram
@@ -51,7 +51,7 @@ sequence_diagram
     U->>O: ace run/loop "task"
     O->>C: Build context (Memory + SOP + Token Mode)
     C-->>O: Injected Prompt
-    loop RALPH Cycle
+    loop ROLF Cycle
         O->>E: Execute task
         E-->>O: Code Changes
         O->>V: Run Tests / Lint
@@ -94,12 +94,12 @@ When a task affects multiple subsystems:
 
 The development of ACE Orchestrator follows a two-phase evolution:
 
-### Phase 1: Bootstrapping (Temporary RALPH Loop)
-Initially, a standalone Python script (`ralph_loop.py`) is used to orchestrate `cursor-agent` in headless mode. This script implements a simplified RALPH cycle to build the core components of ACE (CLI, Registry, Context Builder).
+### Phase 1: Bootstrapping (Temporary ROLF Loop)
+Initially, a standalone Python script (`rolf_loop.py`) is used to orchestrate `cursor-agent` in headless mode. This script implements a simplified ROLF cycle to build the core components of ACE (CLI, Registry, Context Builder).
 - **Status**: Active.
 - **Outcome**: A functional `ace` CLI that can run its own loops.
 
 ### Phase 2: Self-Hosting (The ACE Loop)
-Once the core system is stable, `ralph_loop.py` will be manually removed. The system will then use its own `ace loop` command to implement further features, SOPs, and optimizations.
+Once the core system is stable, `rolf_loop.py` will be manually removed. The system will then use its own `ace loop` command to implement further features, SOPs, and optimizations.
 - **Status**: Target.
 - **Mechanism**: ACE uses its own internal logic, Agent Mail, and Consensus protocols to evolve itself.

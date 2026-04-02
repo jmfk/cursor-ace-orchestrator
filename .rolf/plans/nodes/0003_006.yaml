@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:36.244267'
+depth: 1
+description: ''
+id: '0003_006'
+parent_id: '0003'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**3.6 Memory Pruning**: Implement `ace memory prune` to archive or remove
+  "harmful" strategies (harmful - helpful > threshold).'

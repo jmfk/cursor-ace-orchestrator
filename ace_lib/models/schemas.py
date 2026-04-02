@@ -35,8 +35,10 @@ class Config(BaseModel):
     sso_client_id: Optional[str] = None
     sso_client_secret: Optional[str] = None
     sso_tenant_id: Optional[str] = None
-    model_provider: str = "anthropic"  # "anthropic", "google", "openai", "local"
+    model_provider: str = "anthropic"  # "anthropic", "google", "openai", "local", "deepseek"
     model_name: str = "claude-3-5-sonnet-20240620"
+    temperature: float = 0.0
+    max_tokens: int = 4096
 
 
 class Decision(BaseModel):

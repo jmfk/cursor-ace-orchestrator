@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:50.498893'
+depth: 1
+description: ''
+id: '0003_007'
+parent_id: '0003'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**3.7 Global Memory Sync**: Implement `ace memory sync` to keep `AGENTS.md`
+  in sync with the Agent Registry and recent Decisions.'

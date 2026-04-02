@@ -108,7 +108,7 @@ class GeminiClient:
         # Inject memory
         node_id = nodes[0].get("parent_id", "root") if nodes else "root"
         memory = self._get_relevant_memory(node_id)
-        system_instruction = f"You are a plan validator for the RALPH hierarchical planner. {memory}"
+        system_instruction = f"You are a plan validator for the ROLF hierarchical planner. {memory}"
         
         response_text = self._call_gemini(prompt, system_instruction)
         
@@ -132,7 +132,7 @@ class GeminiClient:
         prompt = f"Plan Node: {json.dumps(node, indent=2)}\n\nIs this task 'actionable' (can be implemented in one go by a coding agent) or does it need to be decomposed into smaller sub-steps? Return a JSON object with 'actionable' (bool) and 'reasoning' (string)."
         
         memory = self._get_relevant_memory(node.get("id", "unknown"))
-        system_instruction = f"You are a task analyzer for the RALPH hierarchical planner. {memory}"
+        system_instruction = f"You are a task analyzer for the ROLF hierarchical planner. {memory}"
         
         response_text = self._call_gemini(prompt, system_instruction)
         
@@ -154,7 +154,7 @@ class GeminiClient:
         prompt = f"Plan Node: {json.dumps(node, indent=2)}\n\nRepo Structure:\n{repo_structure}\n\nBased on the task, which files are most relevant to read or modify? Return a JSON list of file paths."
         
         memory = self._get_relevant_memory(node.get("id", "unknown"))
-        system_instruction = f"You are a context curator for the RALPH hierarchical planner. {memory}"
+        system_instruction = f"You are a context curator for the ROLF hierarchical planner. {memory}"
         
         response_text = self._call_gemini(prompt, system_instruction)
         

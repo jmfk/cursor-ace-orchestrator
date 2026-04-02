@@ -1,0 +1,15 @@
+# ROLF Configuration
+model: "gemini-3-flash"
+max_spend_usd: 20.0
+plan_file: "plan.md"
+changelog_file: "changelog.md"
+log_file: "rolf_execution.log"
+stats_file: "rolf_stats.json"
+state_history_file: "rolf_state_history.json"
+default_prd: "PRD-01 - Cursor-ace-orchestrator-prd.md"
+stagnation_threshold: 3
+max_consecutive_failures: 3
+max_iterations: 50
+quit_on_rate_limit: true
+price_input_1m: 0.10
+price_output_1m: 0.40

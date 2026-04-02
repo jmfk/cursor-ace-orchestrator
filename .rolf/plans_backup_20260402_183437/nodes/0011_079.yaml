@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:26.192980'
+depth: 1
+description: ''
+id: 0011_079
+parent_id: '0011'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**12.2 Public API**: Finalize and document the public REST API for external
+  integrations.'

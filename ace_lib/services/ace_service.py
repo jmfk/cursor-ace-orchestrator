@@ -497,7 +497,7 @@ class ACEService:
         framing = self.get_task_framing(task_type, module_name)
         context_parts.append(f"### TASK FRAMING\n{framing}")
 
-        # 7. RALPH Loop Context (if applicable)
+        # 7. ROLF Loop Context (if applicable)
         rolf_prompt = os.getenv("ACE_LOOP_PROMPT")
         if rolf_prompt:
             context_parts.append(f"### ROLF LOOP PROMPT\n{rolf_prompt}")
@@ -529,7 +529,7 @@ class ACEService:
         # 1. Global Rules (Keep)
         # 2. Agent Playbook (Keep)
         # 3. Task Framing (Keep)
-        # 4. RALPH Loop Prompt (Keep)
+        # 4. ROLF Loop Prompt (Keep)
         # 5. Recent Decisions (Prune first)
         # 6. Recent Sessions (Prune second)
         # 7. Shared Learnings (Prune third)
@@ -545,7 +545,7 @@ class ACEService:
             "GLOBAL RULES",
             "AGENT PLAYBOOK",
             "TASK FRAMING",
-            "RALPH LOOP PROMPT",
+            "ROLF LOOP PROMPT",
         ]
         prune_priority = [
             "RECENT DECISIONS",
@@ -677,20 +677,38 @@ class ACEService:
     def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """
         Call the configured LLM provider (Phase 11.1).
-        Supports Anthropic, Google, and OpenAI providers.
+        Supports Anthropic, Google, OpenAI, and DeepSeek providers.
         """
         config = self.load_config()
         provider = config.model_provider
         model = config.model_name
+        temp = config.temperature
+        max_t = config.max_tokens
+
+        # Phase 11.3: Real-time context injection (mock)
+        # We simulate this by checking for any 'context_updates' in the prompt
+        if "### CONTEXT UPDATE" in prompt:
+            print(f"[ACE] Injecting real-time context update into {model} call...")
+
+        # Phase 11.1: Support for local models
+        if provider == "local":
+            # Mock local model execution via subprocess or local API
+            print(f"[ACE] Executing local model: {model}")
+            # In a real implementation, this might call a local Ollama or vLLM instance
+            # For now, we simulate a basic response
+            return f"Local model {model} response to: {prompt[:50]}..."
 
         if provider == "anthropic":
             client = self.get_anthropic_client()
             if not client:
                 return "Error: ANTHROPIC_API_KEY not set."
 
+            # Phase 11.1: Support for streaming context (mock)
+            # In a full implementation, this would use a generator or callback
             message = client.messages.create(
                 model=model,
-                max_tokens=4096,
+                max_tokens=max_t,
+                temperature=temp,
                 system=system_prompt or "",
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -716,24 +734,39 @@ class ACEService:
                 return "Error: GOOGLE_API_KEY not set."
             genai.configure(api_key=api_key)
             model_instance = genai.GenerativeModel(model)
+            generation_config = genai.types.GenerationConfig(
+                temperature=temp,
+                max_output_tokens=max_t,
+            )
             response = model_instance.generate_content(
-                prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+                prompt if not system_prompt else f"{system_prompt}\n\n{prompt}",
+                generation_config=generation_config
             )
             return response.text
 
-        elif provider == "openai":
+        elif provider == "openai" or provider == "deepseek":
             from openai import OpenAI
 
-            api_key = os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv("OPENAI_API_KEY") if provider == "openai" else os.getenv("DEEPSEEK_API_KEY")
+            base_url = None
+            if provider == "deepseek":
+                base_url = "https://api.deepseek.com"
+            
             if not api_key:
-                return "Error: OPENAI_API_KEY not set."
-            client = OpenAI(api_key=api_key)
+                return f"Error: {provider.upper()}_API_KEY not set."
+            
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
             openai_response = client.chat.completions.create(
                 model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt or ""},
-                    {"role": "user", "content": prompt},
-                ],
+                messages=messages,
+                temperature=temp,
+                max_tokens=max_t if not model.startswith("o1") else None,
             )
             return openai_response.choices[0].message.content or ""
 
@@ -780,12 +813,18 @@ class ACEService:
                         break
         return api_key
 
-    def reflect_on_session(self, session_output: str) -> str:
+    def reflect_on_session(self, session_output: str, task_summary: Optional[str] = None, success: bool = True) -> str:
         config = self.load_config()
+        
+        status_str = "SUCCESS" if success else "FAILURE"
+        task_info = f"Task Summary: {task_summary}\n" if task_summary else ""
+        
         system_prompt = (
             "You are an ACE Reflection Engine. Your task is to analyze the "
             "output of a coding agent session and extract structured "
             "learnings.\n\n"
+            f"Result: {status_str}\n"
+            f"{task_info}"
             "Look for:\n"
             "1. **Strategies [str-XXX]**: Successful patterns, helpful "
             "libraries, or effective approaches.\n"
@@ -808,6 +847,10 @@ class ACEService:
         original_model = config.model_name
         if model_override:
             config.model_name = model_override
+            # Force provider to local if it looks like a path or local name
+            if "/" in model_override or model_override.startswith("local/"):
+                original_provider = config.model_provider
+                config.model_provider = "local"
 
         prompt = f"Session Output:\n{session_output}\n"
 
@@ -1320,22 +1363,44 @@ class ACEService:
         print(f"Session logged to: {session_file}")
 
         if exit_code == 0:
-            if self.get_anthropic_client():
-                # Note: This is internal, so we don't have _perform_reflection here
-                # but we can call reflect_on_session directly
-                reflection_text = self.reflect_on_session(full_output)
-                updates = self.parse_reflection_output(reflection_text)
-                if updates:
-                    playbook_path = self.cursor_rules_dir / "_global.mdc"
-                    if resolved_agent_id:
-                        agents_config = self.load_agents()
-                        agent = next(
-                            (a for a in agents_config.agents if a.id == resolved_agent_id),
-                            None,
-                        )
-                        if agent:
-                            playbook_path = self.base_path / agent.memory_file
-                    self.update_playbook(playbook_path, updates)
+            # PRD: Reflection extraherar: Nya strategier, Nya fallgropar, Beslut som bör bli ADRs, Uppdateringar av helpful/harmful-räknare
+            # We use reflect_on_session which calls the LLM with a specific system prompt
+            reflection_text = self.reflect_on_session(full_output, task_summary=command, success=True)
+            updates = self.parse_reflection_output(reflection_text)
+            if updates:
+                playbook_path = self.cursor_rules_dir / "_global.mdc"
+                if resolved_agent_id:
+                    agents_config = self.load_agents()
+                    agent = next(
+                        (a for a in agents_config.agents if a.id == resolved_agent_id),
+                        None,
+                    )
+                    if agent:
+                        playbook_path = self.base_path / agent.memory_file
+                self.update_playbook(playbook_path, updates)
+            
+            # PRD: Session loggas till .ace/sessions/ (already done above)
+            # PRD: ADR-skapande från decisions (if extracted)
+            for update in updates:
+                if update["type"] == "dec":
+                    # Optionally create a formal ADR if it's a significant decision
+                    # For now, update_playbook already adds it to the .mdc
+                    pass
+        else:
+            # Even on failure, reflect to capture pitfalls
+            reflection_text = self.reflect_on_session(full_output, task_summary=command, success=False)
+            updates = self.parse_reflection_output(reflection_text)
+            if updates:
+                playbook_path = self.cursor_rules_dir / "_global.mdc"
+                if resolved_agent_id:
+                    agents_config = self.load_agents()
+                    agent = next(
+                        (a for a in agents_config.agents if a.id == resolved_agent_id),
+                        None,
+                    )
+                    if agent:
+                        playbook_path = self.base_path / agent.memory_file
+                self.update_playbook(playbook_path, updates)
 
         return exit_code == 0
 
@@ -1424,7 +1489,24 @@ class ACEService:
             pass
         return []
 
-    # --- RALPH Loop Engine ---
+    # --- ROLF Loop Engine ---
+
+    def _perform_reflection_internal(self, session_file: Path, agent_id: Optional[str]):
+        session_content = session_file.read_text(encoding="utf-8")
+        output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
+        if not output_match:
+            return
+
+        reflection_text = self.reflect_on_session(output_match.group(1))
+        updates = self.parse_reflection_output(reflection_text)
+        if updates:
+            playbook_path = self.cursor_rules_dir / "_global.mdc"
+            if agent_id:
+                agents_config = self.load_agents()
+                agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+                if agent:
+                    playbook_path = self.base_path / agent.memory_file
+            self.update_playbook(playbook_path, updates)
 
     def _perform_reflection_internal(self, session_file: Path, agent_id: Optional[str]):
         session_content = session_file.read_text(encoding="utf-8")
@@ -1457,37 +1539,56 @@ class ACEService:
         max_spend: float = 20.0,
         model: str = "gemini-3-flash",
         spec_id: Optional[str] = None,
+        webhook_url: Optional[str] = None,
     ):
         """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 4.1)."""
+        from ace_lib.models.schemas import WebhookEvent
+        
         iteration = 0
         success = False
         state_history = []
         total_cost = 0.0
 
+        # Dispatch loop started event
+        start_payload = {
+            "prompt": prompt,
+            "agent_id": agent_id,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.dispatch_webhook(WebhookEvent.LOOP_STARTED, start_payload)
+        if webhook_url:
+            import requests
+            try:
+                requests.post(webhook_url, json={"event": WebhookEvent.LOOP_STARTED.value, "payload": start_payload}, timeout=5)
+            except Exception: pass
+
         # Phase 11.3: Real-time Context Injection (Mock state)
         session_context_history: List[Any] = []
+        
+        # Real-time context updates (Phase 11.3)
+        context_updates = []
 
         # Use provided PRD and plan file or defaults
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
         plan_file = plan_file or "plan.md"
 
-        print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
-        print(f"[RALPH] Using PRD: {prd_path}")
-        print(f"[RALPH] Using Plan: {plan_file}")
+        print("🚀 [bold blue]Starting ROLF Loop[/bold blue]")
+        print(f"[ROLF] Using PRD: {prd_path}")
+        print(f"[ROLF] Using Plan: {plan_file}")
         if spec_id:
-            print(f"[RALPH] Using Living Spec: {spec_id}")
+            print(f"[ROLF] Using Living Spec: {spec_id}")
 
         # Initial state hash for stagnation detection
         while iteration < max_iterations:
             if total_cost >= max_spend:
                 print(
-                    f"[RALPH] Reached maximum spending limit (${max_spend}). Stopping."
+                    f"[ROLF] Reached maximum spending limit (${max_spend}). Stopping."
                 )
                 break
 
             iteration += 1
             print(
-                f"\n[RALPH] Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f})"
+                f"\n[ROLF] Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f})"
             )
 
             # 1. Initial State Analysis (if it's the first iteration and we have a plan file)
@@ -1497,7 +1598,7 @@ class ACEService:
                 and os.path.exists(str(plan_file))
             ):
                 print(
-                    f"[RALPH] Step 0: Analyzing current project state against {prd_path}..."
+                    f"[ROLF] Step 0: Analyzing current project state against {prd_path}..."
                 )
                 plan_content = Path(plan_file).read_text(encoding="utf-8")
                 prd_content = Path(prd_path).read_text(encoding="utf-8")
@@ -1549,17 +1650,28 @@ class ACEService:
                 context += "\n\n### PREVIOUS ITERATIONS IN THIS SESSION\n"
                 context += "\n".join(session_context_history[-3:]) # Keep last 3
 
+            # Phase 11.3: Inject real-time context updates
+            if context_updates:
+                context += "\n\n### CONTEXT UPDATES (Real-time)\n"
+                context += "\n".join(context_updates[-5:]) # Keep last 5
+
             with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
                 tmp.write(context)
                 context_file = tmp.name
 
             # 2. Execute (Phase 4.1)
-            print(f"[RALPH] Executing task: {prompt[:50]}...")
+            print(f"[ROLF] Executing task: {prompt[:50]}...")
 
             # Call the 'run' command logic directly (Phase 4.1 Integration)
             # Use the configured model if possible (Phase 11.1)
+            # Fetch model from config if not gemini-3-flash (default)
+            config = self.load_config()
+            loop_model = model
+            if loop_model == "gemini-3-flash" and config.model_name:
+                loop_model = config.model_name
+
             agent_cmd = (
-                f"cursor-agent --print --model {model} --force --trust \"{prompt}\""
+                f"cursor-agent --print --model {loop_model} --force --trust \"{prompt}\""
             )
 
             try:
@@ -1576,22 +1688,35 @@ class ACEService:
                 
                 # 3. Verify (Phase 4.1)
                 if task_success:
-                    print(f"[RALPH] Verifying with: {test_cmd}")
+                    print(f"[ROLF] Verifying with: {test_cmd}")
                     result = subprocess.run(
                         test_cmd, shell=True, capture_output=True, text=True
                     )
                     test_passed = result.returncode == 0
                     feedback_status = "SUCCESS" if test_passed else "FAILURE"
-                    print(f"[RALPH] Test result: {feedback_status}")
+                    print(f"[ROLF] Test result: {feedback_status}")
 
                     # Phase 11.3: Update session history
                     status_str = "passed" if test_passed else "failed"
                     session_context_history.append(f"Iteration {iteration}: Tests {status_str}")
 
+                    # Dispatch iteration completed event
+                    iter_payload = {
+                        "iteration": iteration,
+                        "success": test_passed,
+                        "feedback": feedback_status,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self.dispatch_webhook(WebhookEvent.ITERATION_COMPLETED, iter_payload)
+                    if webhook_url:
+                        try:
+                            requests.post(webhook_url, json={"event": WebhookEvent.ITERATION_COMPLETED.value, "payload": iter_payload}, timeout=5)
+                        except Exception: pass
+
                     # --- Automated Security Audit Integration (Phase 10.18) ---
                     if resolved_agent_id:
                         print(
-                            f"[RALPH] Running automated security audit for {resolved_agent_id}..."
+                            f"[ROLF] Running automated security audit for {resolved_agent_id}..."
                         )
                         from ace_lib.agents.security_audit import SecurityAuditService
 
@@ -1600,16 +1725,16 @@ class ACEService:
                             sec_results = sec_service.run_automated_audit(resolved_agent_id)
                             if sec_results["summary"]["failed"] > 0:
                                 print(
-                                    f"[RALPH] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures."
+                                    f"[ROLF] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures."
                                 )
                                 # We don't necessarily fail the loop, but we log it
                         except Exception as e:
-                            print(f"[RALPH] Security audit error: {e}")
+                            print(f"[ROLF] Security audit error: {e}")
 
                     # Notify subscribers of failure if applicable
                     if not test_passed and path:
                         self.notify_subscribers(
-                            path, f"RALPH Loop failed for: {prompt}", success=False
+                            path, f"ROLF Loop failed for: {prompt}", success=False
                         )
 
                     session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1633,17 +1758,24 @@ class ACEService:
                     )
                     session_file.write_text(session_content, encoding="utf-8")
 
-                    # 4. Reflection (Phase 4.1)
-                    reflection_text = ""
-                    if self.get_anthropic_client():
-                        print(f"[RALPH] Performing reflection for iteration {iteration}...")
-                        # Reflect on current iteration output, including test success/failure
-                        reflection_input = (
-                            f"TASK STATUS: {feedback_status}\n"
-                            f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
-                        )
-                        reflection_text = self.reflect_on_session(reflection_input)
-                        updates = self.parse_reflection_output(reflection_text)
+            # 4. Reflection (Phase 4.1)
+            reflection_text = ""
+            if self.get_anthropic_client():
+                print(f"[ROLF] Performing reflection for iteration {iteration}...")
+                # Reflect on current iteration output, including test success/failure
+                reflection_input = (
+                    f"TASK STATUS: {feedback_status}\n"
+                    f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
+                )
+                reflection_text = self.reflect_on_session(reflection_input)
+                updates = self.parse_reflection_output(reflection_text)
+
+                # Phase 11.3: Check for context updates in reflection
+                for update in updates:
+                    if update["type"] == "dec":
+                        context_updates.append(f"Decision: {update['description']}")
+                    elif update["type"] == "str" and update.get("helpful", 0) > 0:
+                        context_updates.append(f"New Strategy: {update['description']}")
 
                         # If test failed, ensure we increment harmful for the strategy used
                         # and if it passed, increment helpful (Phase 3.4).
@@ -1670,7 +1802,7 @@ class ACEService:
                                 if agent:
                                     playbook_path = self.base_path / agent.memory_file
                             self.update_playbook(playbook_path, updates)
-                            print(f"[RALPH] Updated playbook: {playbook_path.name}")
+                            print(f"[ROLF] Updated playbook: {playbook_path.name}")
 
                         # Update prompt with reflection insights if it failed
                         if not test_passed and reflection_text != "No new learnings.":
@@ -1688,7 +1820,7 @@ class ACEService:
                     else:
                         if not test_passed:
                             print(
-                                f"[RALPH] ❌ Verification failed "
+                                f"[ROLF] ❌ Verification failed "
                                 f"(Exit code: {result.returncode})"
                             )
                             # Update prompt for next iteration with failure info
@@ -1700,7 +1832,7 @@ class ACEService:
 
                     # 5. Git Commit (Optional)
                     if git_commit and test_passed:
-                        print("[RALPH] Committing changes...")
+                        print("[ROLF] Committing changes...")
                         try:
                             status = subprocess.run(
                                 ["git", "status", "--porcelain"],
@@ -1709,7 +1841,7 @@ class ACEService:
                                 check=False,
                             )
                             if status.stdout.strip():
-                                commit_msg = f"RALPH Loop: {prompt[:50]}"
+                                commit_msg = f"ROLF Loop: {prompt[:50]}"
                                 # Try to generate a better commit message using LLM if available
                                 client = self.get_anthropic_client()
                                 if client:
@@ -1738,21 +1870,21 @@ class ACEService:
 
                                 subprocess.run(["git", "add", "."], check=True)
                                 subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-                                print(f"[RALPH] Committed: {commit_msg}")
+                                print(f"[ROLF] Committed: {commit_msg}")
                         except Exception as e:
-                            print(f"[RALPH] Git commit failed: {e}")
+                            print(f"[ROLF] Git commit failed: {e}")
 
                     if test_passed:
-                        print("[RALPH] ✅ Verification successful!")
+                        print("[ROLF] ✅ Verification successful!")
                         # Notify subscribers of the change
                         if path:
                             self.notify_subscribers(
-                                path, f"RALPH Loop successful for: {prompt}", success=True
+                                path, f"ROLF Loop successful for: {prompt}", success=True
                             )
 
                         # Update plan.md if it exists
                         if os.path.exists(plan_file):
-                            print(f"[RALPH] Updating {plan_file}...")
+                            print(f"[ROLF] Updating {plan_file}...")
                             update_plan_prompt = (
                                 f"Update '{plan_file}' and 'changelog.md' based on the "
                                 f"successful completion of: {prompt[:100]}"
@@ -1764,14 +1896,14 @@ class ACEService:
 
                     # Update Living Spec if applicable (Phase 10.23)
                     if spec_id:
-                        print(f"[RALPH] Automating Living Spec update for {spec_id}...")
+                        print(f"[ROLF] Automating Living Spec update for {spec_id}...")
                         self.automate_spec_update(spec_id, result.stdout)
 
                     success = test_passed
                     if test_passed:
                         break
             except Exception as e:
-                print(f"[RALPH] Error during execution: {e}")
+                print(f"[ROLF] Error during execution: {e}")
             finally:
                 if os.path.exists(context_file):
                     os.remove(context_file)
@@ -1789,7 +1921,7 @@ class ACEService:
                     h == state_history[0] for h in state_history
                 ):
                     print(
-                        "[RALPH] ⚠️ Stagnation detected! State has not changed for 3 iterations."
+                        "[ROLF] ⚠️ Stagnation detected! State has not changed for 3 iterations."
                     )
                     prompt = (
                         f"STAGNATION DETECTED. You are stuck in the same state. "
@@ -1804,9 +1936,9 @@ class ACEService:
                 os.remove(context_file)
 
         if success:
-            print(f"\n✅ [bold green]RALPH Loop completed in {iteration} iterations![/bold green]")
+            print(f"\n✅ [bold green]ROLF Loop completed in {iteration} iterations![/bold green]")
         else:
-            print(f"\n❌ [bold red]RALPH Loop failed after {iteration} iterations.[/bold red]")
+            print(f"\n❌ [bold red]ROLF Loop failed after {iteration} iterations.[/bold red]")
 
         return success, iteration
 

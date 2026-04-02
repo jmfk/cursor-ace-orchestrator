@@ -5,15 +5,15 @@ from ace_lib.planner.plan_tree import PlanTree
 import yaml
 
 def migrate():
-    # Load PRD path from ralph.yaml or default
+    # Load PRD path from rolf.yaml or default
     prd_path = "PRD-01 - Cursor-ace-orchestrator-prd.md"
-    if os.path.exists("ralph.yaml"):
-        with open("ralph.yaml", "r") as f:
+    if os.path.exists("rolf.yaml"):
+        with open("rolf.yaml", "r") as f:
             config = yaml.safe_load(f)
             if config and "default_prd" in config:
                 prd_path = config["default_prd"]
     
-    base_plan_dir = ".ralph/plans"
+    base_plan_dir = ".rolf/plans"
     
     if os.path.exists(base_plan_dir) and any(os.scandir(base_plan_dir)):
         print(f"PlanTree is not empty ({base_plan_dir}).")

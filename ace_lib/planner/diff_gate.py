@@ -13,9 +13,9 @@ CHURN_PATTERNS: Set[str] = {
     "plan.md",
     "changelog.md",
     "profiling.jsonl",
-    "ralph_execution.log",
-    "ralph_stats.json",
-    "ralph_state_history.json",
+    "rolf_execution.log",
+    "rolf_stats.json",
+    "rolf_state_history.json",
     "roadmap.md",
 }
 

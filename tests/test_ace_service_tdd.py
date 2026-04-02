@@ -39,7 +39,7 @@ def test_review_pr_sop(service, temp_workspace):
     assert "## 3. Security Check" in content
 
 def test_run_loop_basic(service, temp_workspace, monkeypatch):
-    """Test the basic RALPH loop execution (Phase 11.18)."""
+    """Test the basic ROLF loop execution (Phase 11.18)."""
     import subprocess
     from unittest.mock import MagicMock
 
