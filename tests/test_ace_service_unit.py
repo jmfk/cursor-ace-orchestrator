@@ -90,6 +90,24 @@ def test_onboarding_sop_generation(service):
     assert "## Strategier & patterns" in memory_file.read_text()
     assert "## Kända fallgropar" in memory_file.read_text()
 
+def test_pr_review_sop_generation(service):
+    """Test generating PR review SOP (Phase 9.5)."""
+    review_file = service.review_pr("PR-123", "reviewer-1")
+    assert review_file.exists()
+    content = review_file.read_text()
+    assert "SOP: PR Review - PR-123" in content
+    assert "**Reviewer**: reviewer-1" in content
+    assert "## 3. Security Check" in content
+
+def test_audit_sop_generation(service):
+    """Test generating audit SOP (Phase 9.5)."""
+    service.create_agent(id="dev-1", name="Developer 1", role="developer")
+    audit_file = service.audit_agent("dev-1")
+    assert audit_file.exists()
+    content = audit_file.read_text()
+    assert "SOP: Agent Audit - Developer 1 (dev-1)" in content
+    assert "## 1. Playbook Quality" in content
+
 def test_google_stitch_mockup_logic(service, monkeypatch):
     """Test Google Stitch mockup generation logic (Phase 4.5)."""
     from ace_lib.stitch import stitch_engine
