@@ -1538,8 +1538,49 @@ def task_delegate(
         console.print("\n[bold]Delegations:[/bold]")
         for tid, aid in delegations.items():
             console.print(f"- Task [cyan]{tid}[/cyan] -> Agent [green]{aid}[/green]")
+    console.print(
+        "\n[bold green]Delegation complete. Agents have been notified via mail.[/bold green]"
+    )
+
+
+@app.command("loop")
+def ace_loop(
+    prompt: str = typer.Argument(..., help="The task for the RALPH loop"),
+    test_cmd: str = typer.Option(..., "--test", "-t", help="The test command to verify"),
+    max_iterations: int = typer.Option(10, "--max-iter", "-m", help="Max iterations"),
+    path: Optional[str] = typer.Option(None, "--path", "-p", help="Target path"),
+    agent_id: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent ID"),
+    git_commit: bool = typer.Option(False, "--commit", "-c", help="Commit changes"),
+    prd_path: Optional[str] = typer.Option(None, "--prd", help="PRD path"),
+    plan_file: Optional[str] = typer.Option(None, "--plan", help="Plan file"),
+    max_spend: float = typer.Option(20.0, "--max-spend", help="Max spend in USD"),
+    model: str = typer.Option("gemini-3-flash", "--model", help="Model to use"),
+    spec_id: Optional[str] = typer.Option(None, "--spec", help="Living Spec ID"),
+):
+    """Iteratively run: Context Refresh -> Execute -> Verify -> Reflect (PRD-01 / Phase 4.1)."""
+    console.print(f"🚀 [bold blue]Starting RALPH Loop:[/bold blue] {prompt}")
+    svc = get_service()
+    success, iterations = svc.run_loop(
+        prompt=prompt,
+        test_cmd=test_cmd,
+        max_iterations=max_iterations,
+        path=path,
+        agent_id=agent_id,
+        git_commit=git_commit,
+        prd_path=prd_path,
+        plan_file=plan_file,
+        max_spend=max_spend,
+        model=model,
+        spec_id=spec_id,
+    )
+
+    if success:
         console.print(
-            "\n[bold green]Delegation complete. Agents have been notified via mail.[/bold green]"
+            f"\n[bold green]RALPH Loop completed successfully in {iterations} iterations.[/bold green]"
+        )
+    else:
+        console.print(
+            f"\n[bold red]RALPH Loop stopped after {iterations} iterations without success.[/bold red]"
         )
 
 

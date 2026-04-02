@@ -1,0 +1,23 @@
+{
+  "commit": {
+    "hash": "a0c97d4cc34efc9ed0367c16300816b0b019e0e7",
+    "author": "Hermes Agent",
+    "date": "Wed Apr 1 00:51:44 2026 +0200",
+    "subject": "Document bootstrapping vs self-hosting phase"
+  },
+  "details": {
+    "stats": {
+      "added": 13,
+      "deleted": 6,
+      "files": 1
+    },
+    "files": {}
+  },
+  "analysis_result": {
+    "improvement_score": 40,
+    "analysis": "The commit enhances project documentation by clarifying the distinction between bootstrapping and self-hosting phases, which is vital for contributor understanding. However, the lack of updates to plan.md or changelog.md suggests this was a minor architectural clarification rather than a functional milestone.",
+    "suggested_message": "docs: define and distinguish bootstrapping vs. self-hosting phases"
+  },
+  "cost": 0.00019650000000004386,
+  "analyzed_at": "2026-04-02T11:29:38.181653"
+}
