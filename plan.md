@@ -194,4 +194,5 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **11.24 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
 - [x] **11.25 Future Roadmap Task**: Implement TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration.
 - [x] **11.26 Next Roadmap Step**: Define the next set of advanced features for Phase 11.
-- [ ] **11.27 Future Roadmap Task**: Placeholder for the next task in the roadmap.
+- [x] **11.27 Future Roadmap Task**: Placeholder for the next task in the roadmap.
+- [x] **11.28 Next Roadmap Step**: Establish the 'tests/' directory and write unit tests for ACEService, integrate RALPH loop into 'ace.py', implement formal SOPs, and connect Google Stitch stubs.

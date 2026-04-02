@@ -620,8 +620,8 @@ def run(
                 "~/.ace/credentials.[/yellow]"
             )
 
-    # 11.21 Future Roadmap Task: Placeholder for the next task in the roadmap.
-    #    (Completed: Establish the 'tests/' directory and write unit tests for ACEService)
+    # 11.21 Future Roadmap Task: Establish the 'tests/' directory and write unit tests for ACEService.
+    #    (Completed: Comprehensive unit tests added in tests/test_ace_service_core.py and tests/test_ace_service_tdd.py)
 
     # 11.22 Next Roadmap Step: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
     #    (Completed: 'ace loop' and 'ace ralph' commands integrated in ace.py)
