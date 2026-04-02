@@ -5,7 +5,8 @@ import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
-import google.generativeai as genai
+import google.genai as genai
+from google.genai import types
 from dotenv import load_dotenv
 
 # Try to import matplotlib for PNG generation
@@ -43,10 +44,10 @@ class CommitAnalyzer:
         self.total_output_tokens = 0
         self.total_cost = 0.0
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model: Optional[genai.GenerativeModel] = genai.GenerativeModel(self.model_name)
+            self.client = genai.Client(api_key=self.api_key)
+            self.model_name = model
         else:
-            self.model = None
+            self.client = None
             print("⚠️ Warning: GOOGLE_API_KEY not found. LLM features will be disabled.")
 
     def _get_api_key(self) -> Optional[str]:
@@ -132,7 +133,7 @@ class CommitAnalyzer:
 
     def analyze_improvement(self, commit: Dict[str, Any], details: Dict[str, Any]) -> Dict[str, Any]:
         """Use Gemini to measure improvement and suggest a better commit message."""
-        if not self.model:
+        if not self.client:
             return {"improvement_score": 0, "suggested_message": commit["subject"], "analysis": "LLM disabled"}
 
         # Heuristic override for zero-change commits (Phase 12)
@@ -180,10 +181,16 @@ Return the result in JSON format:
 }}
 """
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
             
             # Track usage and cost
-            usage: Any = getattr(response, 'usage_metadata', None)
+            usage = response.usage_metadata
             if usage:
                 in_tokens = usage.prompt_token_count
                 out_tokens = usage.candidates_token_count
@@ -195,12 +202,8 @@ Return the result in JSON format:
                 )
                 self.total_cost += cost
 
-            # Extract JSON from response (handling potential markdown blocks)
-            text = response.text
-            match = re.search(r'\{.*\}', text, re.DOTALL)
-            if match:
-                return json.loads(match.group(0))
-            return {"improvement_score": 0, "analysis": "Failed to parse JSON", "suggested_message": commit["subject"]}
+            # Parse JSON from response
+            return json.loads(response.text)
         except Exception as e:
             return {"improvement_score": 0, "analysis": f"Error: {e}", "suggested_message": commit["subject"]}
 
@@ -269,26 +272,62 @@ Return the result in JSON format:
             f.write("\n".join(report))
         print(f"Report generated: {output_file}")
 
+    def get_total_commit_count(self) -> int:
+        """Get the total number of commits in the current branch."""
+        try:
+            result = subprocess.run(["git", "rev-list", "--count", "HEAD"], capture_output=True, text=True, check=True)
+            return int(result.stdout.strip())
+        except (subprocess.CalledProcessError, ValueError):
+            return 0
+
     def run(self, limit: int = 10) -> None:
         # Phase 12: Persistent Data Storage for Analysis
-        data_dir = Path("analysis_data")
-        data_dir.mkdir(exist_ok=True)
+        # Create a session-specific subfolder with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        data_dir = Path("analysis_data") / timestamp
+        
+        # Interactive limit adjustment
+        total_available = self.get_total_commit_count()
+        print(f"\nTotal commits available in history: {total_available}")
+        
+        try:
+            user_input = input(f"Enter limit (default {limit}, 'all' for {total_available}): ").strip().lower()
+            if user_input == 'all':
+                limit = total_available
+            elif user_input:
+                limit = int(user_input)
+        except (ValueError, EOFError, KeyboardInterrupt):
+            print(f"Using default limit: {limit}")
+
+        print(f"Proceeding with analysis for {limit} commits...\n")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        parent_data_dir = Path("analysis_data")
+        parent_data_dir.mkdir(exist_ok=True)
         
         commits = self.get_commits(limit)
         all_results: List[Dict[str, Any]] = []
         
         for c in commits:
             commit_hash = c['hash']
-            cache_file = data_dir / f"{commit_hash}.json"
+            # Check for cache in any session subfolder
+            cache_file = None
+            for existing_session in parent_data_dir.iterdir():
+                if existing_session.is_dir():
+                    potential_cache = existing_session / f"{commit_hash}.json"
+                    if potential_cache.exists():
+                        cache_file = potential_cache
+                        break
             
-            if cache_file.exists():
-                print(f"Loading cached analysis for {commit_hash[:8]}...")
+            if cache_file:
                 try:
                     cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
-                    all_results.append(cached_data)
-                    # Update totals from cache
-                    self.total_cost += cached_data.get("cost", 0.0)
-                    continue
+                    if isinstance(cached_data, dict) and 'analysis_result' in cached_data:
+                        all_results.append(cached_data)
+                        # Update totals from cache
+                        self.total_cost += cached_data.get("cost", 0.0)
+                        continue
+                    else:
+                        print(f"Cached data for {commit_hash[:8]} is invalid (not a dict or missing analysis_result). Re-analyzing...")
                 except Exception as e:
                     print(f"Error reading cache for {commit_hash[:8]}: {e}")
 
@@ -309,12 +348,23 @@ Return the result in JSON format:
             }
             all_results.append(result)
             
-            # Save to cache
-            cache_file.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            # Save to the current session's subfolder
+            session_cache_file = data_dir / f"{commit_hash}.json"
+            session_cache_file.write_text(json.dumps(result, indent=2), encoding="utf-8")
             
-            if analysis['suggested_message'] != c['subject']:
+            if isinstance(analysis, dict) and analysis.get('suggested_message') != c['subject']:
                 # Optional: replace_commit_message(c['hash'], analysis['suggested_message'])
                 pass
+
+        # Save an index file to maintain the order of commits in this session
+        index_file = data_dir / "index.json"
+        index_data = {
+            "session_timestamp": timestamp,
+            "commit_order": [r['commit']['hash'] for r in all_results],
+            "total_commits": len(all_results),
+            "total_cost": self.total_cost
+        }
+        index_file.write_text(json.dumps(index_data, indent=2), encoding="utf-8")
 
         self.generate_report(all_results)
 

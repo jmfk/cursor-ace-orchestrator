@@ -5,3 +5,8 @@ build
 dist
 __pycache__
 *.pyc
+analysis_data
+ralph_execution.log
+ralph_stats.json
+ralph_state_history.json
+.ace/loop.lock

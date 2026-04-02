@@ -1,0 +1,13 @@
+requests
+pyyaml
+python-dotenv
+typer
+rich
+ruamel.yaml
+anthropic
+pydantic
+fastapi
+uvicorn
+jinja2
+google-genai
+matplotlib
