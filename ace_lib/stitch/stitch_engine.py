@@ -1,7 +1,10 @@
+"""
+Google Stitch integration engine.
+"""
 import re
-import requests
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
+import requests
 
 
 def generate_mockup(
@@ -60,7 +63,7 @@ def sync_mockup(url: str, api_key: Optional[str] = None) -> Optional[str]:
     return ui_code
 
 
-def extract_components(code: str) -> dict:
+def extract_components(code: str) -> Dict[str, str]:
     """Extract individual components from Stitch code (PRD-01 / Phase 8.3)."""
     components = {}
     component_matches = re.finditer(r"export const (\w+) =.*?=>.*?;", code, re.DOTALL)

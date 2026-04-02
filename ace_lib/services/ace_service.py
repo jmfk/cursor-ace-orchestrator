@@ -1,3 +1,6 @@
+"""
+ACE Service module.
+"""
 import os
 import re
 import subprocess
@@ -33,6 +36,9 @@ yaml.preserve_quotes = True
 
 
 class ACEService:
+    """
+    Service for ACE Orchestrator.
+    """
     def __init__(self, base_path: Path = Path(".")):
         self.base_path = base_path
         self.ace_dir = base_path / ".ace"
@@ -1549,11 +1555,11 @@ class ACEService:
             agent_cmd = (
                 f"cursor-agent --print --model {model} --force --trust \"{prompt}\""
             )
-            
+
             try:
                 # Simulate cost tracking (minimal base cost)
                 total_cost += (len(prompt.split()) * 1.3 / 1_000_000 * 0.10)
-                
+
                 # Call the 'run' command logic directly
                 task_success = self.run_agent_task(
                     command=agent_cmd,
@@ -1744,7 +1750,7 @@ class ACEService:
                             update_plan_prompt = (
                                 f"Update '{plan_file}' and 'changelog.md' based on the "
                                 f"successful completion of: {prompt[:100]}"
-                                )
+                            )
                             subprocess.run(
                                 f'cursor-agent --print --model {model} --force --trust "{update_plan_prompt}"',
                                 shell=True,
@@ -2136,7 +2142,6 @@ type: role
             print(
                 f"[EXPANSION] Agent {agent_id} complexity ({complexity}) exceeds threshold ({threshold})."
             )
-
             # Propose a sub-agent
             sub_agent_id = f"{agent_id}-sub-{datetime.now().strftime('%H%M%S')}"
             proposal_title = f"Autonomous Expansion: {sub_agent_id}"
@@ -2368,7 +2373,7 @@ type: role
                             fromfile="local",
                             tofile="stitch",
                         )
-                        diff_file.write_text("\n".join(diff))
+                        diff_file.write_text("\n".join(diff), encoding="utf-8")
 
             # Update local mockup file with synced code
             mockup_file.parent.mkdir(parents=True, exist_ok=True)
@@ -2823,7 +2828,7 @@ type: role
             return []
 
         logs = []
-        with open(log_file, "r") as f:
+        with open(log_file, "r", encoding="utf-8") as f:
             for line in f:
                 try:
                     logs.append(json.loads(line))

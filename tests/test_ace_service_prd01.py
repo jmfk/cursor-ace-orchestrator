@@ -93,8 +93,19 @@ def test_stitch_integration_logic(service, temp_workspace, monkeypatch):
     from ace_lib.stitch import stitch_engine
 
     # Mock stitch_engine
-    monkeypatch.setattr(stitch_engine, "generate_mockup", lambda d, a, k: ("https://stitch.google.com/canvas/mock_123", "export const App = () => <div>Mock</div>;"))
-    monkeypatch.setattr(stitch_engine, "sync_mockup", lambda u, k: "export const App = () => <div>Synced</div>;")
+    monkeypatch.setattr(
+        stitch_engine,
+        "generate_mockup",
+        lambda d, a, k: (
+            "https://stitch.google.com/canvas/mock_123",
+            "export const App = () => <div>Mock</div>;",
+        ),
+    )
+    monkeypatch.setattr(
+        stitch_engine,
+        "sync_mockup",
+        lambda u, k: "export const App = () => <div>Synced</div>;",
+    )
     monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
 
     # Test mockup generation

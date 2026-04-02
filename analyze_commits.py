@@ -214,7 +214,9 @@ Return the result in JSON format:
             f"- **Estimated Total Cost**: ${self.total_cost:.4f} USD",
             "",
             "## Improvement Trend",
-            "![Improvement Graph](improvement_graph.png)" if MATPLOTLIB_AVAILABLE else "Graph not available (matplotlib missing)",
+            "![Improvement Graph](improvement_graph.png)"
+            if MATPLOTLIB_AVAILABLE
+            else "Graph not available (matplotlib missing)",
             "",
             "| Commit | Score | Lines +/- | Suggested Message | Analysis |",
             "| :--- | :--- | :--- | :--- | :--- |"

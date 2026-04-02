@@ -1,11 +1,14 @@
-from fastapi import FastAPI, HTTPException, Body, Request, Depends, Header
-from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
-from typing import List, Optional, Dict
+"""
+ACE API module.
+"""
 import logging
 import time
 import re
 from pathlib import Path
+from typing import List, Optional, Dict
+from fastapi import FastAPI, HTTPException, Body, Request, Depends, Header
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import (
     Agent,

@@ -1,3 +1,6 @@
+"""
+ACE CLI entry point.
+"""
 from pathlib import Path
 import os
 import subprocess
@@ -19,31 +22,38 @@ service = ACEService()
 
 
 def get_service() -> ACEService:
+    """Get the ACEService instance."""
     return service
 
 
 def reset_service(base_path: Path):
+    """Reset the ACEService instance with a new base path."""
     global service
     service = ACEService(base_path)
 
 
 def save_ownership(config: OwnershipConfig):
+    """Save ownership configuration."""
     get_service().save_ownership(config)
 
 
 def load_config():
+    """Load configuration."""
     return get_service().load_config()
 
 
 def load_agents():
+    """Load agents configuration."""
     return get_service().load_agents()
 
 
 def parse_reflection_output(text: str):
+    """Parse reflection output."""
     return get_service().parse_reflection_output(text)
 
 
 def update_playbook(playbook_path: Path, updates: List[Dict]):
+    """Update playbook with new learnings."""
     return get_service().update_playbook(playbook_path, updates)
 
 
