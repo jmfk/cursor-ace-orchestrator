@@ -9,7 +9,7 @@ def generate_onboarding_sop(
     responsibilities: List[str],
     memory_file: str,
     status: str,
-    parent_id: str = None,
+    parent_id: str | None = None,
 ) -> str:
     """Generate a formal onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
     resp_str = ", ".join(responsibilities) if responsibilities else "None"

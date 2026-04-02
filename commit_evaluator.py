@@ -42,7 +42,7 @@ class CommitEvaluator:
         self.use_llm = use_llm
         self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-    def get_commits(self, limit: int = None) -> List[Dict[str, Any]]:
+    def get_commits(self, limit: int | None = None) -> List[Dict[str, Any]]:
         """Fetch commits from the history."""
         cmd = ["git", "log", "--pretty=format:%H|%an|%ad|%s"]
         if limit:
@@ -83,7 +83,8 @@ class CommitEvaluator:
         cmd = ["git", "show", "--numstat", "--format=", commit_hash]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            added, deleted, files_changed, file_types = 0, 0, 0, {}
+            added, deleted, files_changed = 0, 0, 0
+            file_types: Dict[str, int] = {}
 
             for line in result.stdout.splitlines():
                 parts = line.split()
@@ -141,7 +142,7 @@ class CommitEvaluator:
             return
 
         # Aggregate by date
-        daily_value = {}
+        daily_value: Dict[datetime, float] = {}
         for r in results:
             # Git date format: "Thu Apr 2 04:33:52 2026 +0200"
             # We need to parse this. A simpler way is to use git log --date=short
@@ -215,7 +216,7 @@ class CommitEvaluator:
         plt.savefig(output_path)
         plt.close()
 
-    def generate_comprehensive_report(self, limit: int = None, output_file: str = "comprehensive_value_report.md"):
+    def generate_comprehensive_report(self, limit: int | None = None, output_file: str = "comprehensive_value_report.md"):
         """Generate a report covering commits, milestones, and time-series."""
         commits = self.get_commits(limit)
         print(f"Analyzing {len(commits)} commits...")

@@ -45,9 +45,9 @@ PAID_ACCOUNT_REQUIRED = False
 
 def load_config(config_path="ralph.yaml"):
     """Load configuration from YAML file and override defaults."""
-    if os.path.exists(config_path):
+    if os.path.exists(str(config_path)):
         try:
-            with open(config_path, "r") as f:
+            with open(str(config_path), "r") as f:
                 yaml_config = yaml.safe_load(f)
                 if yaml_config:
                     CONFIG.update(yaml_config)
@@ -62,7 +62,7 @@ def log_message(message: str):
     formatted_msg = f"[{timestamp}] {message}"
     print(formatted_msg)
     log_file = CONFIG.get("log_file", "ralph_execution.log")
-    with open(log_file, "a") as f:
+    with open(str(log_file), "a") as f:
         f.write(formatted_msg + "\n")
 
 
@@ -91,7 +91,7 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     stats["total_time_sec"] += elapsed_time
     stats["iterations"] += 1
 
-    with open(stats_file, "w") as f:
+    with open(str(stats_file), "w") as f:
         json.dump(stats, f, indent=2)
 
     log_message(
@@ -314,15 +314,15 @@ def check_stagnation(current_hash: str):
 
     history_file = CONFIG["state_history_file"]
     history = []
-    if os.path.exists(history_file):
-        with open(history_file, "r") as f:
+    if os.path.exists(str(history_file)):
+        with open(str(history_file), "r") as f:
             history = json.load(f)
 
     history.append(current_hash)
     if len(history) > 5:
         history = history[-5:]
 
-    with open(history_file, "w") as f:
+    with open(str(history_file), "w") as f:
         json.dump(history, f)
 
     threshold = CONFIG["stagnation_threshold"]
