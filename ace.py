@@ -383,7 +383,7 @@ def agent_list():
 
 @agent_app.command("onboard")
 def agent_onboard(agent_id: str = typer.Argument(..., help="Agent ID to onboard")):
-    """Run onboarding SOP for an agent."""
+    """Run onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
     res = api_call("POST", f"/agents/{agent_id}/onboard")
     if res:
         console.print(
@@ -392,6 +392,7 @@ def agent_onboard(agent_id: str = typer.Argument(..., help="Agent ID to onboard"
         )
     else:
         try:
+            # Phase 9.5: Formal onboarding SOP logic
             onboarding_file = get_service().onboard_agent(agent_id)
             console.print(
                 f"Onboarding SOP started. File created: "
@@ -408,13 +409,14 @@ def agent_review(
         ..., "--agent", "-a", help="Agent ID to perform the review"
     ),
 ):
-    """Run PR review SOP for an agent."""
+    """Run PR review SOP for an agent (PRD-01 / Phase 9.5)."""
     res = api_call("POST", f"/pr/{pr_id}/review", json={"agent_id": agent_id})
     if res:
         console.print(
             f"PR Review SOP started. File created: [green]{res['review_file']}[/green]"
         )
     else:
+        # Phase 9.5: Formal PR review SOP logic
         review_file = get_service().review_pr(pr_id, agent_id)
         console.print(
             f"PR Review SOP started. File created: [green]{review_file}[/green]"
@@ -1003,6 +1005,7 @@ def loop(
     console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
     svc = get_service()
 
+    # Phase 4.1: Native ace loop integration
     success, iterations = svc.run_loop(
         prompt=prompt,
         test_cmd=test_cmd,
@@ -1281,7 +1284,7 @@ def ui_mockup(
         ..., "--agent", "-a", help="Agent to handle the mockup"
     ),
 ):
-    """Generate a UI mockup using Google Stitch."""
+    """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
     console.print(
         f"Generating UI mockup for: [bold]{description}[/bold] "
         f"using agent [green]{agent_id}[/green]"
@@ -1312,18 +1315,20 @@ def ui_mockup(
     if res:
         url = res["url"]
     else:
+        # Phase 4.5: Connect CLI stubs to actual API or code extraction logic
         url = get_service().ui_mockup(description, agent_id)
     console.print(f"Mockup generated at: [blue]{url}[/blue]")
 
 
 @ui_app.command("sync")
 def ui_sync(url: str = typer.Argument(..., help="Stitch Canvas URL to sync from")):
-    """Sync UI code from Google Stitch."""
+    """Sync UI code from Google Stitch (PRD-01 / Phase 8.3)."""
     console.print(f"Syncing UI code from: [blue]{url}[/blue]")
     res = api_call("GET", "/ui/sync", params={"url": url})
     if res:
         code = res["code"]
     else:
+        # Phase 8.3: Bi-directional sync between Stitch and ACE with visual diffing
         code = get_service().ui_sync(url)
     console.print(f"Code synced successfully:\n[dim]{code}[/dim]")
 
