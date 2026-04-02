@@ -99,9 +99,8 @@ def meta_self_audit():
 
     # 2. System-wide Audit
     console.print("\n[bold blue]System-wide Audit[/bold blue]")
-    console.print(
-        f"  Total Token Cost: [bold magenta]${results.get('total_token_cost', 0.0):.4f}[/bold magenta]"
-    )
+    cost = results.get("total_token_cost", 0.0)
+    console.print(f"  Total Token Cost: [bold magenta]${cost:.4f}[/bold magenta]")
 
     if results["recommendations"]:
         console.print("\n[bold yellow]Recommendations:[/bold yellow]")
@@ -630,20 +629,20 @@ def run(
                 "~/.ace/credentials.[/yellow]"
             )
 
-    # 1. TDD (Test-Driven Development): Establish the 'tests/' directory and write unit tests for ACEService.
-    #    (Completed: Comprehensive unit tests added in tests/test_ace_service_core.py and tests/test_ace_service_tdd.py)
+    # 1. TDD (Test-Driven Development): Establish 'tests/' and write unit tests for ACEService.
+    #    (Completed: Comprehensive unit tests added in tests/test_ace_service_core.py)
 
-    # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
+    # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py'.
     #    (Completed: 'ace loop' and 'ace ralph' commands integrated in ace.py)
 
     # 3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.
-    #    (Completed: Formal SOP generation implemented in ace_lib/sop/sop_engine.py and ACEService)
+    #    (Completed: Formal SOP generation implemented in ace_lib/sop/sop_engine.py)
 
-    # 4. Google Stitch Integration: Connect the CLI stubs to actual API or code extraction logic.
-    #    (Completed: Bi-directional sync and component extraction implemented in ace_lib/stitch/stitch_engine.py)
+    # 4. Google Stitch Integration: Connect CLI stubs to actual API or code extraction logic.
+    #    (Completed: Bi-directional sync and component extraction implemented in stitch_engine.py)
 
-    # 11.38 Next Roadmap Step: Establish the 'tests/' directory and write unit tests for ACEService,
-    #    integrate RALPH loop, and finalize SOP/Stitch logic. (Completed: Finalized all core areas from PRD-01)
+    # 11.38 Next Roadmap Step: Establish 'tests/' and write unit tests for ACEService,
+    #    integrate RALPH loop, and finalize SOP/Stitch logic. (Completed: Finalized PRD-01)
 
     # 5. RBAC for Agents: Implement fine-grained Role-Based Access Control for agent operations.
     #    (Completed: Path and command restrictions implemented in ACEService.run_agent_task)
@@ -1041,23 +1040,15 @@ def loop(
 
     # Phase 4.1: Native ace loop integration
     success, iterations = svc.run_loop(
-        prompt=prompt,
-        test_cmd=test_cmd,
-        max_iterations=max_iterations,
-        path=path,
-        agent_id=agent_id,
-        git_commit=git_commit,
-        prd_path=prd,
-        plan_file=plan_file,
-        max_spend=max_spend,
-        model=model,
-        spec_id=spec_id,
+        prompt=prompt, test_cmd=test_cmd, max_iterations=max_iterations,
+        path=path, agent_id=agent_id, git_commit=git_commit,
+        prd_path=prd, plan_file=plan_file, max_spend=max_spend,
+        model=model, spec_id=spec_id,
     )
 
     if success:
-        console.print(
-            f"\n✅ [bold green]RALPH Loop completed successfully in {iterations} iterations![/bold green]"
-        )
+        msg = f"\n✅ [bold green]RALPH Loop completed in {iterations} iterations![/bold green]"
+        console.print(msg)
     else:
         console.print(
             f"\n❌ [bold red]RALPH Loop failed after {iterations} iterations.[/bold red]"
