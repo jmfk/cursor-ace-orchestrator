@@ -1630,6 +1630,100 @@ type: role
 
         return audit_file
 
+    def self_audit(self) -> Dict:
+        """ACE performs a comprehensive self-audit of its own codebase and memory (Phase 10.24)."""
+        audit_results = {
+            "timestamp": datetime.now().isoformat(),
+            "agents": [],
+            "system_health": "healthy",
+            "recommendations": [],
+        }
+
+        agents_config = self.load_agents()
+        for agent in agents_config.agents:
+            agent_audit = {
+                "id": agent.id,
+                "role": agent.role,
+                "playbook_stats": {"strategies": 0, "pitfalls": 0, "decisions": 0},
+                "memory_health": "unknown",
+                "issues": [],
+            }
+
+            # 1. Audit Playbook Consistency
+            playbook_path = self.base_path / agent.memory_file
+            if playbook_path.exists():
+                content = playbook_path.read_text(encoding="utf-8")
+                strategies = re.findall(r"\[str-\d+\]", content)
+                pitfalls = re.findall(r"\[mis-\d+\]", content)
+                decisions = re.findall(r"\[dec-\d+\]", content)
+
+                agent_audit["playbook_stats"] = {
+                    "strategies": len(strategies),
+                    "pitfalls": len(pitfalls),
+                    "decisions": len(decisions),
+                }
+
+                # Check for low-utility strategies (Phase 10.21 logic)
+                utility_pattern = (
+                    r"<!-- \[(str|mis)-([^\]]+)\]\s+helpful=(\d+)\s+harmful=(\d+)"
+                    r"\s*::\s*(.*?) -->"
+                )
+                low_utility_count = 0
+                for match in re.finditer(utility_pattern, content):
+                    h, m = int(match.group(3)), int(match.group(4))
+                    if m > h:
+                        low_utility_count += 1
+
+                if low_utility_count > 0:
+                    agent_audit["issues"].append(
+                        f"Found {low_utility_count} low-utility strategies. Suggest 'ace memory prune'."
+                    )
+
+                # Check for missing sections
+                if "## Strategier & patterns" not in content:
+                    agent_audit["issues"].append("Missing 'Strategier & patterns' section.")
+                if "## Kända fallgropar" not in content:
+                    agent_audit["issues"].append("Missing 'Kända fallgropar' section.")
+
+                agent_audit["memory_health"] = (
+                    "healthy" if not agent_audit["issues"] else "needs_attention"
+                )
+            else:
+                agent_audit["issues"].append(f"Playbook file missing: {agent.memory_file}")
+                agent_audit["memory_health"] = "critical"
+
+            # 2. Audit Ownership Consistency
+            ownership_config = self.load_ownership()
+            owned_paths = [
+                path for path, mod in ownership_config.modules.items() if mod.agent_id == agent.id
+            ]
+            agent_audit["owned_paths_count"] = len(owned_paths)
+            if not owned_paths:
+                agent_audit["issues"].append("Agent owns no paths.")
+
+            audit_results["agents"].append(agent_audit)
+
+        # 3. System-wide Audit
+        # Check for unowned critical paths
+        ownership_config = self.load_ownership()
+        if not ownership_config.modules:
+            audit_results["recommendations"].append("No ownership defined. Run 'ace own' to assign modules.")
+
+        # Check for token spend
+        token_usages = self.get_token_report()
+        total_cost = sum(u.cost for u in token_usages)
+        audit_results["total_token_cost"] = total_cost
+        if total_cost > 50.0:
+            audit_results["recommendations"].append(f"High token spend detected: ${total_cost:.2f}. Consider 'low' token mode.")
+
+        # Check for MACP stalemates
+        proposals = self.list_macp_proposals()
+        stale_proposals = [p for p in proposals if p.status == ConsensusStatus.STALEMATE]
+        if stale_proposals:
+            audit_results["recommendations"].append(f"Found {len(stale_proposals)} stale MACP proposals.")
+
+        return audit_results
+
     def security_audit(self, agent_id: str):
         """Run security audit SOP for an agent."""
         agents_config = self.load_agents()

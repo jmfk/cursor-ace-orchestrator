@@ -55,33 +55,39 @@ app.add_typer(meta_app, name="meta")
 
 @meta_app.command("self-audit")
 def meta_self_audit():
-    """ACE performs a self-audit of its own codebase and memory."""
-    console.print("🚀 [bold blue]Starting ACE Self-Audit[/bold blue]")
+    """ACE performs a comprehensive self-audit of its own codebase and memory (Phase 10.24)."""
+    console.print("🚀 [bold blue]Starting ACE Self-Audit (Phase 10.24)[/bold blue]")
     svc = get_service()
-    agents_config = svc.load_agents()
+    results = svc.self_audit()
 
-    for agent in agents_config.agents:
-        console.print(f"Auditing agent: [green]{agent.id}[/green]")
-        audit_file = svc.audit_agent(agent.id)
-        console.print(f"  Audit SOP generated: [dim]{audit_file}[/dim]")
+    # 1. Agent Audits
+    for agent in results["agents"]:
+        status_color = "green"
+        if agent["memory_health"] == "needs_attention":
+            status_color = "yellow"
+        elif agent["memory_health"] == "critical":
+            status_color = "red"
 
-        # Run a specialized self-reflection on the agent's memory
-        playbook_path = svc.base_path / agent.memory_file
-        if playbook_path.exists():
-            content = playbook_path.read_text(encoding="utf-8")
-            console.print(f"  Analyzing playbook: [dim]{playbook_path.name}[/dim]")
-            # Here we could call an LLM to analyze the playbook for consistency
-            strategies = re.findall(r"\[str-\d+\]", content)
-            pitfalls = re.findall(r"\[mis-\d+\]", content)
-            decisions = re.findall(r"\[dec-\d+\]", content)
-            console.print(f"    Strategies: {len(strategies)}")
-            console.print(f"    Pitfalls: {len(pitfalls)}")
-            console.print(f"    Decisions: {len(decisions)}")
+        console.print(f"\nAuditing agent: [green]{agent['id']}[/green] ([{status_color}]{agent['memory_health']}[/{status_color}])")
+        console.print(f"  Role: {agent['role']}")
+        stats = agent["playbook_stats"]
+        console.print(f"  Playbook: [dim]{stats['strategies']} strategies, {stats['pitfalls']} pitfalls, {stats['decisions']} decisions[/dim]")
+        console.print(f"  Ownership: [dim]{agent.get('owned_paths_count', 0)} paths[/dim]")
 
-        # Display agent metadata
-        console.print("  Metadata:")
-        for name, value in agent.model_dump().items():
-            console.print(f"    {name}: {value}")
+        if agent["issues"]:
+            console.print("  [bold yellow]Issues:[/bold yellow]")
+            for issue in agent["issues"]:
+                console.print(f"    - {issue}")
+
+    # 2. System-wide Audit
+    console.print("\n[bold blue]System-wide Audit[/bold blue]")
+    console.print(f"  Total Token Cost: [bold magenta]${results.get('total_token_cost', 0.0):.4f}[/bold magenta]")
+
+    if results["recommendations"]:
+        console.print("\n[bold yellow]Recommendations:[/bold yellow]")
+        for rec in results["recommendations"]:
+            console.print(f"  - {rec}")
+
     console.print("\n[bold green]Self-Audit complete.[/bold green]")
 
 
