@@ -1,4 +1,4 @@
-.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm
+.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm full-report
 
 help:
 	@echo "Cursor ACE Orchestrator - Development Commands"
@@ -13,6 +13,7 @@ help:
 	@echo "  make eval-llm     Evaluate recent git commits using Gemini Flash (limit 5)"
 	@echo "  make report       Generate a markdown report with commit value graphs (limit 20)"
 	@echo "  make report-llm   Generate a markdown report with LLM analysis (limit 10)"
+	@echo "  make full-report  Analyze FULL history and aggregate value by milestones/features"
 
 build-ace:
 	python3 ralph_loop.py
@@ -52,3 +53,6 @@ report:
 
 report-llm:
 	python3 commit_evaluator.py --limit 10 --llm --report --output commit_value_report_llm.md
+
+full-report:
+	python3 commit_evaluator.py --all --output milestone_value_report.md

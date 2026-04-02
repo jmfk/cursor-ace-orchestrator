@@ -3,7 +3,8 @@ import json
 import os
 import requests
 import math
-from typing import List, Dict, Any
+import re
+from typing import List, Dict, Any, Tuple
 from datetime import datetime
 
 # Try to import matplotlib for PNG generation
@@ -16,10 +17,10 @@ except ImportError:
 class CommitEvaluator:
     """
     Evaluates the value of git commits based on heuristics and optional LLM analysis.
-    Generates markdown reports and PNG graphs.
+    Aggregates value by features and milestones found in the history.
     """
 
-    # Files to exclude from diff analysis (stats calculation)
+    # Files to exclude from diff analysis
     EXCLUDED_FILES = {
         "ralph_execution.log",
         "ralph_loop.py",
@@ -29,38 +30,59 @@ class CommitEvaluator:
         "changelog.md"
     }
 
-    # Files the script should NEVER touch (read/write/modify)
-    # Note: This script only writes the report and PNG.
-    # We define this for safety/compliance with user request.
-    RESTRICTED_FILES = {
-        "Makefile",
-        "ralph_loop.py",
-        "ralph.yaml"
-    }
+    # Milestone patterns (e.g., M0, M1, Phase 1, Task 10.1)
+    MILESTONE_PATTERNS = [
+        r"(M[0-9]+)",           # M0, M1...
+        r"(Phase\s+[0-9]+)",    # Phase 1, Phase 2...
+        r"(Task\s+[0-9.]+)",    # Task 10.1, Task 11...
+        r"([0-9]+\.[0-9]+)"     # 10.71, 11.2...
+    ]
 
     def __init__(self, model: str = "gemini-2.0-flash", use_llm: bool = False):
         self.model = model
         self.use_llm = use_llm
         self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-    def get_commits(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Fetch recent commits with their metadata."""
-        cmd = ["git", "log", f"-n {limit}", "--pretty=format:%H|%an|%ad|%s"]
+    def get_commits(self, limit: int = None) -> List[Dict[str, Any]]:
+        """Fetch commits from the history."""
+        cmd = ["git", "log", "--pretty=format:%H|%an|%ad|%s"]
+        if limit:
+            cmd.extend(["-n", str(limit)])
+        
         try:
+            print(f"Running command: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print(f"Command output length: {len(result.stdout)}")
             commits = []
             for line in result.stdout.splitlines():
                 parts = line.split("|")
-                if len(parts) == 4:
+                if len(parts) >= 4:
                     commits.append({
                         "hash": parts[0],
                         "author": parts[1],
                         "date": parts[2],
-                        "subject": parts[3]
+                        "subject": "|".join(parts[3:]) # Rejoin in case subject contains pipes
                     })
             return commits
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            print(f"Error running git log: {e}")
+            print(f"Stderr: {e.stderr}")
             return []
+
+    def extract_milestone(self, subject: str) -> str:
+        """Extract milestone or feature name from commit subject."""
+        for pattern in self.MILESTONE_PATTERNS:
+            match = re.search(pattern, subject, re.IGNORECASE)
+            if match:
+                return match.group(1).upper()
+        
+        # Fallback: Check for common feature keywords
+        features = ["auth", "api", "ui", "db", "stitch", "ralph", "ace", "memory", "consensus"]
+        for feat in features:
+            if feat in subject.lower():
+                return f"FEAT:{feat.upper()}"
+        
+        return "GENERAL"
 
     def get_commit_diff_stats(self, commit_hash: str) -> Dict[str, Any]:
         """Get line change statistics for a commit, excluding specific files."""
@@ -76,7 +98,6 @@ class CommitEvaluator:
                 parts = line.split()
                 if len(parts) >= 3:
                     filename = parts[2]
-                    # EXCLUSION LOGIC
                     if any(excluded in filename for excluded in self.EXCLUDED_FILES):
                         continue
 
@@ -131,19 +152,16 @@ class CommitEvaluator:
         if not self.use_llm or not self.api_key:
             return "LLM evaluation skipped."
         try:
-            # Filter diff to exclude restricted files for LLM context too
-            cmd = ["git", "show", "--format=", "--unified=1", commit["hash"]]
-            for excluded in self.EXCLUDED_FILES:
-                cmd.append(f":(exclude){excluded}")
-            
-            diff = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout[:3000]
+            diff = subprocess.run(
+                ["git", "show", "--format=", "--unified=1", commit["hash"]],
+                capture_output=True, text=True, check=True
+            ).stdout[:3000]
         except Exception:
             diff = "Diff unavailable"
-            
         prompt = (
             f"Analyze the following git commit and evaluate its value to the system on a scale of 1-10.\n"
             f"Commit Subject: {commit['subject']}\n"
-            f"Stats (excluding infra/logs): {json.dumps(stats)}\n"
+            f"Stats: {json.dumps(stats)}\n"
             f"Diff Snippet:\n{diff}\n\n"
             "Provide a brief 1-sentence justification and a score (Value: X/10)."
         )
@@ -159,39 +177,12 @@ class CommitEvaluator:
         except Exception as e:
             return f"LLM Exception: {str(e)}"
 
-    def generate_png_graph(self, results: List[Dict], output_path: str = "commit_value_graph.png"):
-        """Generate a PNG graph of commit values using matplotlib."""
-        if not MATPLOTLIB_AVAILABLE:
-            print("Matplotlib not found. Skipping PNG generation.")
-            return
-
-        hashes = [r["commit"]["hash"][:8] for r in reversed(results)]
-        scores = [r["score"] for r in reversed(results)]
-
-        plt.figure(figsize=(12, 6))
-        bars = plt.bar(hashes, scores, color='skyblue')
-        plt.xlabel('Commit Hash')
-        plt.ylabel('Value Score')
-        plt.title('Git Commit Value Analysis')
-        plt.xticks(rotation=45)
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        
-        # Add score labels on top of bars
-        for bar in bars:
-            yval = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2, yval + 0.1, yval, ha='center', va='bottom')
-
-        plt.tight_layout()
-        plt.savefig(output_path)
-        plt.close()
-        print(f"Graph saved: {output_path}")
-
     def generate_report(self, limit: int = 20, output_file: str = "commit_value_report.md"):
-        """Evaluate history and generate a markdown report with ASCII graphs and PNG."""
+        """Evaluate history and generate a markdown report with ASCII graphs."""
         commits = self.get_commits(limit)
         results = []
         
-        print(f"Evaluating {len(commits)} commits (excluding infra/logs)...")
+        print(f"Evaluating {len(commits)} commits...")
         for c in commits:
             stats = self.get_commit_diff_stats(c["hash"])
             h_score = self.calculate_heuristic_score(stats, c["subject"])
@@ -203,11 +194,6 @@ class CommitEvaluator:
                 "llm_analysis": llm_analysis
             })
 
-        # Generate PNG Graph
-        # Use a fixed name as requested or derived from output_file
-        graph_file = "commit_value_graph.png"
-        self.generate_png_graph(results, graph_file)
-
         # Generate Markdown
         report = [
             "# Git Commit Value Report",
@@ -215,13 +201,11 @@ class CommitEvaluator:
             f"Analysis Depth: {limit} commits",
             f"LLM Analysis: {'Enabled' if self.use_llm else 'Disabled'}",
             "",
-            "## Value Trend",
-            f"![Commit Value Graph]({graph_file})",
-            "",
             "## Value Distribution (ASCII Graph)",
             "```"
         ]
         
+        # Simple ASCII histogram of scores
         if results:
             max_score = max(r["score"] for r in results)
             for r in results:
@@ -237,7 +221,11 @@ class CommitEvaluator:
         ])
         
         for r in results:
-            analysis = r["llm_analysis"] if r["llm_analysis"] else f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
+            if r["llm_analysis"]:
+                analysis = r["llm_analysis"]
+            else:
+                analysis = f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
+            # Escape pipes in analysis for markdown table
             analysis = analysis.replace("|", "\\|")
             report.append(f"| `{r['commit']['hash'][:8]}` | **{r['score']}** | {r['commit']['subject']} | {analysis} |")
 
@@ -245,33 +233,113 @@ class CommitEvaluator:
             f.write("\n".join(report))
         
         print(f"Report generated: {output_file}")
-        self.evaluate_history(limit)
 
-    def evaluate_history(self, limit: int = 20):
-        """Evaluate and print the value of recent commits to console."""
-        commits = self.get_commits(limit)
-        print(f"\n{'Hash':<10} | {'Score':<6} | {'Subject':<50} | {'Analysis (Excl. Infra)'}")
-        print("-" * 120)
+    def generate_aggregated_report(self, output_file: str = "milestone_value_report.md"):
+        """Analyze full history, aggregate by milestone, and generate report."""
+        commits = self.get_commits()
+        print(f"Analyzing {len(commits)} commits from full history...")
+        
+        milestones = {} # milestone -> {score, commits, changes, files}
+        
         for c in commits:
+            m_name = self.extract_milestone(c["subject"])
+            if m_name not in milestones:
+                milestones[m_name] = {"score": 0.0, "count": 0, "changes": 0, "files": 0, "commits": []}
+            
             stats = self.get_commit_diff_stats(c["hash"])
-            h_score = self.calculate_heuristic_score(stats, c["subject"])
-            if self.use_llm:
-                analysis = self.get_llm_evaluation(c, stats)
-            else:
-                analysis = f"Files: {stats['files_changed']}, Changes: {stats['total_changes']}"
-            print(f"{c['hash'][:8]:<10} | {h_score:<6} | {c['subject'][:50]:<50} | {analysis}")
+            score = self.calculate_heuristic_score(stats, c["subject"])
+            
+            milestones[m_name]["score"] += score
+            milestones[m_name]["count"] += 1
+            milestones[m_name]["changes"] += stats["total_changes"]
+            milestones[m_name]["files"] += stats["files_changed"]
+            milestones[m_name]["commits"].append({
+                "hash": c["hash"],
+                "subject": c["subject"],
+                "score": score
+            })
+
+        # Sort milestones by total score
+        sorted_milestones = sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True)
+
+        # Generate PNG Graph
+        self.generate_milestone_graph(sorted_milestones, "milestone_value_graph.png")
+
+        # Generate Markdown
+        report = [
+            "# Milestone & Feature Value Report",
+            f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Total Commits Analyzed: {len(commits)}",
+            "",
+            "## Value by Milestone / Feature",
+            "![Milestone Value Graph](milestone_value_graph.png)",
+            "",
+            "| Milestone | Total Value | Commits | Avg Value | Files Touched |",
+            "| :--- | :--- | :--- | :--- | :--- |"
+        ]
+
+        for m_name, data in sorted_milestones:
+            avg_val = round(data["score"] / data["count"], 2) if data["count"] > 0 else 0
+            report.append(
+                f"| **{m_name}** | {round(data['score'], 2)} | {data['count']} | {avg_val} | {data['files']} |"
+            )
+
+        report.append("\n## Top 10 High-Value Commits")
+        report.append("| Hash | Score | Subject |")
+        report.append("| :--- | :--- | :--- |")
+        
+        all_scored_commits = []
+        for m_name, data in milestones.items():
+            all_scored_commits.extend(data["commits"])
+        
+        top_commits = sorted(all_scored_commits, key=lambda x: x["score"], reverse=True)[:10]
+        for tc in top_commits:
+            report.append(f"| `{tc['hash'][:8]}` | **{tc['score']}** | {tc['subject']} |")
+
+        with open(output_file, "w") as f:
+            f.write("\n".join(report))
+        
+        print(f"Aggregated report generated: {output_file}")
+
+    def generate_milestone_graph(self, sorted_milestones: List[Tuple], output_path: str):
+        """Generate a PNG bar chart for milestone values."""
+        if not MATPLOTLIB_AVAILABLE:
+            return
+
+        names = [m[0] for m in sorted_milestones[:15]] # Top 15
+        scores = [m[1]["score"] for m in sorted_milestones[:15]]
+
+        plt.figure(figsize=(14, 7))
+        colors = plt.cm.viridis([i/len(names) for i in range(len(names))])
+        bars = plt.bar(names, scores, color=colors)
+        plt.xlabel('Milestone / Feature')
+        plt.ylabel('Aggregated Value Score')
+        plt.title('Value Contribution by Milestone/Feature')
+        plt.xticks(rotation=45, ha='right')
+        plt.grid(axis='y', linestyle='--', alpha=0.6)
+
+        for bar in bars:
+            yval = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2, yval + 0.5, round(yval, 1), ha='center', va='bottom', fontsize=9)
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--all", action="store_true", help="Analyze full history and aggregate by milestone")
+    parser.add_argument("--limit", type=int, default=20, help="Number of commits to analyze for standard report")
+    parser.add_argument("--report", action="store_true", help="Generate standard markdown report")
     parser.add_argument("--llm", action="store_true", help="Use Gemini Flash for evaluation")
-    parser.add_argument("--report", action="store_true", help="Generate markdown report")
     parser.add_argument("--output", type=str, default="commit_value_report.md", help="Report output file")
     args = parser.parse_args()
 
     evaluator = CommitEvaluator(use_llm=args.llm)
-    if args.report:
+    if args.all:
+        evaluator.generate_aggregated_report(output_file=args.output)
+    elif args.report:
         evaluator.generate_report(limit=args.limit, output_file=args.output)
     else:
-        evaluator.evaluate_history(limit=args.limit)
+        evaluator.generate_aggregated_report(output_file=args.output)
