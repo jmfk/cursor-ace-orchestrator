@@ -50,9 +50,7 @@ class CommitEvaluator:
             cmd.extend(["-n", str(limit)])
         
         try:
-            print(f"Running command: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            print(f"Command output length: {len(result.stdout)}")
             commits = []
             for line in result.stdout.splitlines():
                 parts = line.split("|")
@@ -64,9 +62,7 @@ class CommitEvaluator:
                         "subject": "|".join(parts[3:]) # Rejoin in case subject contains pipes
                     })
             return commits
-        except subprocess.CalledProcessError as e:
-            print(f"Error running git log: {e}")
-            print(f"Stderr: {e.stderr}")
+        except subprocess.CalledProcessError:
             return []
 
     def extract_milestone(self, subject: str) -> str:
@@ -177,8 +173,8 @@ class CommitEvaluator:
         except Exception as e:
             return f"LLM Exception: {str(e)}"
 
-    def generate_report(self, limit: int = 20, output_file: str = "commit_value_report.md"):
-        """Evaluate history and generate a markdown report with ASCII graphs."""
+    def generate_report(self, limit: int = None, output_file: str = "commit_value_report.md"):
+        """Evaluate history and generate a markdown report with ASCII graphs and PNG."""
         commits = self.get_commits(limit)
         results = []
         
@@ -194,12 +190,19 @@ class CommitEvaluator:
                 "llm_analysis": llm_analysis
             })
 
+        # Generate PNG Graph
+        graph_file = "commit_value_graph.png"
+        self.generate_commit_value_graph(results, graph_file)
+
         # Generate Markdown
         report = [
             "# Git Commit Value Report",
             f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Analysis Depth: {limit} commits",
+            f"Analysis Depth: {len(commits)} commits",
             f"LLM Analysis: {'Enabled' if self.use_llm else 'Disabled'}",
+            "",
+            "## Value Trend",
+            f"![Commit Value Graph]({graph_file})",
             "",
             "## Value Distribution (ASCII Graph)",
             "```"
@@ -233,6 +236,28 @@ class CommitEvaluator:
             f.write("\n".join(report))
         
         print(f"Report generated: {output_file}")
+
+    def generate_commit_value_graph(self, results: List[Dict], output_path: str):
+        """Generate a PNG bar chart for individual commit values."""
+        if not MATPLOTLIB_AVAILABLE:
+            return
+
+        # Show only last 30 for readability if it's a long list
+        plot_results = results[-30:] if len(results) > 30 else results
+        hashes = [r["commit"]["hash"][:8] for r in plot_results]
+        scores = [r["score"] for r in plot_results]
+
+        plt.figure(figsize=(14, 7))
+        plt.bar(hashes, scores, color='skyblue')
+        plt.xlabel('Commit Hash')
+        plt.ylabel('Value Score')
+        plt.title('Recent Commit Value Analysis')
+        plt.xticks(rotation=45, ha='right')
+        plt.grid(axis='y', linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        print(f"Graph saved: {output_path}")
 
     def generate_aggregated_report(self, output_file: str = "milestone_value_report.md"):
         """Analyze full history, aggregate by milestone, and generate report."""
@@ -330,7 +355,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--all", action="store_true", help="Analyze full history and aggregate by milestone")
-    parser.add_argument("--limit", type=int, default=20, help="Number of commits to analyze for standard report")
+    parser.add_argument("--limit", type=int, default=None, help="Number of commits to analyze for standard report (default: all)")
     parser.add_argument("--report", action="store_true", help="Generate standard markdown report")
     parser.add_argument("--llm", action="store_true", help="Use Gemini Flash for evaluation")
     parser.add_argument("--output", type=str, default="commit_value_report.md", help="Report output file")

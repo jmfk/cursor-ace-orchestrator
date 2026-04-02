@@ -49,7 +49,7 @@ eval-llm:
 	python3 commit_evaluator.py --limit 5 --llm
 
 report:
-	python3 commit_evaluator.py --limit 20 --report --output commit_value_report.md
+	python3 commit_evaluator.py --report --output commit_value_report.md
 
 report-llm:
 	python3 commit_evaluator.py --limit 10 --llm --report --output commit_value_report_llm.md
