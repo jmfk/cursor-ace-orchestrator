@@ -301,6 +301,8 @@ class ACEService:
         email: Optional[str] = None,
         responsibilities: Optional[List[str]] = None,
         parent_id: Optional[str] = None,
+        allowed_paths: Optional[List[str]] = None,
+        forbidden_commands: Optional[List[str]] = None,
     ) -> Agent:
         config = self.load_agents()
         if any(a.id == id for a in config.agents):
@@ -319,6 +321,8 @@ class ACEService:
             status="active",
             responsibilities=responsibilities or [],
             parent_id=parent_id,
+            allowed_paths=allowed_paths or [],
+            forbidden_commands=forbidden_commands or [],
         )
 
         if parent_id:
