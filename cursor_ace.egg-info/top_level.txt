@@ -1,5 +1,4 @@
 ace
-ace_api
 ace_lib
-ralph_docs
 ralph_loop
+sqe

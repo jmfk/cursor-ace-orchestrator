@@ -22,7 +22,11 @@ dependencies = [
 [project.scripts]
 ace = "ace:app"
 ralph = "ralph_loop:main"
+sqe = "sqe.sqe_loop:main"
+
+[tool.setuptools]
+py-modules = ["ace", "ralph_loop"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ace_lib*", "ace*"]
+include = ["ace_lib*", "sqe*"]

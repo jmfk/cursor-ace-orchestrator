@@ -1,3 +1,4 @@
 [console_scripts]
 ace = ace:app
-ralph = ralph_loop:app
+ralph = ralph_loop:main
+sqe = sqe.sqe_loop:main

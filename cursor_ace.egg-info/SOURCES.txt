@@ -11,6 +11,7 @@ ace_lib/models/__init__.py
 ace_lib/models/schemas.py
 ace_lib/planner/__init__.py
 ace_lib/planner/context_curator.py
+ace_lib/planner/diff_gate.py
 ace_lib/planner/gemini_client.py
 ace_lib/planner/hierarchical_planner.py
 ace_lib/planner/plan_tree.py
@@ -28,6 +29,17 @@ cursor_ace.egg-info/entry_points.txt
 cursor_ace.egg-info/requires.txt
 cursor_ace.egg-info/top_level.txt
 ralph_docs/generator.py
+sqe/__init__.py
+sqe/sqe_loop.py
+sqe/lib/__init__.py
+sqe/lib/code_examiner.py
+sqe/lib/context_curator.py
+sqe/lib/evaluator.py
+sqe/lib/gemini_client.py
+sqe/lib/plan_tree.py
+sqe/lib/prd_analyzer.py
+sqe/lib/reporting.py
+sqe/lib/test_builder.py
 tests/test_ace_core_features.py
 tests/test_ace_service.py
 tests/test_ace_service_prd01.py
@@ -39,8 +51,10 @@ tests/test_aceservice_final.py
 tests/test_aceservice_tdd.py
 tests/test_agent_expansion.py
 tests/test_cross_project_sync.py
+tests/test_improvement_trend.py
 tests/test_new_features.py
 tests/test_playbook_updates.py
+tests/test_quality_gate.py
 tests/test_ralph_loop_extended.py
 tests/test_ralph_loop_new.py
 tests/test_security_audit.py
