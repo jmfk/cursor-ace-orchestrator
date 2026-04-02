@@ -169,7 +169,7 @@ Lines Deleted: {details['stats']['deleted']}
 
 Tasks:
 1. Assign an improvement score (0-100) based on the RUBRIC.
-2. Provide a brief (1-2 sentences) analysis of the improvement. Evaluate if the code change actually improves the codebase.
+2. Provide a brief (1-2 sentences) analysis. Evaluate if the code change actually improves the codebase.
 3. Suggest a better, more descriptive git commit message if the current one is vague.
 
 Return the result in JSON format:
@@ -190,8 +190,9 @@ Return the result in JSON format:
                 self.total_input_tokens += in_tokens
                 self.total_output_tokens += out_tokens
                 
-                cost = (in_tokens / 1_000_000 * self.INPUT_COST_PER_1M) + \
-                       (out_tokens / 1_000_000 * self.OUTPUT_COST_PER_1M)
+                cost = (in_tokens / 1_000_000 * self.INPUT_COST_PER_1M) + (
+                    out_tokens / 1_000_000 * self.OUTPUT_COST_PER_1M
+                )
                 self.total_cost += cost
 
             # Extract JSON from response (handling potential markdown blocks)

@@ -247,6 +247,7 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **12.1 Plugin Marketplace**: Implement the base infrastructure for the ACE Plugin Marketplace.
 - [x] **12.2 Public API**: Finalize and document the public REST API for external integrations.
 - [x] **12.3 Multi-Language Support**: Extend memory and SOP logic to support non-Python projects.
-- [ ] **12.4 Future Roadmap Task**: Placeholder for next steps.
+- [x] **12.4 Future Roadmap Task**: Placeholder for next steps.
 - [ ] **12.5 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
 - [ ] **12.6 Future Roadmap Task**: Placeholder for next steps.
+- [ ] **12.7 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
