@@ -620,16 +620,16 @@ def run(
                 "~/.ace/credentials.[/yellow]"
             )
 
-    # 1. TDD (Test-Driven Development): Establish 'tests/' directory and write unit tests for ACEService.
-    #    (Completed: tests/ directory established with comprehensive unit tests for ACEService)
+    # 11.21 Future Roadmap Task: Placeholder for the next task in the roadmap.
+    #    (Completed: Establish the 'tests/' directory and write unit tests for ACEService)
 
-    # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
+    # 11.22 Next Roadmap Step: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
     #    (Completed: 'ace loop' and 'ace ralph' commands integrated in ace.py)
 
-    # 3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.
+    # 11.23 Next Roadmap Step: Implement formal instructions/SOPs for agent onboarding and PR reviews.
     #    (Completed: Formal SOP generation implemented in ace_lib/sop/sop_engine.py and ACEService)
 
-    # 4. Google Stitch Integration: Connect the CLI stubs to actual API or code extraction logic.
+    # 11.24 Next Roadmap Step: Connect the CLI stubs for Google Stitch to actual API or code extraction logic.
     #    (Completed: Bi-directional sync and component extraction implemented in ace_lib/stitch/stitch_engine.py)
 
     # 5. RBAC for Agents: Implement fine-grained Role-Based Access Control for agent operations.
