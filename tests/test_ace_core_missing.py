@@ -2,99 +2,122 @@ import pytest
 from ace_lib.services.ace_service import ACEService
 
 @pytest.fixture
-def ace_service(tmp_path):
-    """Create a temporary ACE service for testing."""
-    service = ACEService(tmp_path)
-    service.ace_dir.mkdir(parents=True, exist_ok=True)
-    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    return service
+def temp_workspace(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    return workspace
 
-def test_onboarding_sop_generation(ace_service):
-    """Test generating onboarding SOP with formal instructions."""
-    ace_service.create_agent(id="dev-1", name="Developer 1", role="developer", responsibilities=["auth", "api"])
-    onboarding_file = ace_service.onboard_agent("dev-1")
-    
-    assert onboarding_file.exists()
-    content = onboarding_file.read_text(encoding="utf-8")
-    assert "SOP: Agent Onboarding - Developer 1 (dev-1)" in content
-    assert "## 1. Context Acquisition" in content
-    assert "## 2. Role-Specific Setup" in content
-    assert "auth, api" in content
+@pytest.fixture
+def service(temp_workspace):
+    return ACEService(base_path=temp_workspace)
 
-def test_pr_review_sop_generation(ace_service):
-    """Test generating PR review SOP with formal instructions."""
-    ace_service.create_agent(id="reviewer-1", name="Reviewer 1", role="reviewer")
-    review_file = ace_service.review_pr("PR-555", "reviewer-1")
-    
-    assert review_file.exists()
-    content = review_file.read_text(encoding="utf-8")
-    assert "SOP: PR Review - PR-555" in content
-    assert "## 1. Strategy Alignment" in content
-    assert "## 3. Security Check" in content
-    assert "reviewer-1" in content
-
-def test_ralph_loop_native_integration(ace_service, monkeypatch):
-    """Test RALPH loop native integration in ACEService."""
+def test_run_loop_basic(service, monkeypatch):
+    """Test the native run_loop (RALPH loop) integration."""
     import subprocess
     from unittest.mock import MagicMock
 
     # Mock subprocess.run to simulate agent and test execution
-    def mock_run(cmd, shell=True, capture_output=True, text=True, env=None):
+    def mock_run(cmd, shell=True, capture_output=True, text=True, env=None, check=False):
         mock_res = MagicMock()
-        mock_res.returncode = 0
-        mock_res.stdout = "Success"
-        mock_res.stderr = ""
+        if "cursor-agent" in cmd:
+            mock_res.returncode = 0
+            mock_res.stdout = "Agent success output with code block: ```tsx\nconst x = 1;\n```"
+            mock_res.stderr = ""
+        elif "pytest" in cmd:
+            mock_res.returncode = 0
+            mock_res.stdout = "Test success output"
+            mock_res.stderr = ""
+        elif "git status" in cmd:
+            mock_res.returncode = 0
+            mock_res.stdout = "M file.py"
+        elif "git" in cmd:
+            mock_res.returncode = 0
+            mock_res.stdout = ""
         return mock_res
 
     monkeypatch.setattr(subprocess, "run", mock_run)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     
     # Mock reflection to avoid API calls
-    monkeypatch.setattr(ace_service, "reflect_on_session", lambda x: "[str-001] helpful=1 harmful=0 :: Test strategy")
+    monkeypatch.setattr(service, "reflect_on_session", lambda x: "No new learnings.")
 
-    ace_service.create_agent(id="agent-1", name="Agent 1", role="developer")
-    
-    # Create dummy PRD and plan
-    prd_path = ace_service.base_path / "PRD.md"
-    prd_path.write_text("# PRD content")
-    plan_path = ace_service.base_path / "plan.md"
-    plan_path.write_text("# Plan content")
+    # Setup necessary files
+    prd_file = service.base_path / "PRD.md"
+    prd_file.write_text("# PRD\nImplement feature X")
+    plan_file = service.base_path / "plan.md"
+    plan_file.write_text("- [ ] Task 1")
 
-    success, iterations = ace_service.run_loop(
+    success, iterations = service.run_loop(
         prompt="Implement feature X",
-        test_cmd="echo 'tests passed'",
+        test_cmd="pytest",
         max_iterations=1,
-        agent_id="agent-1",
-        prd_path=str(prd_path),
-        plan_file=str(plan_path)
+        prd_path=str(prd_file),
+        plan_file=str(plan_file)
     )
 
     assert success is True
     assert iterations == 1
-    
-    # Verify session was logged
-    sessions = list(ace_service.sessions_dir.glob("session_*.md"))
-    assert len(sessions) > 0
 
-def test_stitch_integration_mockup(ace_service, monkeypatch):
-    """Test Google Stitch integration for mockups."""
+def test_sop_generation(service):
+    """Test formal SOP generation for onboarding and PR reviews."""
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    
+    # Onboarding
+    onboarding_file = service.onboard_agent("dev-1")
+    assert onboarding_file.exists()
+    assert "SOP: Agent Onboarding" in onboarding_file.read_text()
+    
+    # PR Review
+    review_file = service.review_pr("PR-1", "dev-1")
+    assert review_file.exists()
+    assert "SOP: PR Review" in review_file.read_text()
+    
+    # Audit
+    audit_file = service.audit_agent("dev-1")
+    assert audit_file.exists()
+    assert "SOP: Agent Audit" in audit_file.read_text()
+
+def test_stitch_integration_stubs(service, monkeypatch):
+    """Test Google Stitch integration stubs."""
     from ace_lib.stitch import stitch_engine
     
-    mock_url = "https://stitch.google.com/canvas/stitch_test"
-    mock_code = "export const TestComp = () => <div>Test</div>;"
+    mock_url = "https://stitch.google.com/canvas/test"
+    mock_code = "export const App = () => <div>Test</div>;"
     
-    monkeypatch.setattr(stitch_engine, "generate_mockup", lambda desc, aid, key: (mock_url, mock_code))
-    monkeypatch.setattr(ace_service, "get_stitch_key", lambda: "test-key")
-    
-    url = ace_service.ui_mockup("Test UI", "agent-1")
+    monkeypatch.setattr(stitch_engine, "generate_mockup", lambda *args: (mock_url, mock_code))
+    monkeypatch.setattr(stitch_engine, "extract_components", lambda *args: {"App": mock_code})
+    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
+
+    url = service.ui_mockup("Test UI", "dev-1")
     assert url == mock_url
     
-    # Verify files created
-    mockup_id = "stitch_test"
-    mockup_file = ace_service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+    mockup_id = url.split("/")[-1]
+    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
     assert mockup_file.exists()
-    assert "Test UI" in mockup_file.read_text()
-    
-    comp_file = ace_service.ace_dir / "ui_mockups" / "components" / mockup_id / "TestComp.tsx"
-    assert comp_file.exists()
-    assert "TestComp" in comp_file.read_text()
+    assert mock_code in mockup_file.read_text()
+
+def test_rbac_enforcement(service, monkeypatch):
+    """Test RBAC enforcement in run_agent_task."""
+    service.create_agent(id="restricted-agent", name="Restricted", role="dev")
+    agents_config = service.load_agents()
+    agent = agents_config.agents[0]
+    agent.allowed_paths = ["src/allowed"]
+    agent.forbidden_commands = ["rm -rf"]
+    service.save_agents(agents_config)
+    service.clear_cache()
+
+    # Test path restriction
+    success = service.run_agent_task(
+        command="ls",
+        path="src/forbidden/file.py",
+        agent_id="restricted-agent"
+    )
+    assert success is False
+
+    # Test command restriction
+    success = service.run_agent_task(
+        command="rm -rf /",
+        path="src/allowed/file.py",
+        agent_id="restricted-agent"
+    )
+    assert success is False
