@@ -16,6 +16,15 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
+# Try to import plotly for interactive HTML generation
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+
+
 class CommitAnalyzer:
     """
     Analyzes git commits using gemini-3-flash-preview to measure feature improvements.
@@ -29,7 +38,7 @@ class CommitAnalyzer:
         "ralph_execution.log",
         "ralph_loop.py",
         "ralph_state_history.json",
-        "ralph_stats.json"
+        "ralph_stats.json",
     }
 
     # Cost configuration (USD per 1M tokens)
@@ -69,12 +78,14 @@ class CommitAnalyzer:
             for line in result.stdout.splitlines():
                 parts = line.split("|")
                 if len(parts) >= 4:
-                    commits.append({
-                        "hash": parts[0],
-                        "author": parts[1],
-                        "date": parts[2],
-                        "subject": "|".join(parts[3:])
-                    })
+                    commits.append(
+                        {
+                            "hash": parts[0],
+                            "author": parts[1],
+                            "date": parts[2],
+                            "subject": "|".join(parts[3:]),
+                        }
+                    )
             return commits
         except subprocess.CalledProcessError:
             return []
@@ -84,9 +95,11 @@ class CommitAnalyzer:
         # Stats
         cmd_stats = ["git", "show", "--numstat", "--format=", commit_hash]
         stats: Dict[str, int] = {"added": 0, "deleted": 0, "files": 0}
-        
+
         try:
-            res_stats = subprocess.run(cmd_stats, capture_output=True, text=True, check=True)
+            res_stats = subprocess.run(
+                cmd_stats, capture_output=True, text=True, check=True
+            )
             for line in res_stats.stdout.splitlines():
                 parts = line.split()
                 if len(parts) >= 3:
@@ -107,10 +120,14 @@ class CommitAnalyzer:
         # Actual code diff (excluding large/irrelevant files)
         # We use -- . ':(exclude)path' syntax for git show
         exclude_args = [f":(exclude){ex}" for ex in self.EXCLUDED_FILES]
-        cmd_diff = ["git", "show", "--format=", commit_hash, "--"] + ["."] + exclude_args
+        cmd_diff = (
+            ["git", "show", "--format=", commit_hash, "--"] + ["."] + exclude_args
+        )
         diff_content = ""
         try:
-            res_diff = subprocess.run(cmd_diff, capture_output=True, text=True, check=True)
+            res_diff = subprocess.run(
+                cmd_diff, capture_output=True, text=True, check=True
+            )
             diff_content = res_diff.stdout
             # Limit diff size to avoid blowing up the prompt
             if len(diff_content) > 10000:
@@ -131,18 +148,24 @@ class CommitAnalyzer:
 
         return {"stats": stats, "files": files_content, "diff": diff_content}
 
-    def analyze_improvement(self, commit: Dict[str, Any], details: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_improvement(
+        self, commit: Dict[str, Any], details: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Use Gemini to measure improvement and suggest a better commit message."""
         if not self.client:
-            return {"improvement_score": 0, "suggested_message": commit["subject"], "analysis": "LLM disabled"}
+            return {
+                "improvement_score": 0,
+                "suggested_message": commit["subject"],
+                "analysis": "LLM disabled",
+            }
 
         # Heuristic override for zero-change commits (Phase 12)
-        total_changes = details['stats']['added'] + details['stats']['deleted']
+        total_changes = details["stats"]["added"] + details["stats"]["deleted"]
         if total_changes == 0:
             return {
                 "improvement_score": 0,
                 "analysis": "Administrative churn / No code changes (only excluded files or no changes).",
-                "suggested_message": commit["subject"]
+                "suggested_message": commit["subject"],
             }
 
         prompt = f"""
@@ -186,9 +209,9 @@ Return the result in JSON format:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json"
-                )
+                ),
             )
-            
+
             # Track usage and cost
             usage = response.usage_metadata
             if usage:
@@ -196,7 +219,7 @@ Return the result in JSON format:
                 out_tokens = usage.candidates_token_count
                 self.total_input_tokens += in_tokens
                 self.total_output_tokens += out_tokens
-                
+
                 cost = (in_tokens / 1_000_000 * self.INPUT_COST_PER_1M) + (
                     out_tokens / 1_000_000 * self.OUTPUT_COST_PER_1M
                 )
@@ -205,12 +228,16 @@ Return the result in JSON format:
             # Parse JSON from response
             return json.loads(response.text)
         except Exception as e:
-            return {"improvement_score": 0, "analysis": f"Error: {e}", "suggested_message": commit["subject"]}
+            return {
+                "improvement_score": 0,
+                "analysis": f"Error: {e}",
+                "suggested_message": commit["subject"],
+            }
 
     def replace_commit_message(self, commit_hash: str, new_message: str):
         """Replaces the commit message using git filter-repo or a temporary rebase if possible."""
         # For the latest commit, it's easy:
-        latest_hash = self.get_commits(1)[0]['hash']
+        latest_hash = self.get_commits(1)[0]["hash"]
         if commit_hash == latest_hash:
             print(f"Amending latest commit {commit_hash[:8]} message...")
             subprocess.run(["git", "commit", "--amend", "-m", new_message])
@@ -220,21 +247,87 @@ Return the result in JSON format:
             # or interactive rebase which is not supported here.
             # We'll use a simple 'git filter-repo' style approach if available,
             # but for now, we just log it as "would replace" for safety on older commits.
-            print(f"Would replace older commit {commit_hash[:8]} message with: {new_message}")
+            print(
+                f"Would replace older commit {commit_hash[:8]} message with: {new_message}"
+            )
 
-    def generate_report(self, results: List[Dict[str, Any]], output_file: str = "improvement_report.md"):
+    def generate_report(
+        self, results: List[Dict[str, Any]], output_file: str = "improvement_report.md"
+    ):
         """Generates the markdown report and graph."""
-        if MATPLOTLIB_AVAILABLE and results:
-            scores = [r['analysis_result']['improvement_score'] for r in reversed(results)]
-            labels = [r['commit']['hash'][:8] for r in reversed(results)]
+        scores = []
+        labels = []
+        dates = []
+        for r in reversed(results):
+            res = r.get("analysis_result")
+            if isinstance(res, dict):
+                scores.append(res.get("improvement_score", 0))
+            else:
+                scores.append(0)
+            labels.append(r["commit"]["hash"][:8])
+            dates.append(r["commit"]["date"])
 
+        # Calculate 10-point sliding window average
+        window_size = 10
+        moving_avg = []
+        for i in range(len(scores)):
+            start = max(0, i - window_size + 1)
+            window = scores[start : i + 1]
+            moving_avg.append(sum(window) / len(window))
+
+        # Generate Plotly interactive graph (HTML)
+        if PLOTLY_AVAILABLE and results:
+            fig = make_subplots(specs=[[{"secondary_y": False}]])
+            
+            # Add raw scores
+            fig.add_trace(
+                go.Scatter(
+                    x=labels, 
+                    y=scores, 
+                    mode='lines+markers', 
+                    name='Improvement Score',
+                    line=dict(color='blue', width=1),
+                    marker=dict(size=6),
+                    hovertemplate='Commit: %{x}<br>Score: %{y}<extra></extra>'
+                )
+            )
+            
+            # Add sliding window average
+            fig.add_trace(
+                go.Scatter(
+                    x=labels, 
+                    y=moving_avg, 
+                    mode='lines', 
+                    name=f'{window_size}-pt Moving Avg',
+                    line=dict(color='red', width=3),
+                    hovertemplate='Commit: %{x}<br>Avg: %{y:.2f}<extra></extra>'
+                )
+            )
+
+            fig.update_layout(
+                title="Feature Improvement Score per Commit",
+                xaxis_title="Commit Hash",
+                yaxis_title="Improvement Score (0-100)",
+                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+                hovermode="x unified",
+                template="plotly_white"
+            )
+            
+            # Save interactive HTML
+            fig.write_html("improvement_graph.html")
+            print("Interactive graph generated: improvement_graph.html")
+
+        # Fallback to Matplotlib for static PNG
+        if MATPLOTLIB_AVAILABLE and results:
             plt.figure(figsize=(12, 6))
-            plt.plot(labels, scores, marker='o', linestyle='-', color='blue')
+            plt.plot(labels, scores, marker="o", linestyle="-", color="blue", alpha=0.3, label="Score")
+            plt.plot(labels, moving_avg, linestyle="-", color="red", linewidth=2, label=f"{window_size}-pt Avg")
             plt.title("Feature Improvement Score per Commit")
             plt.xlabel("Commit Hash")
             plt.ylabel("Improvement Score (0-100)")
             plt.grid(True, alpha=0.3)
             plt.xticks(rotation=45)
+            plt.legend()
             plt.tight_layout()
             plt.savefig("improvement_graph.png")
             plt.close()
@@ -250,22 +343,35 @@ Return the result in JSON format:
             f"- **Estimated Total Cost**: ${self.total_cost:.4f} USD",
             "",
             "## Improvement Trend",
-            "![Improvement Graph](improvement_graph.png)"
-            if MATPLOTLIB_AVAILABLE
-            else "Graph not available (matplotlib missing)",
+            "### Interactive Graph",
+            "[View Interactive Graph (HTML)](improvement_graph.html)",
+            "",
+            "### Static Graph",
+            (
+                "![Improvement Graph](improvement_graph.png)"
+                if MATPLOTLIB_AVAILABLE
+                else "Graph not available (matplotlib missing)"
+            ),
             "",
             "| Commit | Score | Lines +/- | Suggested Message | Analysis |",
-            "| :--- | :--- | :--- | :--- | :--- |"
+            "| :--- | :--- | :--- | :--- | :--- |",
         ]
 
         for r in results:
-            c = r['commit']
-            res = r['analysis_result']
-            stats = r['details']['stats']
+            c = r["commit"]
+            res = r.get("analysis_result")
+            if not isinstance(res, dict):
+                res = {
+                    "improvement_score": "N/A",
+                    "suggested_message": "Error",
+                    "analysis": str(res),
+                }
+
+            stats = r.get("details", {}).get("stats", {"added": 0, "deleted": 0})
             line_stats = f"+{stats['added']} / -{stats['deleted']}"
             report.append(
-                f"| `{c['hash'][:8]}` | **{res['improvement_score']}** | {line_stats} | "
-                f"{res['suggested_message']} | {res['analysis']} |"
+                f"| `{c['hash'][:8]}` | **{res.get('improvement_score', 0)}** | {line_stats} | "
+                f"{res.get('suggested_message', 'N/A')} | {res.get('analysis', 'N/A')} |"
             )
 
         with open(output_file, "w") as f:
@@ -275,103 +381,205 @@ Return the result in JSON format:
     def get_total_commit_count(self) -> int:
         """Get the total number of commits in the current branch."""
         try:
-            result = subprocess.run(["git", "rev-list", "--count", "HEAD"], capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                ["git", "rev-list", "--count", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
             return int(result.stdout.strip())
         except (subprocess.CalledProcessError, ValueError):
             return 0
 
-    def run(self, limit: int = 10) -> None:
+    def run(
+        self, limit: Optional[int] = None, resume_session: Optional[str] = None
+    ) -> None:
         # Phase 12: Persistent Data Storage for Analysis
         # Create a session-specific subfolder with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        data_dir = Path("analysis_data") / timestamp
-        
+
+        parent_data_dir = Path("analysis_data")
+        parent_data_dir.mkdir(exist_ok=True)
+
+        all_results: List[Dict[str, Any]] = []
+
+        # Auto-resume logic: if resume_session is True (from --resume without value)
+        if resume_session is True or (
+            isinstance(resume_session, str) and resume_session.lower() == "latest"
+        ):
+            sessions = sorted(
+                [d for d in parent_data_dir.iterdir() if d.is_dir()],
+                key=lambda x: x.name,
+                reverse=True,
+            )
+            if sessions:
+                resume_session = sessions[0].name
+                print(f"Auto-resuming latest session: {resume_session}")
+            else:
+                print("No sessions found to resume. Starting new session.")
+                resume_session = None
+
+        if resume_session and isinstance(resume_session, str):
+            data_dir = parent_data_dir / resume_session
+            if not data_dir.exists():
+                print(f"Error: Session {resume_session} not found in {parent_data_dir}")
+                return
+
+            index_file = data_dir / "index.json"
+            if index_file.exists():
+                try:
+                    index_data = json.loads(index_file.read_text(encoding="utf-8"))
+                    print(f"Resuming session {resume_session}...")
+                    # We will reload existing results later in the loop
+                except Exception as e:
+                    print(
+                        f"Warning: Could not read index.json in {resume_session}: {e}"
+                    )
+            else:
+                print(
+                    f"Warning: No index.json found in {resume_session}. Resuming by scanning files..."
+                )
+        else:
+            data_dir = parent_data_dir / timestamp
+            data_dir.mkdir(parents=True, exist_ok=True)
+
         # Interactive limit adjustment
         total_available = self.get_total_commit_count()
         print(f"\nTotal commits available in history: {total_available}")
-        
+
+        # Default to all if limit is not explicitly provided
+        if limit is None:
+            limit = total_available
+            print(f"Defaulting to all {total_available} commits.")
+
         try:
-            user_input = input(f"Enter limit (default {limit}, 'all' for {total_available}): ").strip().lower()
-            if user_input == 'all':
-                limit = total_available
-            elif user_input:
-                limit = int(user_input)
+            # Check if we are in a terminal that supports input
+            import sys
+
+            if sys.stdin.isatty() and not resume_session:
+                user_input = (
+                    input(
+                        f"Enter limit (default {limit}, 'all' for {total_available}): "
+                    )
+                    .strip()
+                    .lower()
+                )
+                if user_input == "all":
+                    limit = total_available
+                elif user_input:
+                    limit = int(user_input)
+            elif not resume_session:
+                print(f"Non-interactive terminal detected. Using limit: {limit}")
         except (ValueError, EOFError, KeyboardInterrupt):
             print(f"Using default limit: {limit}")
 
-        print(f"Proceeding with analysis for {limit} commits...\n")
-        data_dir.mkdir(parents=True, exist_ok=True)
-        parent_data_dir = Path("analysis_data")
-        parent_data_dir.mkdir(exist_ok=True)
-        
+        if not resume_session:
+            print(f"Proceeding with analysis for {limit} commits...\n")
+
         commits = self.get_commits(limit)
-        all_results: List[Dict[str, Any]] = []
-        
+
         for c in commits:
-            commit_hash = c['hash']
+            commit_hash = c["hash"]
             # Check for cache in any session subfolder
             cache_file = None
-            for existing_session in parent_data_dir.iterdir():
-                if existing_session.is_dir():
-                    potential_cache = existing_session / f"{commit_hash}.json"
-                    if potential_cache.exists():
-                        cache_file = potential_cache
-                        break
-            
+            # If resuming, prioritize the current session folder
+            if resume_session:
+                potential_cache = data_dir / f"{commit_hash}.json"
+                if potential_cache.exists():
+                    cache_file = potential_cache
+
+            # If not found in current session (or not resuming), check other sessions
+            if not cache_file:
+                for existing_session in parent_data_dir.iterdir():
+                    if existing_session.is_dir():
+                        potential_cache = existing_session / f"{commit_hash}.json"
+                        if potential_cache.exists():
+                            cache_file = potential_cache
+                            break
+
             if cache_file:
                 try:
                     cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
-                    if isinstance(cached_data, dict) and 'analysis_result' in cached_data:
+                    if (
+                        isinstance(cached_data, dict)
+                        and "analysis_result" in cached_data
+                    ):
                         all_results.append(cached_data)
                         # Update totals from cache
                         self.total_cost += cached_data.get("cost", 0.0)
+                        # If we are resuming, we might want to ensure it's saved in the current session folder too
+                        if resume_session and cache_file.parent != data_dir:
+                            (data_dir / f"{commit_hash}.json").write_text(
+                                json.dumps(cached_data, indent=2), encoding="utf-8"
+                            )
                         continue
                     else:
-                        print(f"Cached data for {commit_hash[:8]} is invalid (not a dict or missing analysis_result). Re-analyzing...")
+                        print(
+                            f"Cached data for {commit_hash[:8]} is invalid (not a dict or missing analysis_result). Re-analyzing..."
+                        )
                 except Exception as e:
                     print(f"Error reading cache for {commit_hash[:8]}: {e}")
 
             print(f"Analyzing commit {commit_hash[:8]}...")
             details = self.get_commit_details(commit_hash)
-            
+
             # Capture cost before and after to store per-commit cost
             cost_before = self.total_cost
             analysis = self.analyze_improvement(c, details)
             commit_cost = self.total_cost - cost_before
-            
+
             result = {
                 "commit": c,
                 "details": details,
                 "analysis_result": analysis,
                 "cost": commit_cost,
-                "analyzed_at": datetime.now().isoformat()
+                "analyzed_at": datetime.now().isoformat(),
             }
             all_results.append(result)
-            
+
             # Save to the current session's subfolder
             session_cache_file = data_dir / f"{commit_hash}.json"
-            session_cache_file.write_text(json.dumps(result, indent=2), encoding="utf-8")
-            
-            if isinstance(analysis, dict) and analysis.get('suggested_message') != c['subject']:
+            session_cache_file.write_text(
+                json.dumps(result, indent=2), encoding="utf-8"
+            )
+
+            if (
+                isinstance(analysis, dict)
+                and analysis.get("suggested_message") != c["subject"]
+            ):
                 # Optional: replace_commit_message(c['hash'], analysis['suggested_message'])
                 pass
 
         # Save an index file to maintain the order of commits in this session
         index_file = data_dir / "index.json"
         index_data = {
-            "session_timestamp": timestamp,
-            "commit_order": [r['commit']['hash'] for r in all_results],
+            "session_timestamp": resume_session or timestamp,
+            "commit_order": [r["commit"]["hash"] for r in all_results],
             "total_commits": len(all_results),
-            "total_cost": self.total_cost
+            "total_cost": self.total_cost,
+            "last_analyzed_at": datetime.now().isoformat(),
         }
         index_file.write_text(json.dumps(index_data, indent=2), encoding="utf-8")
 
         self.generate_report(all_results)
 
+
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit the number of commits to analyze (default: all)",
+    )
+    parser.add_argument(
+        "--resume",
+        nargs="?",
+        const=True,
+        type=str,
+        help="Resume analysis from a specific session timestamp, or the latest if no timestamp provided",
+    )
     args = parser.parse_args()
     analyzer = CommitAnalyzer()
-    analyzer.run(limit=args.limit)
+    analyzer.run(limit=args.limit, resume_session=args.resume)
