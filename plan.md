@@ -204,4 +204,6 @@ This plan outlines the step-by-step implementation of the Cursor ACE Orchestrato
 - [x] **11.34 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
 - [x] **11.35 Future Roadmap Task**: Placeholder for next steps.
 - [x] **11.36 Next Roadmap Step**: Define the next set of advanced features for Phase 12.
-- [ ] **11.37 Future Roadmap Task**: Placeholder for next steps.
+- [x] **11.37 Future Roadmap Task**: Placeholder for next steps.
+- [x] **11.38 Next Roadmap Step**: Establish the 'tests/' directory and write unit tests for ACEService, integrate RALPH loop, and finalize SOP/Stitch logic.
+- [ ] **11.39 Next Roadmap Step**: Define the next set of advanced features for Phase 12.

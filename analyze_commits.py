@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 # Try to import matplotlib for PNG generation
 try:
     import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
@@ -227,5 +226,9 @@ Return the result in JSON format:
         self.generate_report(all_results)
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=10)
+    args = parser.parse_args()
     analyzer = CommitAnalyzer()
-    analyzer.run(limit=15)
+    analyzer.run(limit=args.limit)
