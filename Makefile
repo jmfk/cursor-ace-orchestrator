@@ -1,4 +1,4 @@
-.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm full-report
+.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm full-report comprehensive
 
 help:
 	@echo "Cursor ACE Orchestrator - Development Commands"
@@ -9,11 +9,12 @@ help:
 	@echo "  make install-exe  Build and install the 'ace' binary to /usr/local/bin"
 	@echo "  make build-ralph-exe Build a self-contained 'ralph' executable"
 	@echo "  make install-ralph-exe Build and install the 'ralph' binary to /usr/local/bin"
-	@echo "  make eval         Evaluate recent git commits using heuristics (limit 10)"
+	@echo "  make eval         Evaluate recent git commits using heuristics"
 	@echo "  make eval-llm     Evaluate recent git commits using Gemini Flash (limit 5)"
-	@echo "  make report       Generate a markdown report with commit value graphs (limit 20)"
+	@echo "  make report       Generate a markdown report with commit value graphs"
 	@echo "  make report-llm   Generate a markdown report with LLM analysis (limit 10)"
 	@echo "  make full-report  Analyze FULL history and aggregate value by milestones/features"
+	@echo "  make comprehensive Generate a comprehensive report (Time-series + Milestones + Commits)"
 
 build-ace:
 	python3 ralph_loop.py
@@ -56,3 +57,6 @@ report-llm:
 
 full-report:
 	python3 commit_evaluator.py --all --output milestone_value_report.md
+
+comprehensive:
+	python3 commit_evaluator.py --all --output comprehensive_value_report.md

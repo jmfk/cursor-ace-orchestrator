@@ -1,7 +1,5 @@
 import subprocess
-import json
 import os
-import requests
 import math
 import re
 from typing import List, Dict, Any, Tuple
@@ -10,6 +8,7 @@ from datetime import datetime
 # Try to import matplotlib for PNG generation
 try:
     import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
@@ -17,7 +16,7 @@ except ImportError:
 class CommitEvaluator:
     """
     Evaluates the value of git commits based on heuristics and optional LLM analysis.
-    Aggregates value by features and milestones found in the history.
+    Aggregates value by features, milestones, and time series.
     """
 
     # Files to exclude from diff analysis
@@ -59,7 +58,7 @@ class CommitEvaluator:
                         "hash": parts[0],
                         "author": parts[1],
                         "date": parts[2],
-                        "subject": "|".join(parts[3:]) # Rejoin in case subject contains pipes
+                        "subject": "|".join(parts[3:])
                     })
             return commits
         except subprocess.CalledProcessError:
@@ -72,7 +71,6 @@ class CommitEvaluator:
             if match:
                 return match.group(1).upper()
         
-        # Fallback: Check for common feature keywords
         features = ["auth", "api", "ui", "db", "stitch", "ralph", "ace", "memory", "consensus"]
         for feat in features:
             if feat in subject.lower():
@@ -85,10 +83,7 @@ class CommitEvaluator:
         cmd = ["git", "show", "--numstat", "--format=", commit_hash]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            added = 0
-            deleted = 0
-            files_changed = 0
-            file_types = {}
+            added, deleted, files_changed, file_types = 0, 0, 0, {}
 
             for line in result.stdout.splitlines():
                 parts = line.split()
@@ -103,21 +98,14 @@ class CommitEvaluator:
                         added += a
                         deleted += d
                         files_changed += 1
-                        
                         ext = os.path.splitext(filename)[1] or "no_ext"
                         file_types[ext] = file_types.get(ext, 0) + 1
                     except ValueError:
                         continue
 
-            return {
-                "added": added,
-                "deleted": deleted,
-                "total_changes": added + deleted,
-                "files_changed": files_changed,
-                "file_types": file_types
-            }
+            return {"added": added, "deleted": deleted, "total_changes": added + deleted, "files_changed": files_changed, "file_types": file_types}
         except subprocess.CalledProcessError:
-            return {"added": 0, "deleted": 0, "total_changes": 0, "files_changed": 0, "file_types": {}}
+            return {"total_changes": 0, "files_changed": 0, "file_types": {}}
 
     def calculate_heuristic_score(self, stats: Dict[str, Any], subject: str) -> float:
         """Calculate a value score based on heuristics."""
@@ -127,14 +115,12 @@ class CommitEvaluator:
             score += math.log10(total_changes + 1) * 2.0
         files_changed = stats.get("files_changed", 0)
         score += min(files_changed, 10) * 0.5
-        subject_len = len(subject)
-        if 10 < subject_len < 70:
+        if 10 < len(subject) < 70:
             score += 1.0
         val_keywords = ["fix", "feat", "refactor", "implement", "add", "optimize", "improve"]
         if any(kw in subject.lower() for kw in val_keywords):
             score += 1.5
-        file_types = stats.get("file_types", {})
-        for ext, count in file_types.items():
+        for ext, count in stats.get("file_types", {}).items():
             if ext in [".py", ".ts", ".js", ".go", ".rs", ".java", ".cpp"]:
                 score += count * 1.0
             elif ext in [".md", ".txt"]:
@@ -143,110 +129,57 @@ class CommitEvaluator:
                 score += count * 0.5
         return round(score, 2)
 
-    def get_llm_evaluation(self, commit: Dict[str, Any], stats: Dict[str, Any]) -> str:
-        """Use Gemini Flash to evaluate the semantic value of a commit."""
-        if not self.use_llm or not self.api_key:
-            return "LLM evaluation skipped."
-        try:
-            diff = subprocess.run(
-                ["git", "show", "--format=", "--unified=1", commit["hash"]],
-                capture_output=True, text=True, check=True
-            ).stdout[:3000]
-        except Exception:
-            diff = "Diff unavailable"
-        prompt = (
-            f"Analyze the following git commit and evaluate its value to the system on a scale of 1-10.\n"
-            f"Commit Subject: {commit['subject']}\n"
-            f"Stats: {json.dumps(stats)}\n"
-            f"Diff Snippet:\n{diff}\n\n"
-            "Provide a brief 1-sentence justification and a score (Value: X/10)."
-        )
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
-        headers = {"Content-Type": "application/json"}
-        data = {"contents": [{"parts": [{"text": prompt}]}]}
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=15)
-            if response.status_code == 200:
-                result = response.json()
-                return result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            return f"LLM Error: {response.status_code}"
-        except Exception as e:
-            return f"LLM Exception: {str(e)}"
+    def generate_time_series_graph(self, results: List[Dict], output_path: str):
+        """Generate a PNG line chart for value over time."""
+        if not MATPLOTLIB_AVAILABLE:
+            return
 
-    def generate_report(self, limit: int = None, output_file: str = "commit_value_report.md"):
-        """Evaluate history and generate a markdown report with ASCII graphs and PNG."""
-        commits = self.get_commits(limit)
-        results = []
-        
-        print(f"Evaluating {len(commits)} commits...")
-        for c in commits:
-            stats = self.get_commit_diff_stats(c["hash"])
-            h_score = self.calculate_heuristic_score(stats, c["subject"])
-            llm_analysis = self.get_llm_evaluation(c, stats) if self.use_llm else None
-            results.append({
-                "commit": c,
-                "stats": stats,
-                "score": h_score,
-                "llm_analysis": llm_analysis
-            })
-
-        # Generate PNG Graph
-        graph_file = "commit_value_graph.png"
-        self.generate_commit_value_graph(results, graph_file)
-
-        # Generate Markdown
-        report = [
-            "# Git Commit Value Report",
-            f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Analysis Depth: {len(commits)} commits",
-            f"LLM Analysis: {'Enabled' if self.use_llm else 'Disabled'}",
-            "",
-            "## Value Trend",
-            f"![Commit Value Graph]({graph_file})",
-            "",
-            "## Value Distribution (ASCII Graph)",
-            "```"
-        ]
-        
-        # Simple ASCII histogram of scores
-        if results:
-            max_score = max(r["score"] for r in results)
-            for r in results:
-                bar_len = int((r["score"] / max_score) * 40) if max_score > 0 else 0
-                report.append(f"{r['commit']['hash'][:8]} [{r['score']:>5.2f}] | {'#' * bar_len}")
-        
-        report.extend([
-            "```",
-            "",
-            "## Commit Details",
-            "| Hash | Score | Subject | Analysis |",
-            "| :--- | :--- | :--- | :--- |"
-        ])
-        
+        # Aggregate by date
+        daily_value = {}
         for r in results:
-            if r["llm_analysis"]:
-                analysis = r["llm_analysis"]
-            else:
-                analysis = f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
-            # Escape pipes in analysis for markdown table
-            analysis = analysis.replace("|", "\\|")
-            report.append(f"| `{r['commit']['hash'][:8]}` | **{r['score']}** | {r['commit']['subject']} | {analysis} |")
+            # Git date format: "Thu Apr 2 04:33:52 2026 +0200"
+            # We need to parse this. A simpler way is to use git log --date=short
+            try:
+                # Re-fetch date in short format for easier parsing
+                date_str = subprocess.run(
+                    ["git", "show", "-s", "--format=%ad", "--date=short", r["commit"]["hash"]],
+                    capture_output=True, text=True
+                ).stdout.strip()
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                daily_value[dt] = daily_value.get(dt, 0.0) + r["score"]
+            except Exception:
+                continue
 
-        with open(output_file, "w") as f:
-            f.write("\n".join(report))
+        if not daily_value:
+            return
+
+        sorted_dates = sorted(daily_value.keys())
+        values = [daily_value[d] for d in sorted_dates]
+
+        plt.figure(figsize=(14, 7))
+        plt.plot(sorted_dates, values, marker='o', linestyle='-', color='forestgreen', linewidth=2)
+        plt.fill_between(sorted_dates, values, color='forestgreen', alpha=0.1)
         
-        print(f"Report generated: {output_file}")
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(sorted_dates)//10)))
+        plt.gcf().autofmt_xdate()
+        
+        plt.xlabel('Date')
+        plt.ylabel('Total Value Score')
+        plt.title('System Value Growth Over Time')
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        print(f"Time series graph saved: {output_path}")
 
     def generate_commit_value_graph(self, results: List[Dict], output_path: str):
         """Generate a PNG bar chart for individual commit values."""
         if not MATPLOTLIB_AVAILABLE:
             return
-
-        # Show only last 30 for readability if it's a long list
         plot_results = results[-30:] if len(results) > 30 else results
         hashes = [r["commit"]["hash"][:8] for r in plot_results]
         scores = [r["score"] for r in plot_results]
-
         plt.figure(figsize=(14, 7))
         plt.bar(hashes, scores, color='skyblue')
         plt.xlabel('Commit Hash')
@@ -257,115 +190,96 @@ class CommitEvaluator:
         plt.tight_layout()
         plt.savefig(output_path)
         plt.close()
-        print(f"Graph saved: {output_path}")
-
-    def generate_aggregated_report(self, output_file: str = "milestone_value_report.md"):
-        """Analyze full history, aggregate by milestone, and generate report."""
-        commits = self.get_commits()
-        print(f"Analyzing {len(commits)} commits from full history...")
-        
-        milestones = {} # milestone -> {score, commits, changes, files}
-        
-        for c in commits:
-            m_name = self.extract_milestone(c["subject"])
-            if m_name not in milestones:
-                milestones[m_name] = {"score": 0.0, "count": 0, "changes": 0, "files": 0, "commits": []}
-            
-            stats = self.get_commit_diff_stats(c["hash"])
-            score = self.calculate_heuristic_score(stats, c["subject"])
-            
-            milestones[m_name]["score"] += score
-            milestones[m_name]["count"] += 1
-            milestones[m_name]["changes"] += stats["total_changes"]
-            milestones[m_name]["files"] += stats["files_changed"]
-            milestones[m_name]["commits"].append({
-                "hash": c["hash"],
-                "subject": c["subject"],
-                "score": score
-            })
-
-        # Sort milestones by total score
-        sorted_milestones = sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True)
-
-        # Generate PNG Graph
-        self.generate_milestone_graph(sorted_milestones, "milestone_value_graph.png")
-
-        # Generate Markdown
-        report = [
-            "# Milestone & Feature Value Report",
-            f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Total Commits Analyzed: {len(commits)}",
-            "",
-            "## Value by Milestone / Feature",
-            "![Milestone Value Graph](milestone_value_graph.png)",
-            "",
-            "| Milestone | Total Value | Commits | Avg Value | Files Touched |",
-            "| :--- | :--- | :--- | :--- | :--- |"
-        ]
-
-        for m_name, data in sorted_milestones:
-            avg_val = round(data["score"] / data["count"], 2) if data["count"] > 0 else 0
-            report.append(
-                f"| **{m_name}** | {round(data['score'], 2)} | {data['count']} | {avg_val} | {data['files']} |"
-            )
-
-        report.append("\n## Top 10 High-Value Commits")
-        report.append("| Hash | Score | Subject |")
-        report.append("| :--- | :--- | :--- |")
-        
-        all_scored_commits = []
-        for m_name, data in milestones.items():
-            all_scored_commits.extend(data["commits"])
-        
-        top_commits = sorted(all_scored_commits, key=lambda x: x["score"], reverse=True)[:10]
-        for tc in top_commits:
-            report.append(f"| `{tc['hash'][:8]}` | **{tc['score']}** | {tc['subject']} |")
-
-        with open(output_file, "w") as f:
-            f.write("\n".join(report))
-        
-        print(f"Aggregated report generated: {output_file}")
 
     def generate_milestone_graph(self, sorted_milestones: List[Tuple], output_path: str):
         """Generate a PNG bar chart for milestone values."""
         if not MATPLOTLIB_AVAILABLE:
             return
-
-        names = [m[0] for m in sorted_milestones[:15]] # Top 15
+        names = [m[0] for m in sorted_milestones[:15]]
         scores = [m[1]["score"] for m in sorted_milestones[:15]]
-
         plt.figure(figsize=(14, 7))
         colors = plt.cm.viridis([i/len(names) for i in range(len(names))])
-        bars = plt.bar(names, scores, color=colors)
+        plt.bar(names, scores, color=colors)
         plt.xlabel('Milestone / Feature')
         plt.ylabel('Aggregated Value Score')
         plt.title('Value Contribution by Milestone/Feature')
         plt.xticks(rotation=45, ha='right')
         plt.grid(axis='y', linestyle='--', alpha=0.6)
-
-        for bar in bars:
-            yval = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2, yval + 0.5, round(yval, 1), ha='center', va='bottom', fontsize=9)
-
         plt.tight_layout()
         plt.savefig(output_path)
         plt.close()
 
+    def generate_comprehensive_report(self, limit: int = None, output_file: str = "comprehensive_value_report.md"):
+        """Generate a report covering commits, milestones, and time-series."""
+        commits = self.get_commits(limit)
+        print(f"Analyzing {len(commits)} commits...")
+        
+        results = []
+        milestones = {}
+        
+        for c in commits:
+            stats = self.get_commit_diff_stats(c["hash"])
+            score = self.calculate_heuristic_score(stats, c["subject"])
+            results.append({"commit": c, "stats": stats, "score": score})
+            
+            m_name = self.extract_milestone(c["subject"])
+            if m_name not in milestones:
+                milestones[m_name] = {"score": 0.0, "count": 0, "files": 0, "commits": []}
+            milestones[m_name]["score"] += score
+            milestones[m_name]["count"] += 1
+            milestones[m_name]["files"] += stats["files_changed"]
+            milestones[m_name]["commits"].append({"hash": c["hash"], "subject": c["subject"], "score": score})
+
+        # Generate Graphs
+        self.generate_commit_value_graph(results, "commit_value_graph.png")
+        self.generate_milestone_graph(sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True), "milestone_value_graph.png")
+        self.generate_time_series_graph(results, "value_over_time.png")
+
+        # Generate Markdown
+        report = [
+            "# Comprehensive System Value Report",
+            f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Total Commits Analyzed: {len(commits)}",
+            "",
+            "## 1. Value Growth Over Time",
+            "![Value Over Time](value_over_time.png)",
+            "",
+            "## 2. Value by Milestone / Feature",
+            "![Milestone Value Graph](milestone_value_graph.png)",
+            "",
+            "| Milestone | Total Value | Commits | Avg Value |",
+            "| :--- | :--- | :--- | :--- |"
+        ]
+
+        sorted_milestones = sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True)
+        for m_name, data in sorted_milestones:
+            avg_val = round(data["score"] / data["count"], 2) if data["count"] > 0 else 0
+            report.append(f"| **{m_name}** | {round(data['score'], 2)} | {data['count']} | {avg_val} |")
+
+        report.extend([
+            "",
+            "## 3. Recent Commit Value",
+            "![Recent Commit Graph](commit_value_graph.png)",
+            "",
+            "| Hash | Score | Subject |",
+            "| :--- | :--- | :--- |"
+        ])
+
+        for r in results[:20]: # Show last 20 in table
+            report.append(f"| `{r['commit']['hash'][:8]}` | **{r['score']}** | {r['commit']['subject']} |")
+
+        with open(output_file, "w") as f:
+            f.write("\n".join(report))
+        
+        print(f"Comprehensive report generated: {output_file}")
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--all", action="store_true", help="Analyze full history and aggregate by milestone")
-    parser.add_argument("--limit", type=int, default=None,
-                        help="Number of commits to analyze for standard report (default: all)")
-    parser.add_argument("--report", action="store_true", help="Generate standard markdown report")
-    parser.add_argument("--llm", action="store_true", help="Use Gemini Flash for evaluation")
-    parser.add_argument("--output", type=str, default="commit_value_report.md", help="Report output file")
+    parser.add_argument("--all", action="store_true", help="Generate comprehensive report")
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--output", type=str, default="comprehensive_value_report.md")
     args = parser.parse_args()
 
-    evaluator = CommitEvaluator(use_llm=args.llm)
-    if args.all:
-        evaluator.generate_aggregated_report(output_file=args.output)
-    elif args.report:
-        evaluator.generate_report(limit=args.limit, output_file=args.output)
-    else:
-        evaluator.generate_aggregated_report(output_file=args.output)
+    evaluator = CommitEvaluator()
+    evaluator.generate_comprehensive_report(limit=args.limit, output_file=args.output)
