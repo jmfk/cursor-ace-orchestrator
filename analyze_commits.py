@@ -237,18 +237,47 @@ Return the result in JSON format:
         print(f"Report generated: {output_file}")
 
     def run(self, limit: int = 10) -> None:
+        # Phase 12: Persistent Data Storage for Analysis
+        data_dir = Path("analysis_data")
+        data_dir.mkdir(exist_ok=True)
+        
         commits = self.get_commits(limit)
         all_results: List[Dict[str, Any]] = []
         
         for c in commits:
-            print(f"Analyzing commit {c['hash'][:8]}...")
-            details = self.get_commit_details(c['hash'])
+            commit_hash = c['hash']
+            cache_file = data_dir / f"{commit_hash}.json"
+            
+            if cache_file.exists():
+                print(f"Loading cached analysis for {commit_hash[:8]}...")
+                try:
+                    cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
+                    all_results.append(cached_data)
+                    # Update totals from cache
+                    self.total_cost += cached_data.get("cost", 0.0)
+                    continue
+                except Exception as e:
+                    print(f"Error reading cache for {commit_hash[:8]}: {e}")
+
+            print(f"Analyzing commit {commit_hash[:8]}...")
+            details = self.get_commit_details(commit_hash)
+            
+            # Capture cost before and after to store per-commit cost
+            cost_before = self.total_cost
             analysis = self.analyze_improvement(c, details)
-            all_results.append({
+            commit_cost = self.total_cost - cost_before
+            
+            result = {
                 "commit": c,
                 "details": details,
-                "analysis_result": analysis
-            })
+                "analysis_result": analysis,
+                "cost": commit_cost,
+                "analyzed_at": datetime.now().isoformat()
+            }
+            all_results.append(result)
+            
+            # Save to cache
+            cache_file.write_text(json.dumps(result, indent=2), encoding="utf-8")
             
             if analysis['suggested_message'] != c['subject']:
                 # Optional: replace_commit_message(c['hash'], analysis['suggested_message'])
