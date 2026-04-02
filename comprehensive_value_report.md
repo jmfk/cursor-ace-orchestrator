@@ -1,6 +1,6 @@
 # Comprehensive System Value Report
-Generated on: 2026-04-02 04:47:53
-Total Commits Analyzed: 208
+Generated on: 2026-04-02 08:15:32
+Total Commits Analyzed: 225
 
 ## 1. Value Growth Over Time
 ![Value Over Time](value_over_time.png)
@@ -14,13 +14,13 @@ Total Commits Analyzed: 208
 | **GENERAL** | 478.15 | 51 | 9.38 |
 | **PHASE 10** | 179.35 | 18 | 9.96 |
 | **FEAT:UI** | 156.41 | 19 | 8.23 |
-| **FEAT:ACE** | 83.7 | 8 | 10.46 |
+| **PHASE 11** | 97.69 | 10 | 9.77 |
+| **FEAT:ACE** | 91.88 | 9 | 10.21 |
 | **FEAT:API** | 63.69 | 6 | 10.62 |
 | **FEAT:MEMORY** | 46.34 | 5 | 9.27 |
 | **FEAT:STITCH** | 43.14 | 4 | 10.79 |
 | **10.23** | 40.49 | 1 | 40.49 |
 | **FEAT:DB** | 39.05 | 5 | 7.81 |
-| **PHASE 11** | 27.84 | 2 | 13.92 |
 | **1.0** | 21.52 | 2 | 10.76 |
 | **11.9** | 18.78 | 1 | 18.78 |
 | **9.8** | 17.34 | 2 | 8.67 |
@@ -38,6 +38,7 @@ Total Commits Analyzed: 208
 | **10.70** | 11.39 | 1 | 11.39 |
 | **TASK 10.69** | 11.26 | 1 | 11.26 |
 | **2.5** | 11.16 | 1 | 11.16 |
+| **11.14** | 11.14 | 1 | 11.14 |
 | **TASK 7.1** | 10.8 | 1 | 10.8 |
 | **10.76** | 10.39 | 1 | 10.39 |
 | **11.5** | 10.27 | 1 | 10.27 |
@@ -48,7 +49,9 @@ Total Commits Analyzed: 208
 | **10.53** | 9.86 | 1 | 9.86 |
 | **11.3** | 9.84 | 1 | 9.84 |
 | **9.7** | 9.44 | 1 | 9.44 |
+| **TASK 11.12** | 9.42 | 1 | 9.42 |
 | **7.4** | 9.24 | 1 | 9.24 |
+| **11.21** | 9.0 | 1 | 9.0 |
 | **10.34** | 8.76 | 1 | 8.76 |
 | **TASK 10.73** | 8.75 | 1 | 8.75 |
 | **10.51** | 8.75 | 1 | 8.75 |
@@ -69,11 +72,16 @@ Total Commits Analyzed: 208
 | **TASK 10.82** | 7.99 | 1 | 7.99 |
 | **TASK 10.85** | 7.9 | 1 | 7.9 |
 | **10.71** | 7.74 | 1 | 7.74 |
+| **11.19** | 7.65 | 1 | 7.65 |
+| **11.23** | 7.58 | 1 | 7.58 |
+| **11.25** | 7.55 | 1 | 7.55 |
 | **10.60** | 7.49 | 1 | 7.49 |
 | **10.31** | 7.4 | 1 | 7.4 |
 | **10.65** | 6.94 | 1 | 6.94 |
 | **10.42** | 6.7 | 1 | 6.7 |
+| **11.10** | 6.64 | 1 | 6.64 |
 | **10.80** | 6.41 | 1 | 6.41 |
+| **11.17** | 6.03 | 1 | 6.03 |
 | **9.9** | 6.0 | 1 | 6.0 |
 | **10.56** | 2.5 | 1 | 2.5 |
 | **TASK 9.6** | 1.0 | 1 | 1.0 |
@@ -83,23 +91,23 @@ Total Commits Analyzed: 208
 
 | Hash | Score | Subject |
 | :--- | :--- | :--- |
+| `1cfd3aad` | **7.55** | chore: Add 11.25 future roadmap task placeholder |
+| `e0e6cc66` | **10.57** | roadmap: Define next advanced features for Phase 11 |
+| `68971a07` | **7.58** | Add 11.23 Future Roadmap task placeholder |
+| `c81fd4bd` | **7.58** | Define next advanced features for Phase 11 |
+| `18d25294` | **9.0** | Add 11.21 future roadmap task placeholder |
+| `859c855a` | **7.65** | Add 11.19 future roadmap task placeholder |
+| `ef50b84e` | **8.08** | Roadmap: Define next advanced features for Phase 11 |
+| `49d9567e` | **8.18** | fix: remove unused imports in tests/test_ace_service_tdd.py |
+| `10c84379` | **6.03** | Roadmap 11.17: Placeholder for next task |
+| `00c15900` | **9.37** | Define next advanced features for Phase 11 roadmap |
+| `4c4da0d9` | **11.14** | Add placeholder for 11.14 future roadmap task. |
+| `e84ad3a7` | **7.99** | Roadmap 11.13: Define advanced features for Phase 11 |
+| `43a50a0e` | **9.42** | Add placeholder for future roadmap task 11.12 |
+| `5e62ed66` | **6.23** | Implement missing core areas from PRD-01 (Phase 11.12) |
+| `6093a12c` | **7.67** | Define next advanced features for Phase 11 roadmap |
+| `710f3d21` | **6.64** | Roadmap: Placeholder for 11.10 task |
+| `320ca11a` | **12.36** | Define Phase 11 advanced features roadmap. |
 | `bca95c2c` | **18.78** | Add 11.9 future roadmap task placeholder. |
 | `51023bf9` | **12.75** | Roadmap: Define next Phase 11 advanced features |
 | `ec08f7a4` | **12.75** | chore: 11.7 Roadmap task placeholder |
-| `7c45d1ce` | **15.09** | Define advanced features for Phase 11 roadmap |
-| `b5fec878` | **10.27** | Add 11.5 future roadmap task placeholder |
-| `22cbf8d2` | **12.96** | Define advanced features for 11.4 roadmap |
-| `8a3c43e5` | **9.84** | Add 11.3 future roadmap task placeholder |
-| `2c0b496c` | **8.49** | Add 11.1 Future Roadmap task placeholder |
-| `f5b40cb8` | **9.49** | fix: initialize _anthropic_client and clean up linter issues |
-| `03181edf` | **15.43** | Add 11.2 future roadmap task placeholder |
-| `8fcd8f19` | **8.0** | Chore: Add placeholder for future roadmap task 10.87 |
-| `81bbaaf2` | **7.9** | Add placeholder for roadmap task 10.85 |
-| `3c49ed07` | **7.93** | Define next advanced features for Phase 10 roadmap. |
-| `750c5614` | **7.99** | Add placeholder for Roadmap Task 10.82 |
-| `25f2a57b` | **6.41** | Placeholder for 10.80 roadmap task |
-| `5746a925` | **9.96** | Add 10.77 roadmap task placeholder |
-| `89cb65db` | **9.03** | feat: implement core infrastructure and tests for Phase 10.77 |
-| `7bde8ffd` | **10.39** | Roadmap: Add 10.76 task placeholder |
-| `ced593a7` | **8.4** | Add placeholder for roadmap task 10.75 |
-| `15dc80d9` | **8.35** | Add 10.74 roadmap task placeholder |
