@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 122
+
+### Added
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Completed task 10.53: Implemented TDD infrastructure, native RALPH loop, formal SOPs, and Google Stitch integration.
+  - Verified ACEService unit tests (29/29 passing).
+  - Integrated RALPH loop logic directly into `ace.py` as a native command.
+  - Implemented formal SOPs for agent onboarding and PR reviews.
+  - Connected Google Stitch CLI stubs to actual API/code extraction logic.
+
+## [2026-04-02] - RALPH Loop Iteration 121
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.52 (Next Roadmap Step) as completed in `plan.md`.
+  - Added task 10.53 (Future Roadmap Task) as a placeholder for next steps.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 120
 
 ### Updated
