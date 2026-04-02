@@ -224,6 +224,10 @@ def generate_commit_message(task_name: str):
         "Output ONLY the commit message string. No JSON, no markdown, no quotes."
     )
 
+    url = None
+    headers = None
+    data = None
+
     if api_key and not LLM_CIRCUIT_BREAKER_TRIPPED and not PAID_ACCOUNT_REQUIRED:
         log_message("Generating commit message via direct Gemini API...")
         url = (
@@ -232,6 +236,10 @@ def generate_commit_message(task_name: str):
         )
         headers = {"Content-Type": "application/json"}
         data = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    if not url:
+        return f"update: {task_name}"
+
     try:
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
