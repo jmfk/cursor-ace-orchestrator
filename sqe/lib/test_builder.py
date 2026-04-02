@@ -12,6 +12,7 @@ class TestBuilder:
     def __init__(self, model_name: str = "gemini-3-flash-preview"):
         self.client = GeminiClient(model_name=model_name, memory_path=".ace/sqe_memory.jsonl")
         self.curator = ContextCurator(self.client)
+        self.test_dir = os.getenv("SQE_TEST_DIR", "tests/sqe")
 
     def build_tests(self, decomposition: Dict[str, Any], examination: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -85,7 +86,7 @@ Return the result as a JSON object:
                 test_data = json.loads(json_str)
                 
                 # Save the test file
-                test_file_path = os.path.join("sqe/tests", test_data["test_filename"])
+                test_file_path = os.path.join(self.test_dir, test_data["test_filename"])
                 os.makedirs(os.path.dirname(test_file_path), exist_ok=True)
                 with open(test_file_path, "w", encoding="utf-8") as f:
                     f.write(test_data["test_code"])

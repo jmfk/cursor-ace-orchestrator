@@ -1,4 +1,4 @@
-.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm full-report comprehensive
+.PHONY: build-ace install build-exe install-exe help install-ralph build-ralph-exe install-ralph-exe eval eval-llm report report-llm full-report comprehensive test test-sqe
 
 help:
 	@echo "Cursor ACE Orchestrator - Development Commands"
@@ -15,6 +15,8 @@ help:
 	@echo "  make report-llm   Generate a markdown report with LLM analysis (limit 10)"
 	@echo "  make full-report  Analyze FULL history and aggregate value by milestones/features"
 	@echo "  make comprehensive Generate a comprehensive report (Time-series + Milestones + Commits)"
+	@echo "  make test         Run all tests in the tests/ directory"
+	@echo "  make test-sqe     Run only SQE tests in tests/sqe/"
 
 build-ace:
 	python3 ralph_loop.py
@@ -60,3 +62,9 @@ full-report:
 
 comprehensive:
 	python3 commit_evaluator.py --all --output comprehensive_value_report.md
+
+test:
+	pytest tests/
+
+test-sqe:
+	pytest tests/sqe/
