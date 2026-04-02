@@ -169,7 +169,10 @@ class CommitEvaluator:
         ])
         
         for r in results:
-            analysis = r["llm_analysis"] if r["llm_analysis"] else f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
+            if r["llm_analysis"]:
+                analysis = r["llm_analysis"]
+            else:
+                analysis = f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
             # Escape pipes in analysis for markdown table
             analysis = analysis.replace("|", "\\|")
             report.append(f"| `{r['commit']['hash'][:8]}` | **{r['score']}** | {r['commit']['subject']} | {analysis} |")
@@ -190,7 +193,10 @@ class CommitEvaluator:
         for c in commits:
             stats = self.get_commit_diff_stats(c["hash"])
             h_score = self.calculate_heuristic_score(stats, c["subject"])
-            analysis = self.get_llm_evaluation(c, stats) if self.use_llm else f"Files: {stats['files_changed']}, Changes: {stats['total_changes']}"
+            if self.use_llm:
+                analysis = self.get_llm_evaluation(c, stats)
+            else:
+                analysis = f"Files: {stats['files_changed']}, Changes: {stats['total_changes']}"
             print(f"{c['hash'][:8]:<10} | {h_score:<6} | {c['subject'][:50]:<50} | {analysis}")
 
 if __name__ == "__main__":
