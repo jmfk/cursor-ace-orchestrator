@@ -76,12 +76,12 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
         "total_time_sec": 0.0,
         "iterations": 0,
     }
-    if os.path.exists(stats_file):
-        with open(stats_file, "r") as f:
+    if os.path.exists(str(stats_file)):
+        with open(str(stats_file), "r") as f:
             stats = json.load(f)
 
-    price_in = CONFIG.get("price_input_1m", 0.10)
-    price_out = CONFIG.get("price_output_1m", 0.40)
+    price_in = float(str(CONFIG.get("price_input_1m", 0.10)))
+    price_out = float(str(CONFIG.get("price_output_1m", 0.40)))
 
     cost = input_tokens / 1_000_000 * price_in + output_tokens / 1_000_000 * price_out
 
@@ -116,22 +116,21 @@ def run_cursor_agent(prompt: str):
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
 
-    cmd = [
-        "cursor-agent",
-        "--api-key",
-        os.getenv("CURSOR_API_KEY", ""),
-        "--print",
-        "--model",
-        CONFIG["model"],
-        "--output-format",
-        "stream-json",
-        "--force",
-        "--trust",
-        prompt,
-    ]
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        cmd_args = [
+            "cursor-agent",
+            "--api-key",
+            os.getenv("CURSOR_API_KEY", ""),
+            "--print",
+            "--model",
+            str(CONFIG["model"]),
+            "--output-format",
+            "stream-json",
+            "--force",
+            "--trust",
+            prompt,
+        ]
+        result = subprocess.run(cmd_args, capture_output=True, text=True)
         elapsed = time.time() - start_time
 
         if result.returncode != 0:
@@ -152,7 +151,7 @@ def run_cursor_agent(prompt: str):
                     "🚨 Detected rate limit from Cursor Agent (429/RESOURCE_EXHAUSTED)."
                 )
 
-            if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
+            if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
                 log_message(
                     "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
@@ -176,7 +175,7 @@ def run_cursor_agent(prompt: str):
             f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
         )
 
-        if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
+        if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
             LLM_CIRCUIT_BREAKER_TRIPPED = True
             log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
 
@@ -257,13 +256,13 @@ def generate_commit_message(task_name: str):
             if response.status_code == 429 or "RESOURCE_EXHAUSTED" in error_text:
                 PAID_ACCOUNT_REQUIRED = True
 
-            if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
+            if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
             log_message("Falling back to iteration-based message.")
     except Exception as e:
         CONSECUTIVE_FAILURES += 1
         log_message(f"⚠️ Error calling Gemini API: {e}.")
-        if CONSECUTIVE_FAILURES >= CONFIG["max_consecutive_failures"]:
+        if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
             LLM_CIRCUIT_BREAKER_TRIPPED = True
         log_message("Falling back to iteration-based message.")
 
@@ -325,7 +324,7 @@ def check_stagnation(current_hash: str):
     with open(str(history_file), "w") as f:
         json.dump(history, f)
 
-    threshold = CONFIG["stagnation_threshold"]
+    threshold = int(str(CONFIG.get("stagnation_threshold", 2)))
     if len(history) >= threshold + 1:
         last_n = history[-(threshold + 1) :]
         if all(h == last_n[0] for h in last_n):
@@ -333,13 +332,13 @@ def check_stagnation(current_hash: str):
     return False
 
 
-def get_total_cost():
+def get_total_cost() -> float:
     """Get total cost from stats file."""
     stats_file = CONFIG["stats_file"]
-    if os.path.exists(stats_file):
-        with open(stats_file, "r") as f:
+    if os.path.exists(str(stats_file)):
+        with open(str(stats_file), "r") as f:
             stats = json.load(f)
-            return stats.get("total_cost_usd", 0.0)
+            return float(stats.get("total_cost_usd", 0.0))
     return 0.0
 
 
@@ -412,7 +411,7 @@ def main():
             break
 
         current_cost = get_total_cost()
-        if current_cost >= CONFIG["max_spend_usd"]:
+        if current_cost >= float(str(CONFIG.get("max_spend_usd", 20.0))):
             log_message(
                 f"Reached maximum spending limit (${CONFIG['max_spend_usd']}). Stopping."
             )

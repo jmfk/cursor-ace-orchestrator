@@ -44,7 +44,7 @@ class CommitAnalyzer:
         self.total_cost = 0.0
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
+            self.model: Optional[genai.GenerativeModel] = genai.GenerativeModel(self.model_name)
         else:
             self.model = None
             print("⚠️ Warning: GOOGLE_API_KEY not found. LLM features will be disabled.")

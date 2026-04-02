@@ -45,8 +45,8 @@ class ACEService:
         self.vector_db_dir = self.ace_dir / "vector_db"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
         self._cache: Dict[str, Any] = {}
-        self._chroma_client = None
-        self._anthropic_client = None
+        self._chroma_client: Any = None
+        self._anthropic_client: Any = None
 
     def _get_chroma_client(self) -> Any:
         if not self._chroma_client:
@@ -717,15 +717,14 @@ class ACEService:
             if not api_key:
                 return "Error: OPENAI_API_KEY not set."
             client = OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
+            openai_response = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": system_prompt or ""},
                     {"role": "user", "content": prompt},
                 ],
             )
-            choices: Any = response.choices
-            return choices[0].message.content
+            return openai_response.choices[0].message.content or ""
 
         return f"Error: Unsupported model provider {provider}"
 
@@ -969,11 +968,11 @@ class ACEService:
         existing_adrs = list(self.decisions_dir.glob("ADR-*.md"))
         next_num = 1
         if existing_adrs:
-            nums = [
-                int(re.search(r"ADR-(\d+)", f.name).group(1))
-                for f in existing_adrs
-                if re.search(r"ADR-(\d+)", f.name)
-            ]
+            nums = []
+            for f in existing_adrs:
+                match = re.search(r"ADR-(\d+)", f.name)
+                if match:
+                    nums.append(int(match.group(1)))
             if nums:
                 next_num = max(nums) + 1
 
@@ -1404,7 +1403,7 @@ class ACEService:
                 headers["X-API-Key"] = config.distributed_memory_api_key
             response = requests.get(
                 f"{config.distributed_memory_url}/search",
-                params={"query": query, "n": n_results},
+                params={"query": query, "n": str(n_results)},
                 headers=headers,
                 timeout=10,
             )
@@ -1951,9 +1950,9 @@ type: role
 
         return audit_file
 
-    def self_audit(self) -> Dict:
+    def self_audit(self) -> Dict[str, Any]:
         """ACE performs a comprehensive self-audit of its own codebase and memory (Phase 10.24)."""
-        audit_results = {
+        audit_results: Dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "agents": [],
             "system_health": "healthy",
@@ -1962,7 +1961,7 @@ type: role
 
         agents_config = self.load_agents()
         for agent in agents_config.agents:
-            agent_audit = {
+            agent_audit: Dict[str, Any] = {
                 "id": agent.id,
                 "role": agent.role,
                 "playbook_stats": {"strategies": 0, "pitfalls": 0, "decisions": 0},
@@ -1996,7 +1995,7 @@ type: role
                         low_utility_count += 1
 
                 if low_utility_count > 0:
-                    issues: List[str] = agent_audit.get("issues", [])
+                    issues = list(agent_audit.get("issues", []))
                     issues.append(
                         f"Found {low_utility_count} low-utility strategies. Suggest 'ace memory prune'."
                     )
@@ -2004,13 +2003,13 @@ type: role
 
                 # Check for missing sections
                 if "## Strategier & patterns" not in content:
-                    issues: List[str] = agent_audit.get("issues", [])
+                    issues = list(agent_audit.get("issues", []))
                     issues.append(
                         "Missing 'Strategier & patterns' section."
                     )
                     agent_audit["issues"] = issues
                 if "## Kända fallgropar" not in content:
-                    issues: List[str] = agent_audit.get("issues", [])
+                    issues = list(agent_audit.get("issues", []))
                     issues.append("Missing 'Kända fallgropar' section.")
                     agent_audit["issues"] = issues
 
@@ -2018,7 +2017,7 @@ type: role
                     "healthy" if not agent_audit["issues"] else "needs_attention"
                 )
             else:
-                issues: List[str] = agent_audit.get("issues", [])
+                issues = list(agent_audit.get("issues", []))
                 issues.append(
                     f"Playbook file missing: {agent.memory_file}"
                 )
@@ -2034,11 +2033,11 @@ type: role
             ]
             agent_audit["owned_paths_count"] = len(owned_paths)
             if not owned_paths:
-                issues: List[str] = agent_audit.get("issues", [])
+                issues = list(agent_audit.get("issues", []))
                 issues.append("Agent owns no paths.")
                 agent_audit["issues"] = issues
 
-            agents_audit: List[Dict[str, Any]] = audit_results.get("agents", [])
+            agents_audit = list(audit_results.get("agents", []))
             agents_audit.append(agent_audit)
             audit_results["agents"] = agents_audit
 
@@ -2046,7 +2045,7 @@ type: role
         # Check for unowned critical paths
         ownership_config = self.load_ownership()
         if not ownership_config.modules:
-            recommendations: List[str] = audit_results.get("recommendations", [])
+            recommendations = list(audit_results.get("recommendations", []))
             recommendations.append(
                 "No ownership defined. Run 'ace own' to assign modules."
             )
@@ -2054,12 +2053,12 @@ type: role
 
         # Check for token spend
         token_usages = self.get_token_report()
-        total_cost = sum(u.cost for u in token_usages)
-        audit_results["total_token_cost"] = total_cost
-        if total_cost > 50.0:
-            recommendations: List[str] = audit_results.get("recommendations", [])
+        total_token_cost = sum(u.cost for u in token_usages)
+        audit_results["total_token_cost"] = total_token_cost
+        if total_token_cost > 50.0:
+            recommendations = list(audit_results.get("recommendations", []))
             recommendations.append(
-                f"High token spend detected: ${total_cost:.2f}. Consider 'low' token mode."
+                f"High token spend detected: ${total_token_cost:.2f}. Consider 'low' token mode."
             )
             audit_results["recommendations"] = recommendations
 
@@ -2069,7 +2068,7 @@ type: role
             p for p in proposals if p.status == ConsensusStatus.STALEMATE
         ]
         if stale_proposals:
-            recommendations: List[str] = audit_results.get("recommendations", [])
+            recommendations = list(audit_results.get("recommendations", []))
             recommendations.append(
                 f"Found {len(stale_proposals)} stale MACP proposals."
             )
@@ -3039,7 +3038,7 @@ type: role
             just = s.get("justification", "")
 
             # Avoid duplicates
-            if desc in content:
+            if desc and desc in content:
                 continue
 
             ts = datetime.now().strftime("%H%M%S")

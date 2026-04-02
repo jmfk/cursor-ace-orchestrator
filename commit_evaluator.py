@@ -164,8 +164,8 @@ class CommitEvaluator:
         values = [daily_value[d] for d in sorted_dates]
 
         plt.figure(figsize=(14, 7))
-        plt.plot(sorted_dates, values, marker='o', linestyle='-', color='forestgreen', linewidth=2)
-        plt.fill_between(sorted_dates, values, color='forestgreen', alpha=0.1)
+        plt.plot(list(sorted_dates), values, marker='o', linestyle='-', color='forestgreen', linewidth=2) # type: ignore
+        plt.fill_between(list(sorted_dates), values, color='forestgreen', alpha=0.1) # type: ignore
         
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(sorted_dates)//10)))
@@ -205,7 +205,11 @@ class CommitEvaluator:
         names = [m[0] for m in sorted_milestones[:15]]
         scores = [m[1]["score"] for m in sorted_milestones[:15]]
         plt.figure(figsize=(14, 7))
-        colors = plt.cm.viridis([i/len(names) for i in range(len(names))])
+        # Use a standard colormap if viridis is not available
+        try:
+            colors = plt.cm.viridis([i/len(names) for i in range(len(names))]) # type: ignore
+        except Exception:
+            colors = 'skyblue' # type: ignore
         plt.bar(names, scores, color=colors)
         plt.xlabel('Milestone / Feature')
         plt.ylabel('Aggregated Value Score')
@@ -233,10 +237,14 @@ class CommitEvaluator:
             m_name = self.extract_milestone(c["subject"])
             if m_name not in milestones:
                 milestones[m_name] = {"score": 0.0, "count": 0, "files": 0, "commits": []}
-            milestones[m_name]["score"] += score
-            milestones[m_name]["count"] += 1
-            milestones[m_name]["files"] += stats["files_changed"]
-            milestones[m_name]["commits"].append({"hash": c["hash"], "subject": c["subject"], "score": score})
+            
+            m_data = milestones[m_name]
+            m_data["score"] = float(str(m_data["score"])) + float(score)
+            m_data["count"] = int(str(m_data["count"])) + 1
+            m_data["files"] = int(str(m_data["files"])) + int(stats["files_changed"])
+            m_commits = m_data["commits"]
+            if isinstance(m_commits, list):
+                m_commits.append({"hash": c["hash"], "subject": c["subject"], "score": score})
 
         # Generate Graphs
         self.generate_commit_value_graph(results, "commit_value_graph.png")
@@ -262,10 +270,12 @@ class CommitEvaluator:
             "| :--- | :--- | :--- | :--- |"
         ]
 
-        sorted_milestones = sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True)
+        sorted_milestones = sorted(milestones.items(), key=lambda x: float(str(x[1]["score"])), reverse=True)
         for m_name, data in sorted_milestones:
-            avg_val = round(data["score"] / data["count"], 2) if data["count"] > 0 else 0
-            report.append(f"| **{m_name}** | {round(data['score'], 2)} | {data['count']} | {avg_val} |")
+            score_val = float(str(data["score"]))
+            count_val = int(str(data["count"]))
+            avg_val = round(score_val / count_val, 2) if count_val > 0 else 0
+            report.append(f"| **{m_name}** | {round(score_val, 2)} | {count_val} | {avg_val} |")
 
         report.extend([
             "",
@@ -277,7 +287,9 @@ class CommitEvaluator:
         ])
 
         for r in results[:20]: # Show last 20 in table
-            report.append(f"| `{r['commit']['hash'][:8]}` | **{r['score']}** | {r['commit']['subject']} |")
+            commit_data = r['commit']
+            if isinstance(commit_data, dict):
+                report.append(f"| `{str(commit_data['hash'])[:8]}` | **{r['score']}** | {commit_data['subject']} |")
 
         with open(output_file, "w") as f:
             f.write("\n".join(report))
