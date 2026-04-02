@@ -236,7 +236,7 @@ def generate_commit_message(task_name: str):
         )
         headers = {"Content-Type": "application/json"}
         data = {"contents": [{"parts": [{"text": prompt}]}]}
-    
+
     if not url:
         return f"update: {task_name}"
 

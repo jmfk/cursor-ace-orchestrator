@@ -632,8 +632,8 @@ def run(
     # 11.24 Next Roadmap Step: Connect the CLI stubs for Google Stitch to actual API or code extraction logic.
     #    (Completed: Bi-directional sync and component extraction implemented in ace_lib/stitch/stitch_engine.py)
 
-    # 11.38 Next Roadmap Step: Establish the 'tests/' directory and write unit tests for ACEService, integrate RALPH loop, and finalize SOP/Stitch logic.
-    #    (Completed: Finalized all core areas from PRD-01)
+    # 11.38 Next Roadmap Step: Establish the 'tests/' directory and write unit tests for ACEService,
+    #    integrate RALPH loop, and finalize SOP/Stitch logic. (Completed: Finalized all core areas from PRD-01)
 
     # 5. RBAC for Agents: Implement fine-grained Role-Based Access Control for agent operations.
     #    (Completed: Path and command restrictions implemented in ACEService.run_agent_task)

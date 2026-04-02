@@ -181,7 +181,7 @@ Return the result in JSON format:
             # For older commits, we'd need to use something like:
             # git filter-branch --msg-filter 'sed "s/old/new/g"' HEAD
             # or interactive rebase which is not supported here.
-            # We'll use a simple 'git filter-repo' style approach if available, 
+            # We'll use a simple 'git filter-repo' style approach if available,
             # but for now, we just log it as "would replace" for safety on older commits.
             print(f"Would replace older commit {commit_hash[:8]} message with: {new_message}")
 
@@ -190,7 +190,7 @@ Return the result in JSON format:
         if MATPLOTLIB_AVAILABLE and results:
             scores = [r['analysis_result']['improvement_score'] for r in reversed(results)]
             labels = [r['commit']['hash'][:8] for r in reversed(results)]
-            
+
             plt.figure(figsize=(12, 6))
             plt.plot(labels, scores, marker='o', linestyle='-', color='blue')
             plt.title("Feature Improvement Score per Commit")
@@ -224,7 +224,10 @@ Return the result in JSON format:
             res = r['analysis_result']
             stats = r['details']['stats']
             line_stats = f"+{stats['added']} / -{stats['deleted']}"
-            report.append(f"| `{c['hash'][:8]}` | **{res['improvement_score']}** | {line_stats} | {res['suggested_message']} | {res['analysis']} |")
+            report.append(
+                f"| `{c['hash'][:8]}` | **{res['improvement_score']}** | {line_stats} | "
+                f"{res['suggested_message']} | {res['analysis']} |"
+            )
 
         with open(output_file, "w") as f:
             f.write("\n".join(report))
