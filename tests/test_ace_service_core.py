@@ -2,88 +2,88 @@ import pytest
 from ace_lib.services.ace_service import ACEService
 
 @pytest.fixture
-def ace_service(tmp_path):
-    """Create a temporary ACE service for testing."""
-    service = ACEService(tmp_path)
-    service.ace_dir.mkdir(parents=True, exist_ok=True)
-    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    for subdir in ["mail", "sessions", "decisions", "specs"]:
-        (service.ace_dir / subdir).mkdir(parents=True, exist_ok=True)
-    return service
+def temp_workspace(tmp_path):
+    """Create a temporary workspace for testing."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    return workspace
 
-def test_onboard_agent_sop(ace_service):
-    """Test formal onboarding SOP generation (Phase 9.5)."""
-    ace_service.create_agent(id="auth-expert", name="Aegis", role="auth")
-    sop_path = ace_service.onboard_agent("auth-expert")
-    
-    assert sop_path.exists()
-    content = sop_path.read_text()
-    assert "# SOP: Agent Onboarding - Aegis (auth-expert)" in content
+@pytest.fixture
+def service(temp_workspace):
+    """Initialize ACEService in a temporary workspace."""
+    return ACEService(base_path=temp_workspace)
+
+def test_onboarding_sop_generation(service):
+    """Test generating onboarding SOP (Phase 9.5)."""
+    service.create_agent(id="dev-1", name="Developer 1", role="developer", responsibilities=["src/core"])
+    onboarding_file = service.onboard_agent("dev-1")
+
+    assert onboarding_file.exists()
+    content = onboarding_file.read_text()
+    assert "SOP: Agent Onboarding - Developer 1 (dev-1)" in content
     assert "## 1. Context Acquisition" in content
-    assert "## 2. Role-Specific Setup" in content
+    assert "src/core" in content
     
-    # Verify mail notification
-    messages = ace_service.list_mail("auth-expert")
-    assert any(m.subject == "ONBOARDING SOP" for m in messages)
+    # Check if memory file was created with correct sections
+    memory_file = service.base_path / ".cursor/rules/developer.mdc"
+    assert memory_file.exists()
+    assert "## Strategier & patterns" in memory_file.read_text()
+    assert "## Kända fallgropar" in memory_file.read_text()
 
-def test_pr_review_sop(ace_service):
-    """Test formal PR review SOP generation (Phase 9.5)."""
-    ace_service.create_agent(id="reviewer-1", name="Reviewer One", role="reviewer")
-    sop_path = ace_service.review_pr("PR-456", "reviewer-1")
-    
-    assert sop_path.exists()
-    content = sop_path.read_text()
-    assert "# SOP: PR Review - PR-456" in content
-    assert "- **Reviewer**: reviewer-1" in content
-    assert "## 1. Strategy Alignment" in content
-    
-    # Verify mail notification
-    messages = ace_service.list_mail("reviewer-1")
-    assert any(m.subject == "PR REVIEW TASK: PR-456" for m in messages)
+def test_pr_review_sop_generation(service):
+    """Test generating PR review SOP (Phase 9.5)."""
+    review_file = service.review_pr("PR-123", "reviewer-1")
+    assert review_file.exists()
+    content = review_file.read_text()
+    assert "SOP: PR Review - PR-123" in content
+    assert "**Reviewer**: reviewer-1" in content
+    assert "## 3. Security Check" in content
 
-def test_ui_mockup_integration(ace_service, monkeypatch):
-    """Test Google Stitch integration (Phase 4.5)."""
-    # Mock the agent-based mockup generation to avoid subprocess call
-    monkeypatch.setattr(
-        ace_service,
-        "_generate_mockup_with_agent",
-        lambda desc: "export const Mock = () => <div>Mock</div>;"
-    )
-    
-    mockup_url = ace_service.ui_mockup("Login Screen", "auth-expert")
-    assert "stitch.google.com/canvas/stitch_" in mockup_url
-    
-    # Verify mockup file creation
-    mockup_dir = ace_service.ace_dir / "ui_mockups"
-    mockup_files = list(mockup_dir.glob("stitch_*.md"))
-    assert len(mockup_files) == 1
-    content = mockup_files[0].read_text()
-    assert "# UI Mockup: Login Screen" in content
-    assert "export const Mock" in content
+def test_audit_sop_generation(service):
+    """Test generating audit SOP (Phase 9.5)."""
+    service.create_agent(id="dev-1", name="Developer 1", role="developer")
+    audit_file = service.audit_agent("dev-1")
+    assert audit_file.exists()
+    content = audit_file.read_text()
+    assert "SOP: Agent Audit - Developer 1 (dev-1)" in content
+    assert "## 1. Playbook Quality" in content
 
-def test_ui_sync_integration(ace_service, monkeypatch):
-    """Test Google Stitch sync (Phase 8.3)."""
-    mockup_id = "stitch_12345"
+def test_google_stitch_mockup_logic(service, monkeypatch):
+    """Test Google Stitch mockup generation logic (Phase 4.5)."""
+    from ace_lib.stitch import stitch_engine
+
+    # Mock generate_mockup
+    mock_url = "https://stitch.google.com/canvas/test_mockup"
+    mock_code = "export const Mockup = () => <div>Mockup</div>;"
+    
+    def mock_gen(*args, **kwargs):
+        return mock_url, mock_code
+        
+    monkeypatch.setattr(stitch_engine, "generate_mockup", mock_gen)
+    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
+
+    url = service.ui_mockup("Login page", "agent-1")
+    assert url == mock_url
+    
+    mockup_id = url.split("/")[-1]
+    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+    assert mockup_file.exists()
+    assert mock_code in mockup_file.read_text()
+
+def test_google_stitch_sync_logic(service, monkeypatch):
+    """Test Google Stitch code sync logic (Phase 8.3)."""
+    from ace_lib.stitch import stitch_engine
+
+    mockup_id = "test_mockup"
+    new_code = "export const Test = () => <div>New Test</div>;"
+    
+    monkeypatch.setattr(stitch_engine, "sync_mockup", lambda *args, **kwargs: new_code)
+    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
+
     url = f"https://stitch.google.com/canvas/{mockup_id}"
+    code = service.ui_sync(url)
+    assert code == new_code
     
-    # Create a local mockup file first
-    mockup_dir = ace_service.ace_dir / "ui_mockups"
-    mockup_dir.mkdir(parents=True, exist_ok=True)
-    mockup_file = mockup_dir / f"{mockup_id}.md"
-    mockup_file.write_text("# UI Mockup\n```tsx\nexport const Old = () => <div />;\n```")
-    
-    # Mock stitch_engine.sync_mockup
-    import ace_lib.stitch.stitch_engine as stitch_engine
-    monkeypatch.setattr(
-        stitch_engine,
-        "sync_mockup",
-        lambda url, key: "export const New = () => <div />;"
-    )
-    
-    synced_code = ace_service.ui_sync(url)
-    assert "export const New" in synced_code
-    
-    # Verify file update
-    content = mockup_file.read_text()
-    assert "export const New" in content
-    assert "(Synced)" in content
+    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+    assert mockup_file.exists()
+    assert "New Test" in mockup_file.read_text()

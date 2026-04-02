@@ -2355,6 +2355,7 @@ type: role
                         diff_file.write_text("\n".join(diff))
 
             # Update local mockup file with synced code
+            mockup_file.parent.mkdir(parents=True, exist_ok=True)
             content = (
                 f"# UI Mockup (Synced): {mockup_id}\n"
                 f"- **URL**: {url}\n"

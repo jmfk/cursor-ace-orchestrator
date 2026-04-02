@@ -6,11 +6,37 @@ import math
 from typing import List, Dict, Any
 from datetime import datetime
 
+# Try to import matplotlib for PNG generation
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
 class CommitEvaluator:
     """
     Evaluates the value of git commits based on heuristics and optional LLM analysis.
-    Generates markdown reports and data for visualization.
+    Generates markdown reports and PNG graphs.
     """
+
+    # Files to exclude from diff analysis (stats calculation)
+    EXCLUDED_FILES = {
+        "ralph_execution.log",
+        "ralph_loop.py",
+        "ralph_state_history.json",
+        "ralph_stats.json",
+        "plan.md",
+        "changelog.md"
+    }
+
+    # Files the script should NEVER touch (read/write/modify)
+    # Note: This script only writes the report and PNG.
+    # We define this for safety/compliance with user request.
+    RESTRICTED_FILES = {
+        "Makefile",
+        "ralph_loop.py",
+        "ralph.yaml"
+    }
 
     def __init__(self, model: str = "gemini-2.0-flash", use_llm: bool = False):
         self.model = model
@@ -37,7 +63,7 @@ class CommitEvaluator:
             return []
 
     def get_commit_diff_stats(self, commit_hash: str) -> Dict[str, Any]:
-        """Get line change statistics for a commit."""
+        """Get line change statistics for a commit, excluding specific files."""
         cmd = ["git", "show", "--numstat", "--format=", commit_hash]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -49,6 +75,11 @@ class CommitEvaluator:
             for line in result.stdout.splitlines():
                 parts = line.split()
                 if len(parts) >= 3:
+                    filename = parts[2]
+                    # EXCLUSION LOGIC
+                    if any(excluded in filename for excluded in self.EXCLUDED_FILES):
+                        continue
+
                     try:
                         a = int(parts[0]) if parts[0] != "-" else 0
                         d = int(parts[1]) if parts[1] != "-" else 0
@@ -56,7 +87,7 @@ class CommitEvaluator:
                         deleted += d
                         files_changed += 1
                         
-                        ext = os.path.splitext(parts[2])[1] or "no_ext"
+                        ext = os.path.splitext(filename)[1] or "no_ext"
                         file_types[ext] = file_types.get(ext, 0) + 1
                     except ValueError:
                         continue
@@ -100,16 +131,19 @@ class CommitEvaluator:
         if not self.use_llm or not self.api_key:
             return "LLM evaluation skipped."
         try:
-            diff = subprocess.run(
-                ["git", "show", "--format=", "--unified=1", commit["hash"]],
-                capture_output=True, text=True, check=True
-            ).stdout[:3000]
+            # Filter diff to exclude restricted files for LLM context too
+            cmd = ["git", "show", "--format=", "--unified=1", commit["hash"]]
+            for excluded in self.EXCLUDED_FILES:
+                cmd.append(f":(exclude){excluded}")
+            
+            diff = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout[:3000]
         except Exception:
             diff = "Diff unavailable"
+            
         prompt = (
             f"Analyze the following git commit and evaluate its value to the system on a scale of 1-10.\n"
             f"Commit Subject: {commit['subject']}\n"
-            f"Stats: {json.dumps(stats)}\n"
+            f"Stats (excluding infra/logs): {json.dumps(stats)}\n"
             f"Diff Snippet:\n{diff}\n\n"
             "Provide a brief 1-sentence justification and a score (Value: X/10)."
         )
@@ -125,12 +159,39 @@ class CommitEvaluator:
         except Exception as e:
             return f"LLM Exception: {str(e)}"
 
+    def generate_png_graph(self, results: List[Dict], output_path: str = "commit_value_graph.png"):
+        """Generate a PNG graph of commit values using matplotlib."""
+        if not MATPLOTLIB_AVAILABLE:
+            print("Matplotlib not found. Skipping PNG generation.")
+            return
+
+        hashes = [r["commit"]["hash"][:8] for r in reversed(results)]
+        scores = [r["score"] for r in reversed(results)]
+
+        plt.figure(figsize=(12, 6))
+        bars = plt.bar(hashes, scores, color='skyblue')
+        plt.xlabel('Commit Hash')
+        plt.ylabel('Value Score')
+        plt.title('Git Commit Value Analysis')
+        plt.xticks(rotation=45)
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Add score labels on top of bars
+        for bar in bars:
+            yval = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2, yval + 0.1, yval, ha='center', va='bottom')
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        print(f"Graph saved: {output_path}")
+
     def generate_report(self, limit: int = 20, output_file: str = "commit_value_report.md"):
-        """Evaluate history and generate a markdown report with ASCII graphs."""
+        """Evaluate history and generate a markdown report with ASCII graphs and PNG."""
         commits = self.get_commits(limit)
         results = []
         
-        print(f"Evaluating {len(commits)} commits...")
+        print(f"Evaluating {len(commits)} commits (excluding infra/logs)...")
         for c in commits:
             stats = self.get_commit_diff_stats(c["hash"])
             h_score = self.calculate_heuristic_score(stats, c["subject"])
@@ -142,6 +203,11 @@ class CommitEvaluator:
                 "llm_analysis": llm_analysis
             })
 
+        # Generate PNG Graph
+        # Use a fixed name as requested or derived from output_file
+        graph_file = "commit_value_graph.png"
+        self.generate_png_graph(results, graph_file)
+
         # Generate Markdown
         report = [
             "# Git Commit Value Report",
@@ -149,11 +215,13 @@ class CommitEvaluator:
             f"Analysis Depth: {limit} commits",
             f"LLM Analysis: {'Enabled' if self.use_llm else 'Disabled'}",
             "",
+            "## Value Trend",
+            f"![Commit Value Graph]({graph_file})",
+            "",
             "## Value Distribution (ASCII Graph)",
             "```"
         ]
         
-        # Simple ASCII histogram of scores
         if results:
             max_score = max(r["score"] for r in results)
             for r in results:
@@ -169,11 +237,7 @@ class CommitEvaluator:
         ])
         
         for r in results:
-            if r["llm_analysis"]:
-                analysis = r["llm_analysis"]
-            else:
-                analysis = f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
-            # Escape pipes in analysis for markdown table
+            analysis = r["llm_analysis"] if r["llm_analysis"] else f"Files: {r['stats']['files_changed']}, Changes: {r['stats']['total_changes']}"
             analysis = analysis.replace("|", "\\|")
             report.append(f"| `{r['commit']['hash'][:8]}` | **{r['score']}** | {r['commit']['subject']} | {analysis} |")
 
@@ -181,14 +245,12 @@ class CommitEvaluator:
             f.write("\n".join(report))
         
         print(f"Report generated: {output_file}")
-        
-        # Also print summary to console
         self.evaluate_history(limit)
 
     def evaluate_history(self, limit: int = 20):
         """Evaluate and print the value of recent commits to console."""
         commits = self.get_commits(limit)
-        print(f"\n{'Hash':<10} | {'Score':<6} | {'Subject':<50} | {'Analysis'}")
+        print(f"\n{'Hash':<10} | {'Score':<6} | {'Subject':<50} | {'Analysis (Excl. Infra)'}")
         print("-" * 120)
         for c in commits:
             stats = self.get_commit_diff_stats(c["hash"])
