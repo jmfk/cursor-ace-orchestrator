@@ -46,6 +46,7 @@ class ACEService:
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
         self._cache = {}
         self._chroma_client = None
+        self._anthropic_client = None
 
     def _get_chroma_client(self):
         if not self._chroma_client:
@@ -769,6 +770,7 @@ class ACEService:
         return api_key
 
     def reflect_on_session(self, session_output: str) -> str:
+        config = self.load_config()
         system_prompt = (
             "You are an ACE Reflection Engine. Your task is to analyze the "
             "output of a coding agent session and extract structured "
@@ -788,11 +790,23 @@ class ACEService:
             "output. If no new learnings are found, "
             'return "No new learnings."'
         )
+
+        # Phase 11.2: Fine-tuned Reflection Models
+        # If a fine-tuned model is configured for reflection, use it.
+        model_override = os.getenv("ACE_REFLECTION_MODEL")
+        original_model = config.model_name
+        if model_override:
+            config.model_name = model_override
+
         prompt = f"Session Output:\n{session_output}\n"
 
         try:
-            return self.call_llm(prompt, system_prompt)
+            result = self.call_llm(prompt, system_prompt)
+            # Restore original model name
+            config.model_name = original_model
+            return result
         except Exception:
+            config.model_name = original_model
             return "Error during reflection."
 
     def parse_reflection_output(self, reflection_text: str) -> List[Dict]:
@@ -1093,32 +1107,31 @@ class ACEService:
         return proposals
 
     def finalize_macp(self, proposal_id: str) -> str:
-        """Finalize an MACP proposal by reaching a consensus."""
+        """Finalize an MACP proposal by reaching a consensus (Phase 11.1)."""
         proposal = self.get_macp_proposal(proposal_id)
         if not proposal:
             return f"Error: Proposal {proposal_id} not found."
 
-        client = self.get_anthropic_client()
-        if not client:
-            return "Consensus: Referee mediation requires ANTHROPIC_API_KEY."
-
-        referee_prompt = (
-            "You are the ACE MACP Referee. Reach a consensus based on the debate history and votes.\n\n"
+        system_prompt = (
+            "You are the ACE MACP Referee. Reach a consensus based on the "
+            "debate history and votes."
+        )
+        prompt = (
             f"Proposal: {proposal.title}\n{proposal.description}\n\n"
             f"History:\n" + "\n".join(proposal.history) + "\n\n"
             f"Votes: {proposal.votes}\n"
-            "Provide a clear consensus summary and final recommendation."
+            "Provide a clear consensus summary and final recommendation. "
+            "Start with 'CONSENSUS:' or 'STALEMATE:'."
         )
 
         try:
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": referee_prompt}],
-            )
-            consensus = "".join([b.text for b in message.content if hasattr(b, "text")])
+            consensus = self.call_llm(prompt, system_prompt)
             proposal.consensus_summary = consensus
-            proposal.status = ConsensusStatus.CONSENSUS
+            if "CONSENSUS:" in consensus.upper():
+                proposal.status = ConsensusStatus.CONSENSUS
+            elif "STALEMATE:" in consensus.upper():
+                proposal.status = ConsensusStatus.STALEMATE
+
             proposal.updated_at = datetime.now().isoformat()
             self._save_macp_proposal(proposal)
 
@@ -1139,21 +1152,17 @@ class ACEService:
                     )
 
             return consensus
-        except (ImportError, Exception) as e:
+        except Exception as e:
             return f"Error: {e}"
 
     def debate(self, proposal_id: str, agent_ids: List[str], turns: int = 3) -> str:
-        """Mediate a multi-turn debate for an MACP proposal."""
+        """Mediate a multi-turn debate for an MACP proposal (Phase 11.1)."""
         proposal = self.get_macp_proposal(proposal_id)
         if not proposal:
             return f"Error: Proposal {proposal_id} not found."
 
         proposal.status = ConsensusStatus.DEBATING
         proposal.turns_remaining = turns
-
-        client = self.get_anthropic_client()
-        if not client:
-            return "Consensus: Debate mediation requires ANTHROPIC_API_KEY."
 
         for turn in range(1, turns + 1):
             for aid in agent_ids:
@@ -1167,25 +1176,24 @@ class ACEService:
                     else "No previous turns."
                 )
 
-                prompt = (
+                system_prompt = (
                     f"You are agent {aid} with role {role}.\n"
                     f"MACP Proposal: {proposal.title}\n"
-                    f"Description: {proposal.description}\n"
-                    f"Debate History:\n{history_str}\n\n"
-                    f"This is turn {turn} of {turns}. Provide your perspective. "
+                    f"Description: {proposal.description}\n\n"
+                    "Your task is to participate in a multi-agent debate to "
+                    "reach consensus. Be critical but constructive.\n"
+                    "If you agree with the current direction, state 'I AGREE'.\n"
+                    "If you disagree, provide specific reasons and alternatives.\n"
                     "Include 'ESCALATE' if human intervention is needed.\n"
                     "End with 'VOTE: SUPPORT', 'VOTE: OPPOSE', or 'VOTE: ABSTAIN'."
                 )
+                prompt = (
+                    f"Debate History:\n{history_str}\n\n"
+                    f"This is turn {turn} of {turns}. Provide your perspective."
+                )
 
                 try:
-                    message = client.messages.create(
-                        model="claude-3-5-sonnet-20241022",
-                        max_tokens=512,
-                        messages=[{"role": "user", "content": prompt}],
-                    )
-                    perspective = "".join(
-                        [b.text for b in message.content if hasattr(b, "text")]
-                    )
+                    perspective = self.call_llm(prompt, system_prompt)
 
                     if "ESCALATE" in perspective.upper():
                         proposal.status = ConsensusStatus.ESCALATED
@@ -1199,11 +1207,12 @@ class ACEService:
                     if vote_match:
                         proposal.votes[aid] = vote_match.group(1)
 
+                    proposal.history.append(f"Turn {turn} - Agent {aid} ({role}): {perspective}")
+                    self._save_macp_proposal(proposal)
+                except Exception as e:
                     proposal.history.append(
-                        f"Turn {turn} - Agent {aid} ({role}): {perspective}"
+                        f"Turn {turn} - Agent {aid} (Error): {str(e)}"
                     )
-                except (ImportError, Exception) as e:
-                    proposal.history.append(f"Turn {turn} - Agent {aid}: Error: {e}")
 
             proposal.turns_remaining -= 1
             self._save_macp_proposal(proposal)
@@ -1444,6 +1453,9 @@ class ACEService:
         state_history = []
         total_cost = 0.0
 
+        # Phase 11.3: Real-time Context Injection (Mock state)
+        session_context_history = []
+
         # Use provided PRD and plan file or defaults
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
         plan_file = plan_file or "plan.md"
@@ -1520,6 +1532,11 @@ class ACEService:
                         f"Constraints: {', '.join(spec.constraints)}\n\n{context}"
                     )
 
+            # Phase 11.3: Inject session history into context
+            if session_context_history:
+                context += "\n\n### PREVIOUS ITERATIONS IN THIS SESSION\n"
+                context += "\n".join(session_context_history[-3:]) # Keep last 3
+
             with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
                 tmp.write(context)
                 context_file = tmp.name
@@ -1528,6 +1545,7 @@ class ACEService:
             print(f"[RALPH] Executing task: {prompt[:50]}...")
 
             # Call the 'run' command logic directly (Phase 4.1 Integration)
+            # Use the configured model if possible (Phase 11.1)
             agent_cmd = (
                 f"cursor-agent --print --model {model} --force --trust \"{prompt}\""
             )
@@ -1553,6 +1571,10 @@ class ACEService:
                     test_passed = result.returncode == 0
                     feedback_status = "SUCCESS" if test_passed else "FAILURE"
                     print(f"[RALPH] Test result: {feedback_status}")
+
+                    # Phase 11.3: Update session history
+                    status_str = "passed" if test_passed else "failed"
+                    session_context_history.append(f"Iteration {iteration}: Tests {status_str}")
 
                     # --- Automated Security Audit Integration (Phase 10.18) ---
                     if resolved_agent_id:

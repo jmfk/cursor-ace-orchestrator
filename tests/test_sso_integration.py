@@ -1,7 +1,5 @@
 import pytest
-from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import Config
 
 @pytest.fixture
 def temp_workspace(tmp_path):
