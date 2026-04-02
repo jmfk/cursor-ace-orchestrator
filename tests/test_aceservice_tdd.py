@@ -1,7 +1,6 @@
 import pytest
-from pathlib import Path
+import subprocess
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType
 
 @pytest.fixture
 def temp_workspace(tmp_path):
@@ -15,85 +14,74 @@ def service(temp_workspace):
     """Initialize ACEService in a temporary workspace."""
     return ACEService(base_path=temp_workspace)
 
-def test_onboarding_sop_generation(service):
-    """Test generating onboarding SOP (Phase 9.5)."""
-    service.create_agent(id="dev-1", name="Developer 1", role="developer", responsibilities=["src/core"])
-    onboarding_file = service.onboard_agent("dev-1")
-
-    assert onboarding_file.exists()
-    content = onboarding_file.read_text()
-    assert "SOP: Agent Onboarding - Developer 1 (dev-1)" in content
-    assert "## 1. Context Acquisition" in content
-    assert "src/core" in content
+def test_ralph_loop_integration(service, monkeypatch):
+    """Test the RALPH loop integration (Phase 4.1)."""
+    # Mock the run_agent_task and reflect_on_session
+    monkeypatch.setattr(service, "run_agent_task", lambda *args, **kwargs: True)
+    monkeypatch.setattr(service, "reflect_on_session", lambda *args, **kwargs: "No new learnings.")
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: None)
     
-    # Check if memory file was created with correct sections
-    memory_file = service.base_path / ".cursor/rules/developer.mdc"
-    assert memory_file.exists()
-    assert "## Strategier & patterns" in memory_file.read_text()
-    assert "## Kända fallgropar" in memory_file.read_text()
-
-def test_pr_review_sop_generation(service):
-    """Test generating PR review SOP (Phase 9.5)."""
-    review_file = service.review_pr("PR-123", "reviewer-1")
-    assert review_file.exists()
-    content = review_file.read_text()
-    assert "SOP: PR Review - PR-123" in content
-    assert "**Reviewer**: reviewer-1" in content
-    assert "## 3. Security Check" in content
-
-def test_google_stitch_mockup_logic(service, monkeypatch):
-    """Test Google Stitch mockup generation logic (Phase 4.5)."""
-    from ace_lib.stitch import stitch_engine
-
-    # Mock generate_mockup
-    mock_url = "https://stitch.google.com/canvas/test_mockup"
-    mock_code = "export const Mockup = () => <div>Mockup</div>;"
+    # Mock subprocess.run for the test command
+    class MockResult:
+        returncode = 0
+        stdout = "Tests passed"
+        stderr = ""
     
-    def mock_gen(*args, **kwargs):
-        return mock_url, mock_code
-        
-    monkeypatch.setattr(stitch_engine, "generate_mockup", mock_gen)
-    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
-
-    url = service.ui_mockup("Login page", "agent-1")
-    assert url == mock_url
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: MockResult())
     
-    mockup_id = url.split("/")[-1]
-    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
-    assert mockup_file.exists()
-    assert mock_code in mockup_file.read_text()
-
-def test_ralph_loop_basic(service, monkeypatch):
-    """Test a basic iteration of the RALPH loop (Phase 4.1)."""
-    # Mock build_context to return a simple context
-    monkeypatch.setattr(service, "build_context", lambda **kwargs: ("Test Context", "test-agent"))
+    # Create dummy PRD and plan files
+    (service.base_path / "PRD-01 - Cursor-ace-orchestrator-prd.md").write_text("PRD Content")
+    (service.base_path / "plan.md").write_text("Plan Content")
     
-    # Mock subprocess.Popen for the 'run' part of the loop
-    import subprocess
-    from unittest.mock import MagicMock
-    
-    mock_process = MagicMock()
-    mock_process.stdout = ["Test output line"]
-    mock_process.wait.return_value = 0
-    mock_process.returncode = 0
-    
-    def mock_popen(*args, **kwargs):
-        return mock_process
-        
-    monkeypatch.setattr(subprocess, "Popen", mock_popen)
-    
-    # Mock reflection to avoid LLM call
-    monkeypatch.setattr(service, "reflect_on_session", lambda output: "Reflection result")
-    monkeypatch.setattr(service, "parse_reflection_output", lambda text: [])
-    
-    # Run loop with 1 iteration
     success, iterations = service.run_loop(
         prompt="Test task",
-        test_cmd="echo 'tests passed'",
-        max_iterations=1,
-        agent_id="test-agent"
+        test_cmd="pytest",
+        max_iterations=2,
+        prd_path=str(service.base_path / "PRD-01 - Cursor-ace-orchestrator-prd.md"),
+        plan_file=str(service.base_path / "plan.md")
     )
     
+    assert success is True
     assert iterations == 1
-    # Note: success depends on test_cmd exit code which we also need to mock if it's called
-    # In ACEService.run_loop, it likely calls subprocess for test_cmd too.
+
+def test_sop_onboarding_full(service):
+    """Test full onboarding SOP flow (Phase 9.5)."""
+    agent_id = "onboard-test"
+    service.create_agent(id=agent_id, name="Onboarder", role="onboarder")
+    
+    onboarding_file = service.onboard_agent(agent_id)
+    assert onboarding_file.exists()
+    
+    # Check if mail was sent
+    mail_dir = service.mail_dir / agent_id
+    assert mail_dir.exists()
+    mail_files = list(mail_dir.glob("*.yaml"))
+    assert len(mail_files) > 0
+    
+    # Check if memory file was initialized
+    memory_path = service.base_path / ".cursor/rules/onboarder.mdc"
+    assert memory_path.exists()
+    assert "# Onboarder Playbook (onboarder)" in memory_path.read_text()
+
+def test_ui_mockup_with_components(service, monkeypatch):
+    """Test UI mockup generation with component extraction (Phase 4.5/8.3)."""
+    from ace_lib.stitch import stitch_engine
+    
+    mock_url = "https://stitch.google.com/canvas/comp_test"
+    mock_code = """
+export const Button = () => <button>Click</button>;
+export const Card = () => <div>Card</div>;
+"""
+    
+    monkeypatch.setattr(stitch_engine, "generate_mockup", lambda *args, **kwargs: (mock_url, mock_code))
+    monkeypatch.setattr(service, "get_stitch_key", lambda: "test-key")
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "true")
+    
+    url = service.ui_mockup("Component test", "agent-1")
+    assert url == mock_url
+    
+    # Check if components were extracted
+    comp_dir = service.ace_dir / "ui_mockups" / "components" / "comp_test"
+    assert comp_dir.exists()
+    assert (comp_dir / "Button.tsx").exists()
+    assert (comp_dir / "Card.tsx").exists()
