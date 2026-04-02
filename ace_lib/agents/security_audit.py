@@ -3,7 +3,7 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import List, Dict, Any
 from ace_lib.services.ace_service import ACEService
 
 
@@ -11,7 +11,7 @@ class SecurityAuditService:
     def __init__(self, ace_service: ACEService):
         self.ace_service = ace_service
 
-    def run_automated_audit(self, agent_id: str) -> Dict:
+    def run_automated_audit(self, agent_id: str) -> Dict[str, Any]:
         """Run automated security checks for an agent's owned modules (Phase 10.18)."""
         agents_config = self.ace_service.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
@@ -24,7 +24,7 @@ class SecurityAuditService:
             path for path, mod in ownership.modules.items() if mod.agent_id == agent_id
         ]
 
-        results = {
+        results: Dict[str, Any] = {
             "agent_id": agent_id,
             "timestamp": datetime.now().isoformat(),
             "checks": [],
@@ -82,9 +82,9 @@ class SecurityAuditService:
 
         return results
 
-    def _check_secrets(self, path: Path) -> Dict:
+    def _check_secrets(self, path: Path) -> Dict[str, Any]:
         """Scan for potential secrets in a directory."""
-        findings = []
+        findings: List[Dict[str, Any]] = []
         # 1. Secret scanning (simple regex for now)
         patterns = {
             "Generic API Key": (
@@ -128,7 +128,7 @@ class SecurityAuditService:
             "findings": findings,
         }
 
-    def _audit_npm(self, path: Path) -> Dict:
+    def _audit_npm(self, path: Path) -> Dict[str, Any]:
         """Run npm audit."""
         try:
             result = subprocess.run(
@@ -158,7 +158,7 @@ class SecurityAuditService:
                 "error": "NPM audit failed.",
             }
 
-    def _audit_pip(self, path: Path) -> Dict:
+    def _audit_pip(self, path: Path) -> Dict[str, Any]:
         """Run safety check for python dependencies."""
         try:
             # Check if safety is installed

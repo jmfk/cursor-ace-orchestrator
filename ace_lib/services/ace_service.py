@@ -5,7 +5,7 @@ import hashlib
 import tempfile
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple, Callable
+from typing import Optional, List, Dict, Tuple, Callable, Any
 from ruamel.yaml import YAML
 import anthropic
 from ace_lib.utils.profiler import profiler
@@ -44,11 +44,11 @@ class ACEService:
         self.specs_dir = self.ace_dir / "specs"
         self.vector_db_dir = self.ace_dir / "vector_db"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
-        self._cache = {}
+        self._cache: Dict[str, Any] = {}
         self._chroma_client = None
         self._anthropic_client = None
 
-    def _get_chroma_client(self):
+    def _get_chroma_client(self) -> Any:
         if not self._chroma_client:
             import chromadb
             from chromadb.config import Settings
@@ -556,7 +556,7 @@ class ACEService:
 
         # Separate sections
         keep_list = []
-        prune_map = {header: [] for header in prune_priority}
+        prune_map: Dict[str, List[str]] = {header: [] for header in prune_priority}
         other_list = []
 
         for s in sections:
@@ -724,11 +724,12 @@ class ACEService:
                     {"role": "user", "content": prompt},
                 ],
             )
-            return response.choices[0].message.content
+            choices: Any = response.choices
+            return choices[0].message.content
 
         return f"Error: Unsupported model provider {provider}"
 
-    def get_google_client(self):
+    def get_google_client(self) -> str:
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             # Fallback to ~/.ace/credentials
@@ -745,7 +746,7 @@ class ACEService:
             )
         return api_key  # Return key for now, as we use it in subprocess/requests
 
-    def get_cursor_key(self):
+    def get_cursor_key(self) -> Optional[str]:
         api_key = os.getenv("CURSOR_API_KEY")
         if not api_key:
             # Fallback to ~/.ace/credentials
@@ -757,7 +758,7 @@ class ACEService:
                         break
         return api_key
 
-    def get_stitch_key(self):
+    def get_stitch_key(self) -> Optional[str]:
         api_key = os.getenv("STITCH_API_KEY")
         if not api_key:
             # Fallback to ~/.ace/credentials
@@ -1454,7 +1455,7 @@ class ACEService:
         total_cost = 0.0
 
         # Phase 11.3: Real-time Context Injection (Mock state)
-        session_context_history = []
+        session_context_history: List[Any] = []
 
         # Use provided PRD and plan file or defaults
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
@@ -1481,8 +1482,8 @@ class ACEService:
             # 1. Initial State Analysis (if it's the first iteration and we have a plan file)
             if (
                 iteration == 1
-                and os.path.exists(prd_path)
-                and os.path.exists(plan_file)
+                and os.path.exists(str(prd_path))
+                and os.path.exists(str(plan_file))
             ):
                 print(
                     f"[RALPH] Step 0: Analyzing current project state against {prd_path}..."
@@ -1750,16 +1751,14 @@ class ACEService:
                                 shell=True,
                             )
 
-                        # Update Living Spec if applicable (Phase 10.23)
-                        if spec_id:
-                            print(f"[RALPH] Automating Living Spec update for {spec_id}...")
-                            self.automate_spec_update(spec_id, result.stdout)
+                    # Update Living Spec if applicable (Phase 10.23)
+                    if spec_id:
+                        print(f"[RALPH] Automating Living Spec update for {spec_id}...")
+                        self.automate_spec_update(spec_id, result.stdout)
 
-                        success = True
+                    success = test_passed
+                    if test_passed:
                         break
-                else:
-                    print(f"[RALPH] [red]Iteration {iteration} agent execution failed. Retrying...[/red]")
-                    prompt = f"Previous attempt agent execution failed. Retrying original task: {prompt}"
             except Exception as e:
                 print(f"[RALPH] Error during execution: {e}")
             finally:
@@ -1997,25 +1996,33 @@ type: role
                         low_utility_count += 1
 
                 if low_utility_count > 0:
-                    agent_audit["issues"].append(
+                    issues: List[str] = agent_audit.get("issues", [])
+                    issues.append(
                         f"Found {low_utility_count} low-utility strategies. Suggest 'ace memory prune'."
                     )
+                    agent_audit["issues"] = issues
 
                 # Check for missing sections
                 if "## Strategier & patterns" not in content:
-                    agent_audit["issues"].append(
+                    issues: List[str] = agent_audit.get("issues", [])
+                    issues.append(
                         "Missing 'Strategier & patterns' section."
                     )
+                    agent_audit["issues"] = issues
                 if "## Kända fallgropar" not in content:
-                    agent_audit["issues"].append("Missing 'Kända fallgropar' section.")
+                    issues: List[str] = agent_audit.get("issues", [])
+                    issues.append("Missing 'Kända fallgropar' section.")
+                    agent_audit["issues"] = issues
 
                 agent_audit["memory_health"] = (
                     "healthy" if not agent_audit["issues"] else "needs_attention"
                 )
             else:
-                agent_audit["issues"].append(
+                issues: List[str] = agent_audit.get("issues", [])
+                issues.append(
                     f"Playbook file missing: {agent.memory_file}"
                 )
+                agent_audit["issues"] = issues
                 agent_audit["memory_health"] = "critical"
 
             # 2. Audit Ownership Consistency
@@ -2027,26 +2034,34 @@ type: role
             ]
             agent_audit["owned_paths_count"] = len(owned_paths)
             if not owned_paths:
-                agent_audit["issues"].append("Agent owns no paths.")
+                issues: List[str] = agent_audit.get("issues", [])
+                issues.append("Agent owns no paths.")
+                agent_audit["issues"] = issues
 
-            audit_results["agents"].append(agent_audit)
+            agents_audit: List[Dict[str, Any]] = audit_results.get("agents", [])
+            agents_audit.append(agent_audit)
+            audit_results["agents"] = agents_audit
 
         # 3. System-wide Audit
         # Check for unowned critical paths
         ownership_config = self.load_ownership()
         if not ownership_config.modules:
-            audit_results["recommendations"].append(
+            recommendations: List[str] = audit_results.get("recommendations", [])
+            recommendations.append(
                 "No ownership defined. Run 'ace own' to assign modules."
             )
+            audit_results["recommendations"] = recommendations
 
         # Check for token spend
         token_usages = self.get_token_report()
         total_cost = sum(u.cost for u in token_usages)
         audit_results["total_token_cost"] = total_cost
         if total_cost > 50.0:
-            audit_results["recommendations"].append(
+            recommendations: List[str] = audit_results.get("recommendations", [])
+            recommendations.append(
                 f"High token spend detected: ${total_cost:.2f}. Consider 'low' token mode."
             )
+            audit_results["recommendations"] = recommendations
 
         # Check for MACP stalemates
         proposals = self.list_macp_proposals()
@@ -2054,13 +2069,15 @@ type: role
             p for p in proposals if p.status == ConsensusStatus.STALEMATE
         ]
         if stale_proposals:
-            audit_results["recommendations"].append(
+            recommendations: List[str] = audit_results.get("recommendations", [])
+            recommendations.append(
                 f"Found {len(stale_proposals)} stale MACP proposals."
             )
+            audit_results["recommendations"] = recommendations
 
         return audit_results
 
-    def security_audit(self, agent_id: str):
+    def security_audit(self, agent_id: str) -> Path:
         """Run security audit SOP for an agent."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
@@ -2600,7 +2617,7 @@ type: role
         return spec
 
     def create_spec(
-        self, id: str, title: str, intent: str, constraints: List[str] = None
+        self, id: str, title: str, intent: str, constraints: Optional[List[str]] = None
     ) -> LivingSpec:
         spec = LivingSpec(
             id=id, title=title, intent=intent, constraints=constraints or []

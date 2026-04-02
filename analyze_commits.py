@@ -50,7 +50,7 @@ class CommitAnalyzer:
             print("⚠️ Warning: GOOGLE_API_KEY not found. LLM features will be disabled.")
 
     def _get_api_key(self) -> Optional[str]:
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key: Optional[str] = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             cred_file = Path.home() / ".ace" / "credentials"
             if cred_file.exists():
@@ -64,7 +64,7 @@ class CommitAnalyzer:
         cmd = ["git", "log", "--pretty=format:%H|%an|%ad|%s", "-n", str(limit)]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            commits = []
+            commits: List[Dict[str, Any]] = []
             for line in result.stdout.splitlines():
                 parts = line.split("|")
                 if len(parts) >= 4:
@@ -82,7 +82,7 @@ class CommitAnalyzer:
         """Get diff stats and specific file changes (plan.md, changelog.md)."""
         # Stats
         cmd_stats = ["git", "show", "--numstat", "--format=", commit_hash]
-        stats = {"added": 0, "deleted": 0, "files": 0}
+        stats: Dict[str, int] = {"added": 0, "deleted": 0, "files": 0}
         
         try:
             res_stats = subprocess.run(cmd_stats, capture_output=True, text=True, check=True)
@@ -104,7 +104,7 @@ class CommitAnalyzer:
             pass
 
         # File contents (plan.md, changelog.md)
-        files_content = {}
+        files_content: Dict[str, str] = {}
         for target in ["plan.md", "changelog.md"]:
             cmd_file = ["git", "show", f"{commit_hash}:{target}"]
             try:
@@ -116,7 +116,7 @@ class CommitAnalyzer:
 
         return {"stats": stats, "files": files_content}
 
-    def analyze_improvement(self, commit: Dict, details: Dict) -> Dict[str, Any]:
+    def analyze_improvement(self, commit: Dict[str, Any], details: Dict[str, Any]) -> Dict[str, Any]:
         """Use Gemini to measure improvement and suggest a better commit message."""
         if not self.model:
             return {"improvement_score": 0, "suggested_message": commit["subject"], "analysis": "LLM disabled"}
@@ -151,9 +151,10 @@ Return the result in JSON format:
             response = self.model.generate_content(prompt)
             
             # Track usage and cost
-            if hasattr(response, 'usage_metadata'):
-                in_tokens = response.usage_metadata.prompt_token_count
-                out_tokens = response.usage_metadata.candidates_token_count
+            usage: Any = getattr(response, 'usage_metadata', None)
+            if usage:
+                in_tokens = usage.prompt_token_count
+                out_tokens = usage.candidates_token_count
                 self.total_input_tokens += in_tokens
                 self.total_output_tokens += out_tokens
                 
@@ -185,7 +186,7 @@ Return the result in JSON format:
             # but for now, we just log it as "would replace" for safety on older commits.
             print(f"Would replace older commit {commit_hash[:8]} message with: {new_message}")
 
-    def generate_report(self, results: List[Dict], output_file: str = "improvement_report.md"):
+    def generate_report(self, results: List[Dict[str, Any]], output_file: str = "improvement_report.md"):
         """Generates the markdown report and graph."""
         if MATPLOTLIB_AVAILABLE and results:
             scores = [r['analysis_result']['improvement_score'] for r in reversed(results)]
@@ -233,9 +234,9 @@ Return the result in JSON format:
             f.write("\n".join(report))
         print(f"Report generated: {output_file}")
 
-    def run(self, limit: int = 10):
+    def run(self, limit: int = 10) -> None:
         commits = self.get_commits(limit)
-        all_results = []
+        all_results: List[Dict[str, Any]] = []
         
         for c in commits:
             print(f"Analyzing commit {c['hash'][:8]}...")
