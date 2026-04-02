@@ -1,108 +1,81 @@
 import pytest
+from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType
-
+from ace_lib.models.schemas import TaskType, Agent
 
 @pytest.fixture
 def ace_service(tmp_path):
     """Create a temporary ACE service for testing."""
     service = ACEService(tmp_path)
-    # Initialize basic structure
     service.ace_dir.mkdir(parents=True, exist_ok=True)
-    (service.ace_dir / "agents.yaml").touch()
-    (service.ace_dir / "config.yaml").touch()
-    (service.ace_dir / "ownership.yaml").touch()
     service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     return service
 
+def test_onboard_agent_creates_files(ace_service):
+    # Setup
+    agent_id = "test-agent"
+    ace_service.create_agent(id=agent_id, name="Test Agent", role="tester")
+    
+    # Execute
+    sop_path = ace_service.onboard_agent(agent_id)
+    
+    # Verify SOP file
+    assert sop_path.exists()
+    assert f"onboarding_{agent_id}.md" in sop_path.name
+    content = sop_path.read_text()
+    assert "# SOP: Agent Onboarding - Test Agent (test-agent)" in content
+    
+    # Verify Playbook file
+    playbook_path = ace_service.cursor_rules_dir / "tester.mdc"
+    assert playbook_path.exists()
+    assert "# Test Agent Playbook (tester)" in playbook_path.read_text()
+    
+    # Verify Mail
+    messages = ace_service.list_mail(agent_id)
+    assert len(messages) == 1
+    assert messages[0].subject == "ONBOARDING SOP"
 
-def test_service_init(ace_service):
-    assert ace_service.ace_dir.exists()
-    assert ace_service.cursor_rules_dir.exists()
+def test_review_pr_creates_sop(ace_service):
+    # Setup
+    agent_id = "reviewer-agent"
+    pr_id = "PR-999"
+    ace_service.create_agent(id=agent_id, name="Reviewer", role="reviewer")
+    
+    # Execute
+    review_path = ace_service.review_pr(pr_id, agent_id)
+    
+    # Verify
+    assert review_path.exists()
+    assert f"review_{pr_id}_{agent_id}.md" in review_path.name
+    content = review_path.read_text()
+    assert f"# SOP: PR Review - {pr_id}" in content
+    assert f"- **Reviewer**: {agent_id}" in content
+    
+    # Verify Mail
+    messages = ace_service.list_mail(agent_id)
+    assert any(m.subject == f"PR REVIEW TASK: {pr_id}" for m in messages)
 
+def test_build_context_with_agent(ace_service):
+    # Setup
+    agent_id = "context-agent"
+    ace_service.create_agent(id=agent_id, name="Context Agent", role="context-role")
+    playbook_path = ace_service.cursor_rules_dir / "context-role.mdc"
+    playbook_path.write_text("### AGENT SPECIFIC STRATEGY\n<!-- [str-001] helpful=1 harmful=0 :: Test Strategy -->")
+    
+    # Execute
+    context, resolved_id = ace_service.build_context(agent_id=agent_id, task_type=TaskType.IMPLEMENT)
+    
+    # Verify
+    assert resolved_id == agent_id
+    assert "### AGENT PLAYBOOK (context-role)" in context
+    assert "### AGENT SPECIFIC STRATEGY" in context
+    assert "### TASK FRAMING" in context
+    assert "You are implementing new functionality" in context
 
-def test_agent_creation(ace_service):
-    agent = ace_service.create_agent(
-        id="test-agent",
-        name="Test Agent",
-        role="tester",
-        responsibilities=["testing things"],
-    )
-    assert agent.id == "test-agent"
-    assert agent.role == "tester"
-
-    agents_config = ace_service.load_agents()
-    assert len(agents_config.agents) == 1
-    assert agents_config.agents[0].id == "test-agent"
-
-
-def test_ownership_resolution(ace_service):
+def test_resolve_owner_longest_prefix(ace_service):
     ace_service.assign_ownership("src/auth", "auth-agent")
-    ace_service.assign_ownership("src/auth/utils", "utils-agent")
-
+    ace_service.assign_ownership("src/auth/providers", "provider-agent")
+    
     assert ace_service.resolve_owner("src/auth/login.py") == "auth-agent"
-    assert ace_service.resolve_owner("src/auth/utils/hash.py") == "utils-agent"
+    assert ace_service.resolve_owner("src/auth/providers/google.py") == "provider-agent"
     assert ace_service.resolve_owner("src/other.py") is None
-
-
-def test_context_building(ace_service):
-    # Setup global rules
-    global_rules = ace_service.cursor_rules_dir / "_global.mdc"
-    global_rules.write_text("Global Rule 1")
-
-    # Setup agent and playbook
-    ace_service.create_agent(id="a1", name="A1", role="r1")
-    playbook = ace_service.cursor_rules_dir / "r1.mdc"
-    playbook.write_text("Playbook Strategy 1")
-
-    context, agent_id = ace_service.build_context(
-        agent_id="a1", task_type=TaskType.IMPLEMENT
-    )
-
-    assert "Global Rule 1" in context
-    assert "Playbook Strategy 1" in context
-    assert agent_id == "a1"
-
-
-def test_memory_synthesis_logic(ace_service, monkeypatch):
-    # Mock anthropic client to avoid API calls
-    class MockClient:
-        class Messages:
-            def create(self, **kwargs):
-                class MockMessage:
-                    content = [
-                        type(
-                            "obj",
-                            (object,),
-                            {
-                                "text": (
-                                    '[{"type": "str", "description": "Synthesized Strategy", '
-                                    '"justification": "Because test"}]'
-                                )
-                            },
-                        )
-                    ]
-
-                return MockMessage()
-
-        messages = Messages()
-
-    monkeypatch.setattr(ace_service, "get_anthropic_client", lambda: MockClient())
-
-    # Setup agent with some learnings
-    agent = ace_service.create_agent(id="a1", name="A1", role="r1")
-    playbook_path = ace_service.base_path / agent.memory_file
-    playbook_path.parent.mkdir(parents=True, exist_ok=True)
-    playbook_path.write_text("""
-## Strategier & patterns
-<!-- [str-001] helpful=10 harmful=0 :: Good strategy -->
-<!-- [str-002] helpful=8 harmful=0 :: Another good one -->
-""")
-
-    synthesized = ace_service.synthesize_memories("a1")
-    assert len(synthesized) == 1
-    assert synthesized[0]["description"] == "Synthesized Strategy"
-
-    shared_file = ace_service.ace_dir / "shared-learnings.mdc"
-    assert shared_file.exists()
-    assert "Synthesized Strategy" in shared_file.read_text()

@@ -614,6 +614,14 @@ def run(
                 "~/.ace/credentials.[/yellow]"
             )
 
+    # Notify subscribers of the change (Phase 7.3)
+    if path:
+        svc.notify_subscribers(
+            path, 
+            f"Command executed: {command}. Exit code: {exit_code}", 
+            success=(exit_code == 0)
+        )
+
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
