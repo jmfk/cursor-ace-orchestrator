@@ -7,7 +7,11 @@ import hashlib
 import re
 import requests
 import argparse
+import fcntl
+import signal
 from datetime import datetime
+
+LOOP_LOCK_FILE = ".ace/loop.lock"
 
 # Try to import yaml, but provide a fallback or install it if missing
 try:
@@ -21,13 +25,14 @@ except ImportError:
 DEFAULTS = {
     "model": "gemini-3-flash",
     "max_spend_usd": 20.0,
+    "max_iterations": 50,
     "plan_file": "plan.md",
     "changelog_file": "changelog.md",
     "log_file": "ralph_execution.log",
     "stats_file": "ralph_stats.json",
     "state_history_file": "ralph_state_history.json",
     "default_prd": "PRD-01 - Cursor-ace-orchestrator-prd.md",
-    "stagnation_threshold": 2,
+    "stagnation_threshold": 3,
     "max_consecutive_failures": 3,
     "quit_on_rate_limit": True,
     "price_input_1m": 0.10,
@@ -101,7 +106,30 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     log_message(f"Total Cost so far: ${stats['total_cost_usd']:.4f}")
 
 
-def run_cursor_agent(prompt: str):
+def parse_usage_from_output(stdout: str) -> tuple[int, int]:
+    """Parse token usage from cursor-agent stream-json output."""
+    input_tokens = 0
+    output_tokens = 0
+    found_usage = False
+    for line in stdout.splitlines():
+        try:
+            obj = json.loads(line)
+            if "usage" in obj:
+                input_tokens += obj["usage"].get("input_tokens", 0)
+                output_tokens += obj["usage"].get("output_tokens", 0)
+                found_usage = True
+        except json.JSONDecodeError:
+            continue
+    
+    if not found_usage:
+        # Fallback to conservative estimate: ~4 chars per token
+        input_tokens = int(len(stdout) / 4)
+        output_tokens = int(len(stdout) / 4)
+        
+    return input_tokens, output_tokens
+
+
+def run_cursor_agent(prompt: str, timeout: int = 300):
     """Runs cursor-agent in non-interactive mode and tracks usage."""
     global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
 
@@ -130,14 +158,42 @@ def run_cursor_agent(prompt: str):
             "--trust",
             prompt,
         ]
-        result = subprocess.run(cmd_args, capture_output=True, text=True)
-        elapsed = time.time() - start_time
+        
+        # Use Popen with process group to ensure cleanup of sub-agents
+        proc = subprocess.Popen(
+            cmd_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            preexec_fn=os.setsid if hasattr(os, "setsid") else None,
+        )
+        
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+            elapsed = time.time() - start_time
+        except subprocess.TimeoutExpired:
+            if hasattr(os, "killpg"):
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            else:
+                proc.terminate()
+            stdout, stderr = proc.communicate()
+            log_message(f"❌ Cursor Agent timed out after {timeout}s and was killed.")
+            return None
+        finally:
+            # Ensure cleanup even on unexpected errors
+            try:
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                else:
+                    proc.terminate()
+            except (ProcessLookupError, OSError):
+                pass
 
-        if result.returncode != 0:
+        if proc.returncode != 0:
             CONSECUTIVE_FAILURES += 1
-            error_output = result.stdout + result.stderr
+            error_output = stdout + stderr
             log_message(
-                f"❌ Cursor Agent failed with Exit Code {result.returncode} "
+                f"❌ Cursor Agent failed with Exit Code {proc.returncode} "
                 f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
             )
 
@@ -157,16 +213,15 @@ def run_cursor_agent(prompt: str):
                     "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
                 )
 
-            log_message(f"--- STDOUT ---\n{result.stdout}")
-            log_message(f"--- STDERR ---\n{result.stderr}")
+            log_message(f"--- STDOUT ---\n{stdout}")
+            log_message(f"--- STDERR ---\n{stderr}")
             return None
 
         CONSECUTIVE_FAILURES = 0
-        input_tokens = len(prompt.split()) * 1.3
-        output_tokens = len(result.stdout.split()) * 1.3
-        update_stats(int(input_tokens), int(output_tokens), elapsed)
+        input_tokens, output_tokens = parse_usage_from_output(stdout)
+        update_stats(input_tokens, output_tokens, elapsed)
         log_message("✅ Cursor Agent completed successfully.")
-        return result.stdout
+        return stdout
 
     except Exception as e:
         CONSECUTIVE_FAILURES += 1
@@ -294,20 +349,24 @@ def get_current_task():
 
 
 def get_project_state_hash():
-    """Generate a hash of the current project state (git status)."""
+    """Generate a hash of the current project state (git diff)."""
     try:
-        status = subprocess.run(
-            ["git", "status", "--porcelain"], capture_output=True, text=True
-        )
+        # Hash the actual diff content for better stagnation detection
+        diff = subprocess.run(
+            ["git", "diff", "HEAD"], capture_output=True, text=True
+        ).stdout
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"], capture_output=True, text=True
+        ).stdout
         plan_content = get_file_content(CONFIG["plan_file"])
-        state_str = status.stdout + plan_content
+        state_str = diff + untracked + plan_content
         return hashlib.sha256(state_str.encode()).hexdigest()
     except Exception:
         return ""
 
 
-def check_stagnation(current_hash: str):
-    """Check if the project state has stagnated."""
+def check_stagnation(current_hash: str, current_task: str):
+    """Check if the project state or task has stagnated."""
     if not current_hash:
         return False
 
@@ -317,18 +376,25 @@ def check_stagnation(current_hash: str):
         with open(str(history_file), "r") as f:
             history = json.load(f)
 
-    history.append(current_hash)
-    if len(history) > 5:
-        history = history[-5:]
+    # Track both hash and task
+    history.append({"hash": current_hash, "task": current_task})
+    if len(history) > 10:
+        history = history[-10:]
 
     with open(str(history_file), "w") as f:
         json.dump(history, f)
 
-    threshold = int(str(CONFIG.get("stagnation_threshold", 2)))
-    if len(history) >= threshold + 1:
-        last_n = history[-(threshold + 1) :]
-        if all(h == last_n[0] for h in last_n):
+    threshold = int(str(CONFIG.get("stagnation_threshold", 3)))
+    if len(history) >= threshold:
+        last_n = history[-threshold:]
+        # Check if hash is identical across last N iterations
+        if all(h["hash"] == last_n[0]["hash"] for h in last_n):
             return True
+        # Check if task is identical across last N iterations (task stagnation)
+        if all(h["task"] == last_n[0]["task"] for h in last_n):
+            log_message(f"⚠️ Task stagnation detected for: {current_task}")
+            return True
+            
     return False
 
 
@@ -388,6 +454,17 @@ def main():
         log_message(f"🚨 PRD file not found: {prd_path}")
         return
 
+    os.makedirs(os.path.dirname(LOOP_LOCK_FILE), exist_ok=True)
+    lock_fd = open(LOOP_LOCK_FILE, "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_fd.write(f"ralph_loop pid={os.getpid()} started={datetime.now().isoformat()}\n")
+        lock_fd.flush()
+    except OSError:
+        log_message("🚨 Another loop (ralph or ace) is already running. Exiting.")
+        lock_fd.close()
+        return
+
     log_message(
         f"🚀 Starting RALPH Loop using {prd_path} (Model: {CONFIG['model']})..."
     )
@@ -404,8 +481,8 @@ def main():
     )
     run_cursor_agent(analysis_prompt)
 
-    iteration = 0
-    while True:
+    max_iter = int(CONFIG.get("max_iterations", 50))
+    for iteration in range(1, max_iter + 1):
         if PAID_ACCOUNT_REQUIRED and CONFIG["quit_on_rate_limit"]:
             log_message("🚨 STOPPED: Rate limit exceeded.")
             break
@@ -417,8 +494,7 @@ def main():
             )
             break
 
-        iteration += 1
-        log_message(f"=== Iteration {iteration} (Cost: ${current_cost:.4f}) ===")
+        log_message(f"=== Iteration {iteration}/{max_iter} (Cost: ${current_cost:.4f}) ===")
 
         current_task = get_current_task()
         log_message(f"📍 Current Task: {current_task}")
@@ -433,24 +509,26 @@ def main():
             if not plan_content:
                 continue
 
-        # Step 2: Build
-        log_message("Step 2: Building...")
+        # Step 2: Build, Verify, and Update Plan
+        log_message("Step 2: Building, Verifying, and Updating Plan...")
         current_hash = get_project_state_hash()
-        if check_stagnation(current_hash):
+        if check_stagnation(current_hash, current_task):
             log_message("⚠️ Stagnation detected!")
             prompt = (
-                f"Stagnation detected. Analyze {prd_path} and {plan_file} to recover."
+                f"Stagnation detected for task '{current_task}'. Analyze {prd_path} and {plan_file} to recover. "
+                f"Implement the next necessary change, run tests/linter to verify, and update '{plan_file}'."
             )
         else:
-            prompt = f"Implement next task from {plan_file}. Target PRD: {prd_path}."
+            prompt = (
+                f"Implement the next task from {plan_file}: '{current_task}'. "
+                f"Target PRD: {prd_path}. "
+                f"After implementation, run all tests and linter, fix any failures, "
+                f"and mark the task as completed in '{plan_file}' and update '{CONFIG['changelog_file']}'."
+            )
         run_cursor_agent(prompt)
 
-        # Step 3: Verify
-        log_message("Step 3: Verifying...")
-        run_cursor_agent("Run all tests and linter. Fix any failures.")
-
-        # Step 4: Commit
-        log_message("Step 4: Committing...")
+        # Step 3: Commit
+        log_message("Step 3: Committing...")
         try:
             status = subprocess.run(
                 ["git", "status", "--porcelain"], capture_output=True, text=True
@@ -464,10 +542,8 @@ def main():
         except Exception as e:
             log_message(f"Git failed: {e}")
 
-        # Step 5: Update Plan
-        log_message("Step 5: Updating plan...")
-        run_cursor_agent(f"Update '{plan_file}' and '{CONFIG['changelog_file']}'.")
-
+        # Check for completion
+        plan_content = get_file_content(plan_file)
         if "[ ]" not in plan_content:
             log_message("🎉 Plan complete! Checking PRD...")
             gap_result = run_cursor_agent(
@@ -476,6 +552,15 @@ def main():
             if gap_result and "PRD_COMPLETE" in gap_result:
                 log_message("✅ PRD Complete!")
                 break
+    else:
+        log_message(f"Reached maximum iterations ({max_iter}). Stopping.")
+
+    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    lock_fd.close()
+    try:
+        os.remove(LOOP_LOCK_FILE)
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
