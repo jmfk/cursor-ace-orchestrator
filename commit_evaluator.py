@@ -216,7 +216,8 @@ class CommitEvaluator:
         plt.savefig(output_path)
         plt.close()
 
-    def generate_comprehensive_report(self, limit: int | None = None, output_file: str = "comprehensive_value_report.md"):
+    def generate_comprehensive_report(self, limit: int | None = None,
+                                      output_file: str = "comprehensive_value_report.md"):
         """Generate a report covering commits, milestones, and time-series."""
         commits = self.get_commits(limit)
         print(f"Analyzing {len(commits)} commits...")
