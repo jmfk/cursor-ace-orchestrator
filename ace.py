@@ -641,6 +641,18 @@ def run(
     # 7. Distributed Memory: Implement a distributed vector store for cross-team learning.
     #    (Completed: Distributed memory sync and search implemented in ACEService)
 
+    # 8. Living Specs Automation: Automate living specs updates based on implementation changes.
+    #    (Completed: automate_spec_update implemented in ACEService)
+
+    # 9. Task Decomposition & Delegation: Decompose complex tasks and delegate to agents.
+    #    (Completed: decompose_task and delegate_tasks implemented in ACEService)
+
+    # 10. Memory Synthesis: Synthesize shared memories from individual experiences.
+    #    (Completed: synthesize_memories implemented in ACEService)
+
+    # 11. Adaptive Memory Pruning: Automatically archive low-utility memories.
+    #    (Completed: adaptive_memory_prune implemented in ACEService)
+
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
