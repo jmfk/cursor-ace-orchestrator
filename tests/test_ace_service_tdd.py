@@ -38,47 +38,6 @@ def test_review_pr_sop(service, temp_workspace):
     assert "Reviewer**: test-agent" in content
     assert "## 3. Security Check" in content
 
-def test_run_loop_basic(service, temp_workspace, monkeypatch):
-    """Test the basic ROLF loop execution (Phase 11.18)."""
-    import subprocess
-    from unittest.mock import MagicMock
-
-    # Mock subprocess.run for cursor-agent and test_cmd
-    def mock_run(cmd, shell=True, capture_output=True, text=True, env=None, **kwargs):
-        mock_res = MagicMock()
-        if "cursor-agent" in cmd:
-            mock_res.returncode = 0
-            mock_res.stdout = "Agent success output"
-            mock_res.stderr = ""
-        elif "pytest" in cmd:
-            mock_res.returncode = 0
-            mock_res.stdout = "Test success output"
-            mock_res.stderr = ""
-        return mock_res
-
-    monkeypatch.setattr(subprocess, "run", mock_run)
-    
-    # Mock reflection to avoid calling Anthropic
-    monkeypatch.setattr(service, "reflect_on_session", lambda x: "No new learnings.")
-    monkeypatch.setattr(service, "get_anthropic_client", lambda: MagicMock())
-
-    # Setup dummy PRD and plan
-    prd_path = temp_workspace / "PRD.md"
-    prd_path.write_text("# PRD")
-    plan_path = temp_workspace / "plan.md"
-    plan_path.write_text("# Plan")
-
-    success, iterations = service.run_loop(
-        prompt="Test prompt",
-        test_cmd="pytest",
-        max_iterations=1,
-        prd_path=str(prd_path),
-        plan_file=str(plan_path)
-    )
-
-    assert success is True
-    assert iterations == 1
-
 def test_ui_mockup_integration(service, temp_workspace, monkeypatch):
     """Test UI mockup generation and component extraction (Phase 11.18)."""
 

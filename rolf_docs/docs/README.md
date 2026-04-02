@@ -81,7 +81,7 @@ Main execution loop for ROLF.
 | `log_file` | Path to the execution log file. (Default: `rolf_execution.log`) |
 | `stats_file` | Path to the statistics JSON file. (Default: `rolf_stats.json`) |
 | `state_history_file` | Path to the state history JSON file. (Default: `rolf_state_history.json`) |
-| `default_prd` | The default PRD file to use for planning. (Default: `PRD-01 - Cursor-ace-orchestrator-prd.md`) |
+| `default_prd` | The default PRD file to use for planning. (Default: `PRD-01.md`) |
 | `stagnation_threshold` | Number of identical iterations before detecting stagnation. (Default: `3`) |
 | `max_consecutive_failures` | Number of failures before tripping the circuit breaker. (Default: `3`) |
 | `max_iterations` | Maximum number of iterations before halting. (Default: `50`) |

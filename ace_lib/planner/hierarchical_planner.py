@@ -211,8 +211,61 @@ class HierarchicalPlanner:
             self.exit_with_analysis(f"Stagnation detected: Processed node {node.id} {self.max_node_visits} times without progress.")
 
         print(f"Processing Node: {node.id} - {node.title}")
-        
+
         if not node.actionable:
+            # ARCHITECTURAL FIX #1: Enforce decomposition for depth 0-1 nodes (Phases)
+            # These should NEVER be marked as actionable without decomposition
+            if node.depth <= 1:
+                if not node.description or not node.description.strip():
+                    self.exit_with_analysis(
+                        f"Critical validation failure: Depth {node.depth} node {node.id} has no description. "
+                        f"Phase-level nodes must have clear descriptions before decomposition."
+                    )
+
+                print(f"Forcing decomposition for Phase-level node {node.id} (depth={node.depth})...")
+                context = self.curator.select_context(node, self.tree)
+                prompt = (
+                    f"Decompose the following Phase-level task into concrete, actionable sub-tasks.\n"
+                    f"Task: {node.title}\n"
+                    f"Description: {node.description}\n"
+                    f"Context:\n{context}\n\n"
+                    f"IMPORTANT: Create specific, measurable sub-tasks that can be executed individually.\n"
+                    f"Return a JSON list of sub-tasks with 'title' and 'description'."
+                )
+                output = self.run_cursor_agent(prompt, self.planner_model)
+                if output:
+                    sub_nodes_data = self.parse_plan_output(output)
+                    if sub_nodes_data:
+                        before_count = len(node.children)
+                        self.tree.add_children(node.id, sub_nodes_data)
+                        if len(self.tree.nodes[node.id].children) > before_count:
+                            return None # Success, move to first child in next step
+
+                # If decomposition failed for Phase-level node, this is critical
+                self.exit_with_analysis(
+                    f"Critical failure: Phase-level node {node.id} (depth={node.depth}) could not be decomposed. "
+                    f"Manual intervention required to break down: {node.title}"
+                )
+
+            # ARCHITECTURAL FIX #2: Validate description before marking as actionable
+            if not node.description or not node.description.strip():
+                print(f"⚠️ Warning: Node {node.id} has no description. Attempting to generate one...")
+                context = self.curator.select_context(node, self.tree)
+                prompt = (
+                    f"Provide a clear, actionable description for this task:\n"
+                    f"Title: {node.title}\n"
+                    f"Context:\n{context}\n\n"
+                    f"Output ONLY the description (2-3 sentences max)."
+                )
+                output = self.run_cursor_agent(prompt, self.planner_model)
+                if output and output.strip():
+                    node.description = output.strip()[:500]  # Limit length
+                    self.tree.save_node(node)
+                else:
+                    self.exit_with_analysis(
+                        f"Cannot proceed: Node {node.id} has no description and generation failed."
+                    )
+
             # Check if it's actionable or needs decomposition
             actionable = self.validator.is_actionable(node.to_dict())
             if not actionable:
@@ -234,7 +287,7 @@ class HierarchicalPlanner:
                         self.tree.add_children(node.id, sub_nodes_data)
                         if len(self.tree.nodes[node.id].children) > before_count:
                             return None # Success, move to first child in next step
-                
+
                 # If we are here, decomposition failed or hit max_depth
                 print(f"Node {node.id} could not be decomposed further. Marking as actionable.")
                 node.actionable = True

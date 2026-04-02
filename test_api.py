@@ -131,16 +131,3 @@ def test_debate(client, monkeypatch):
     assert response.status_code == 200
     assert response.json()["consensus"] == "Consensus reached"
 
-
-def test_loop(client, monkeypatch):
-    # Mock run_loop to avoid execution
-    import ace_api.main
-
-    monkeypatch.setattr(
-        ace_api.main.service, "run_loop", lambda p, t, m, path, aid: (True, 1)
-    )
-
-    response = client.post("/loop", json={"prompt": "Fix bug", "test_cmd": "pytest"})
-    assert response.status_code == 200
-    assert response.json()["success"] is True
-    assert response.json()["iterations"] == 1

@@ -1569,7 +1569,7 @@ class ACEService:
         context_updates = []
 
         # Use provided PRD and plan file or defaults
-        prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
+        prd_path = prd_path or "PRD-01.md"
         plan_file = plan_file or "plan.md"
 
         print("🚀 [bold blue]Starting ROLF Loop[/bold blue]")

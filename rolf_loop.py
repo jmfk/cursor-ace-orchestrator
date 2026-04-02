@@ -33,7 +33,7 @@ DEFAULTS = {
     "log_file": "rolf_execution.log",
     "stats_file": "rolf_stats.json",
     "state_history_file": "rolf_state_history.json",
-    "default_prd": "PRD-01 - Cursor-ace-orchestrator-prd.md",
+    "default_prd": "PRD-01.md",
     "stagnation_threshold": 3,
     "max_consecutive_failures": 3,
     "quit_on_rate_limit": True,
@@ -90,12 +90,21 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     price_in = float(str(CONFIG.get("price_input_1m", 0.10)))
     price_out = float(str(CONFIG.get("price_output_1m", 0.40)))
 
-    cost = float(input_tokens) / 1_000_000 * price_in + float(output_tokens) / 1_000_000 * price_out
+    cost = (
+        float(input_tokens) / 1_000_000 * price_in
+        + float(output_tokens) / 1_000_000 * price_out
+    )
 
-    stats["total_input_tokens"] = int(stats.get("total_input_tokens", 0)) + int(input_tokens)
-    stats["total_output_tokens"] = int(stats.get("total_output_tokens", 0)) + int(output_tokens)
+    stats["total_input_tokens"] = int(stats.get("total_input_tokens", 0)) + int(
+        input_tokens
+    )
+    stats["total_output_tokens"] = int(stats.get("total_output_tokens", 0)) + int(
+        output_tokens
+    )
     stats["total_cost_usd"] = float(stats.get("total_cost_usd", 0.0)) + float(cost)
-    stats["total_time_sec"] = float(stats.get("total_time_sec", 0.0)) + float(elapsed_time)
+    stats["total_time_sec"] = float(stats.get("total_time_sec", 0.0)) + float(
+        elapsed_time
+    )
     stats["iterations"] = int(stats.get("iterations", 0)) + 1
 
     with open(str(stats_file), "w") as f:
@@ -122,17 +131,27 @@ def parse_usage_from_output(stdout: str) -> tuple[int, int]:
                 found_usage = True
         except json.JSONDecodeError:
             continue
-    
+
     if not found_usage:
         # Fallback to conservative estimate: ~4 chars per token
         input_tokens = int(len(stdout) / 4)
         output_tokens = int(len(stdout) / 4)
-        
+
     return input_tokens, output_tokens
 
 
-def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout: int = 300):
-    """Runs cursor-agent in non-interactive mode and tracks usage."""
+def run_cursor_agent(
+    prompt: str, model_override: Optional[str] = None, timeout: int = 300
+):
+    """
+    Runs cursor-agent in non-interactive mode and tracks usage.
+
+    Returns:
+        str: The output if successful
+        None: If there was an error
+
+    Note: Sets global flags for infrastructure failures (provider errors, rate limits)
+    """
     global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
 
     if LLM_CIRCUIT_BREAKER_TRIPPED:
@@ -162,7 +181,7 @@ def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout:
             "--trust",
             prompt,
         ]
-        
+
         # Use Popen with process group to ensure cleanup of sub-agents
         proc = subprocess.Popen(
             cmd_args,
@@ -171,7 +190,7 @@ def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout:
             text=True,
             preexec_fn=os.setsid if hasattr(os, "setsid") else None,
         )
-        
+
         try:
             stdout, stderr = proc.communicate(timeout=timeout)
             elapsed = time.time() - start_time
@@ -194,32 +213,60 @@ def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout:
                 pass
 
         if proc.returncode != 0:
-            CONSECUTIVE_FAILURES += 1
             error_output = stdout + stderr
-            log_message(
-                f"❌ Cursor Agent failed with Exit Code {proc.returncode} "
-                f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
-            )
 
-            if (
+            # ARCHITECTURAL FIX: Distinguish between infrastructure and logic failures
+            is_infrastructure_failure = (
                 "429" in error_output
                 or "RESOURCE_EXHAUSTED" in error_output
                 or "rate limit" in error_output.lower()
-            ):
-                PAID_ACCOUNT_REQUIRED = True
+                or "Provider Error" in error_output
+                or "trouble connecting" in error_output.lower()
+                or "connection" in error_output.lower()
+                or "timeout" in error_output.lower()
+            )
+
+            if is_infrastructure_failure:
                 log_message(
-                    "🚨 Detected rate limit from Cursor Agent (429/RESOURCE_EXHAUSTED)."
+                    f"⚠️ Infrastructure failure detected (Exit Code {proc.returncode}). "
+                    f"This is a transient provider error, not a logic failure."
                 )
 
-            if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
-                LLM_CIRCUIT_BREAKER_TRIPPED = True
+                if (
+                    "429" in error_output
+                    or "RESOURCE_EXHAUSTED" in error_output
+                    or "rate limit" in error_output.lower()
+                ):
+                    PAID_ACCOUNT_REQUIRED = True
+                    log_message(
+                        "🚨 Rate limit detected. Marking paid account as required."
+                    )
+
+                # Don't increment consecutive failures for infrastructure issues
+                log_message(f"--- STDOUT ---\n{stdout}")
+                log_message(f"--- STDERR ---\n{stderr}")
+                log_message("Sleeping 30 seconds before retry...")
+                time.sleep(30)
+                return None
+            else:
+                # Logic failure - increment counter
+                CONSECUTIVE_FAILURES += 1
                 log_message(
-                    "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
+                    f"❌ Cursor Agent logic failure with Exit Code {proc.returncode} "
+                    f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
                 )
 
-            log_message(f"--- STDOUT ---\n{stdout}")
-            log_message(f"--- STDERR ---\n{stderr}")
-            return None
+                if CONSECUTIVE_FAILURES >= int(
+                    str(CONFIG.get("max_consecutive_failures", 3))
+                ):
+                    LLM_CIRCUIT_BREAKER_TRIPPED = True
+                    log_message(
+                        "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
+                    )
+
+                log_message(f"--- STDOUT ---\n{stdout}")
+                log_message(f"--- STDERR ---\n{stderr}")
+                return None
 
         CONSECUTIVE_FAILURES = 0
         input_tokens, output_tokens = parse_usage_from_output(stdout)
@@ -228,15 +275,34 @@ def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout:
         return stdout
 
     except Exception as e:
-        CONSECUTIVE_FAILURES += 1
-        log_message(
-            f"🚨 Unexpected error during subprocess execution: {str(e)} "
-            f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
+        error_str = str(e).lower()
+        is_infrastructure_failure = (
+            "connection" in error_str
+            or "timeout" in error_str
+            or "network" in error_str
         )
 
-        if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
-            LLM_CIRCUIT_BREAKER_TRIPPED = True
-            log_message("🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures.")
+        if is_infrastructure_failure:
+            log_message(
+                f"⚠️ Infrastructure exception: {str(e)}. "
+                f"This is a transient error, not a logic failure."
+            )
+            log_message("Sleeping 30 seconds before retry...")
+            time.sleep(30)
+        else:
+            CONSECUTIVE_FAILURES += 1
+            log_message(
+                f"🚨 Unexpected error during subprocess execution: {str(e)} "
+                f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
+            )
+
+            if CONSECUTIVE_FAILURES >= int(
+                str(CONFIG.get("max_consecutive_failures", 3))
+            ):
+                LLM_CIRCUIT_BREAKER_TRIPPED = True
+                log_message(
+                    "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
+                )
 
         return None
 
@@ -315,7 +381,9 @@ def generate_commit_message(task_name: str):
             if response.status_code == 429 or "RESOURCE_EXHAUSTED" in error_text:
                 PAID_ACCOUNT_REQUIRED = True
 
-            if CONSECUTIVE_FAILURES >= int(str(CONFIG.get("max_consecutive_failures", 3))):
+            if CONSECUTIVE_FAILURES >= int(
+                str(CONFIG.get("max_consecutive_failures", 3))
+            ):
                 LLM_CIRCUIT_BREAKER_TRIPPED = True
             log_message("Falling back to iteration-based message.")
     except Exception as e:
@@ -360,7 +428,9 @@ def get_project_state_hash():
             ["git", "diff", "HEAD"], capture_output=True, text=True
         ).stdout
         untracked = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard"], capture_output=True, text=True
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
         ).stdout
         plan_content = get_file_content(CONFIG["plan_file"])
         state_str = diff + untracked + plan_content
@@ -404,13 +474,19 @@ def check_stagnation(current_hash: str, current_task: str):
     if len(history) >= threshold:
         last_n = history[-threshold:]
         # Check if hash is identical across last N iterations
-        if all(isinstance(h, dict) and h.get("hash") == last_n[0].get("hash") for h in last_n):
+        if all(
+            isinstance(h, dict) and h.get("hash") == last_n[0].get("hash")
+            for h in last_n
+        ):
             return True
         # Check if task is identical across last N iterations (task stagnation)
-        if all(isinstance(h, dict) and h.get("task") == last_n[0].get("task") for h in last_n):
+        if all(
+            isinstance(h, dict) and h.get("task") == last_n[0].get("task")
+            for h in last_n
+        ):
             log_message(f"⚠️ Task stagnation detected for: {current_task}")
             return True
-            
+
     return False
 
 
@@ -474,16 +550,16 @@ def main():
     lock_fd = open(LOOP_LOCK_FILE, "w")
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        lock_fd.write(f"rolf_loop pid={os.getpid()} started={datetime.now().isoformat()}\n")
+        lock_fd.write(
+            f"rolf_loop pid={os.getpid()} started={datetime.now().isoformat()}\n"
+        )
         lock_fd.flush()
     except OSError:
         log_message("🚨 Another loop (rolf or ace) is already running. Exiting.")
         lock_fd.close()
         return
 
-    log_message(
-        f"🚀 Starting Hierarchical ROLF Loop using {prd_path}..."
-    )
+    log_message(f"🚀 Starting Hierarchical ROLF Loop using {prd_path}...")
 
     # 3. Initialize Planner
     planner = HierarchicalPlanner(
@@ -492,7 +568,7 @@ def main():
         planner_model=CONFIG.get("planner_model", "gemini-3-flash"),
         validator_model=CONFIG.get("validator_model", "gemini-3-flash-preview"),
         context_model=CONFIG.get("context_model", "gemini-3-flash-preview"),
-        executor_model=CONFIG.get("executor_model", "gemini-3-flash")
+        executor_model=CONFIG.get("executor_model", "gemini-3-flash"),
     )
 
     if LLM_CIRCUIT_BREAKER_TRIPPED:
@@ -506,7 +582,9 @@ def main():
     try:
         while iteration < max_iterations:
             if LLM_CIRCUIT_BREAKER_TRIPPED:
-                log_message("🚨 CIRCUIT BREAKER IS TRIPPED. Manual intervention required.")
+                log_message(
+                    "🚨 CIRCUIT BREAKER IS TRIPPED. Manual intervention required."
+                )
                 break
 
             total_cost = get_total_cost()
@@ -515,7 +593,9 @@ def main():
                 break
 
             iteration += 1
-            log_message(f"\n--- ROLF Loop Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f}) ---")
+            log_message(
+                f"\n--- ROLF Loop Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f}) ---"
+            )
 
             # Get next task from hierarchical planner
             node = planner.tree.get_next_incomplete()
@@ -532,18 +612,23 @@ def main():
 
             # Run one step of the planner
             node_executed = planner.run_step()
-            
+
             # After run_step finishes, check for changes
             from ace_lib.planner.diff_gate import evaluate as evaluate_diff
+
             diff_result = evaluate_diff()
             if diff_result.is_meaningful:
-                task_title = node_executed.title if node_executed else "Hierarchical Planning Update"
+                task_title = (
+                    node_executed.title
+                    if node_executed
+                    else "Hierarchical Planning Update"
+                )
                 commit_msg = generate_commit_message(task_title)
                 log_message(f"Committing changes: {commit_msg}")
                 subprocess.run(["git", "add", "."], check=True)
                 subprocess.run(["git", "commit", "-m", commit_msg], check=True)
                 # subprocess.run(["git", "push"], check=True) # Optional: push
-            
+
             # If run_step returned None but there are still tasks, it was a decomposition step
             if not node_executed and planner.tree.get_next_incomplete() is None:
                 log_message("🎉 All tasks in the hierarchical plan are completed!")
@@ -552,6 +637,7 @@ def main():
     except Exception as e:
         log_message(f"🚨 Hierarchical Planner failed: {e}")
         import traceback
+
         log_message(traceback.format_exc())
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)

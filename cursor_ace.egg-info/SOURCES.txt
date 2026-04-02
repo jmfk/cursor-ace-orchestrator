@@ -56,8 +56,6 @@ tests/test_improvement_trend.py
 tests/test_new_features.py
 tests/test_playbook_updates.py
 tests/test_quality_gate.py
-tests/test_rolf_loop_extended.py
-tests/test_rolf_loop_new.py
 tests/test_security_audit.py
 tests/test_sop_flow.py
 tests/test_sso_integration.py

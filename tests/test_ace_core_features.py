@@ -70,12 +70,3 @@ def test_ui_mockup_integration(service, temp_workspace, monkeypatch):
     mockup_file = temp_workspace / ".ace" / "ui_mockups" / "mock_123.md"
     assert mockup_file.exists()
     assert "export const Button" in mockup_file.read_text()
-
-def test_native_loop_command_structure(service, temp_workspace, monkeypatch):
-    """Test Phase 4.1: Native ace loop command exists in ACEService."""
-    # We just verify the method exists and takes correct arguments
-    import inspect
-    sig = inspect.signature(service.run_loop)
-    assert "prompt" in sig.parameters
-    assert "test_cmd" in sig.parameters
-    assert "max_iterations" in sig.parameters

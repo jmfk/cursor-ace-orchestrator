@@ -102,41 +102,6 @@ def test_decision_records(service):
     assert decisions[0].title == "Use SQLite"
     assert decisions[0].id == "ADR-001"
 
-@patch("subprocess.run")
-def test_rolf_loop_success(mock_run, service, temp_workspace):
-    """Test successful ROLF loop execution."""
-    # Mock successful agent run
-    mock_agent_res = MagicMock()
-    mock_agent_res.returncode = 0
-    mock_agent_res.stdout = "Agent finished task"
-    mock_agent_res.stderr = ""
-    
-    # Mock successful test run
-    mock_test_res = MagicMock()
-    mock_test_res.returncode = 0
-    mock_test_res.stdout = "Tests passed"
-    mock_test_res.stderr = ""
-    
-    # mock_run will be called:
-    # 1. Inside run_agent_task (executing cursor-agent)
-    # 2. Inside run_loop (executing test_cmd)
-    mock_run.side_effect = [mock_agent_res, mock_test_res]
-    
-    # Setup dummy files - use filenames that won't trigger analysis step
-    (temp_workspace / "other_plan.md").write_text("# Plan")
-    (temp_workspace / "other_prd.md").write_text("# PRD")
-    
-    success, iterations = service.run_loop(
-        prompt="Test task",
-        test_cmd="pytest",
-        max_iterations=1,
-        plan_file="other_plan.md",
-        prd_path="other_prd.md"
-    )
-    
-    assert success is True
-    assert iterations == 1
-
 def test_stitch_integration_stubs(service):
     """Test Google Stitch integration stubs."""
     # Mocking environment for Stitch

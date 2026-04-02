@@ -6,7 +6,7 @@ changelog_file: "changelog.md"
 log_file: "rolf_execution.log"
 stats_file: "rolf_stats.json"
 state_history_file: "rolf_state_history.json"
-default_prd: "PRD-01 - Cursor-ace-orchestrator-prd.md"
+default_prd: "PPRD-01.md"
 stagnation_threshold: 3
 max_consecutive_failures: 3
 max_iterations: 50

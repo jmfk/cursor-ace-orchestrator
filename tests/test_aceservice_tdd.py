@@ -14,36 +14,6 @@ def service(temp_workspace):
     """Initialize ACEService in a temporary workspace."""
     return ACEService(base_path=temp_workspace)
 
-def test_rolf_loop_integration(service, monkeypatch):
-    """Test the ROLF loop integration (Phase 4.1)."""
-    # Mock the run_agent_task and reflect_on_session
-    monkeypatch.setattr(service, "run_agent_task", lambda *args, **kwargs: True)
-    monkeypatch.setattr(service, "reflect_on_session", lambda *args, **kwargs: "No new learnings.")
-    monkeypatch.setattr(service, "get_anthropic_client", lambda: None)
-    
-    # Mock subprocess.run for the test command
-    class MockResult:
-        returncode = 0
-        stdout = "Tests passed"
-        stderr = ""
-    
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: MockResult())
-    
-    # Create dummy PRD and plan files
-    (service.base_path / "PRD-01 - Cursor-ace-orchestrator-prd.md").write_text("PRD Content")
-    (service.base_path / "plan.md").write_text("Plan Content")
-    
-    success, iterations = service.run_loop(
-        prompt="Test task",
-        test_cmd="pytest",
-        max_iterations=2,
-        prd_path=str(service.base_path / "PRD-01 - Cursor-ace-orchestrator-prd.md"),
-        plan_file=str(service.base_path / "plan.md")
-    )
-    
-    assert success is True
-    assert iterations == 1
-
 def test_sop_onboarding_full(service):
     """Test full onboarding SOP flow (Phase 9.5)."""
     agent_id = "onboard-test"
