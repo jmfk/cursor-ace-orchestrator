@@ -1471,6 +1471,7 @@ class ACEService:
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
         plan_file = plan_file or "plan.md"
 
+        print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
         print(f"[RALPH] Using PRD: {prd_path}")
         print(f"[RALPH] Using Plan: {plan_file}")
         if spec_id:
@@ -1801,6 +1802,11 @@ class ACEService:
             # Cleanup context file
             if os.path.exists(context_file):
                 os.remove(context_file)
+
+        if success:
+            print(f"\n✅ [bold green]RALPH Loop completed in {iteration} iterations![/bold green]")
+        else:
+            print(f"\n❌ [bold red]RALPH Loop failed after {iteration} iterations.[/bold red]")
 
         return success, iteration
 
