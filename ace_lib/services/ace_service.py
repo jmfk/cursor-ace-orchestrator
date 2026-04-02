@@ -86,16 +86,16 @@ class ACEService:
             r"<!-- \[(str|mis|dec)-([^\]]+)\]\s+"
             r"(?:helpful=(\d+)\s+harmful=(\d+)\s*)?::\s*(.*?) -->"
         )
-        entries = re.findall(pattern, content)
+        matches = re.findall(pattern, content)
 
-        if not entries:
+        if not matches:
             return False
 
         ids = []
         documents = []
         metadatas = []
 
-        for l_type, l_id, helpful, harmful, desc in entries:
+        for l_type, l_id, helpful, harmful, desc in matches:
             entry_id = f"{l_type}-{l_id}"
             ids.append(entry_id)
             documents.append(desc)
@@ -1514,7 +1514,7 @@ class ACEService:
 
     # --- SOP Engine ---
 
-    def onboard_agent(self, agent_id: str) -> str:
+    def onboard_agent(self, agent_id: str) -> Path:
         """Run onboarding SOP for an agent (PRD-01 / Phase 9.5)."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)
@@ -1574,9 +1574,9 @@ type: role
             ),
         )
 
-        return str(onboarding_file)
+        return onboarding_file
 
-    def review_pr(self, pr_id: str, agent_id: str) -> str:
+    def review_pr(self, pr_id: str, agent_id: str) -> Path:
         """Run PR review SOP for an agent (PRD-01 / Phase 9.5)."""
         self.ace_dir.mkdir(parents=True, exist_ok=True)
         sop_dir = self.ace_dir / "sops"
@@ -1599,9 +1599,9 @@ type: role
             ),
         )
 
-        return str(review_file)
+        return review_file
 
-    def audit_agent(self, agent_id: str):
+    def audit_agent(self, agent_id: str) -> Path:
         """Run audit SOP for an agent (PRD-01 / Phase 9.5)."""
         agents_config = self.load_agents()
         agent = next((a for a in agents_config.agents if a.id == agent_id), None)

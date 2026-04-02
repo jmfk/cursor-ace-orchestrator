@@ -1,8 +1,7 @@
 import pytest
-import os
 from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType, TokenMode, Agent
+from ace_lib.models.schemas import TokenMode
 
 @pytest.fixture
 def ace_service(tmp_path):
@@ -94,7 +93,7 @@ def test_adr_management(ace_service):
     assert decisions[0].id == "ADR-001"
 
 def test_onboard_agent(ace_service):
-    agent = ace_service.create_agent(id="a1", name="A1", role="r1")
+    ace_service.create_agent(id="a1", name="A1", role="r1")
     onboarding_file = ace_service.onboard_agent("a1")
     assert Path(onboarding_file).exists()
     assert "Agent Onboarding" in Path(onboarding_file).read_text()

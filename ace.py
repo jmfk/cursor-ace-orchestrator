@@ -1000,7 +1000,6 @@ def loop(
         try:
             process = subprocess.run(full_cmd, shell=True, capture_output=True, text=True)
             output = process.stdout + process.stderr
-            exit_code = process.returncode
             console.print(output)
         except Exception as e:
             console.print(f"[red]Execution error: {e}[/red]")
