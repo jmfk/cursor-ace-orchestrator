@@ -103,7 +103,13 @@ class CommitEvaluator:
                     except ValueError:
                         continue
 
-            return {"added": added, "deleted": deleted, "total_changes": added + deleted, "files_changed": files_changed, "file_types": file_types}
+            return {
+                "added": added,
+                "deleted": deleted,
+                "total_changes": added + deleted,
+                "files_changed": files_changed,
+                "file_types": file_types
+            }
         except subprocess.CalledProcessError:
             return {"total_changes": 0, "files_changed": 0, "file_types": {}}
 
@@ -232,7 +238,10 @@ class CommitEvaluator:
 
         # Generate Graphs
         self.generate_commit_value_graph(results, "commit_value_graph.png")
-        self.generate_milestone_graph(sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True), "milestone_value_graph.png")
+        self.generate_milestone_graph(
+            sorted(milestones.items(), key=lambda x: x[1]["score"], reverse=True),
+            "milestone_value_graph.png"
+        )
         self.generate_time_series_graph(results, "value_over_time.png")
 
         # Generate Markdown
