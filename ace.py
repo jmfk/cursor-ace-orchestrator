@@ -1,6 +1,10 @@
 """
 ACE CLI entry point.
 """
+import typer
+from rich.console import Console
+from rich.table import Table
+import requests
 from pathlib import Path
 import os
 import subprocess
@@ -8,10 +12,6 @@ import tempfile
 import re
 from datetime import datetime
 from typing import Optional, List, Dict
-import requests
-import typer
-from rich.console import Console
-from rich.table import Table
 
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig
@@ -199,7 +199,7 @@ def api_call(method: str, endpoint: str, **kwargs):
     """Make an API call, fallback to local service if API is unavailable."""
     try:
         url = f"{API_BASE_URL}{endpoint}"
-        response = requests.request(method, url, timeout=0.5, **kwargs)
+        response = requests.request(method, url, timeout=0.1, **kwargs)
         if response.status_code == 200:
             return response.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
