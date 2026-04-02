@@ -672,3 +672,38 @@ def test_living_spec_automation(service, monkeypatch):
     md_file = service.specs_dir / "test-spec.md"
     assert md_file.exists()
     assert "Implemented feature X" in md_file.read_text()
+
+
+def test_self_audit(service):
+    """Test ACE self-audit logic (Phase 10.24)."""
+    # Setup agent and playbook
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text("""# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=5 :: Harmful strategy -->
+## Kända fallgropar
+## Arkitekturella beslut
+""")
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+
+    # Setup ownership
+    service.assign_ownership("src/core", "dev-1")
+
+    # Run self-audit
+    results = service.self_audit()
+
+    assert results["system_health"] == "healthy"
+    assert len(results["agents"]) == 1
+    agent_audit = results["agents"][0]
+    assert agent_audit["id"] == "dev-1"
+    assert agent_audit["playbook_stats"]["strategies"] == 1
+    assert agent_audit["owned_paths_count"] == 1
+    assert any("low-utility strategies" in issue for issue in agent_audit["issues"])
+
+    # Test with missing playbook
+    service.create_agent(id="dev-2", name="Dev 2", role="missing")
+    results = service.self_audit()
+    agent_2_audit = next(a for a in results["agents"] if a["id"] == "dev-2")
+    assert agent_2_audit["memory_health"] == "critical"
+    assert any("Playbook file missing" in issue for issue in agent_2_audit["issues"])

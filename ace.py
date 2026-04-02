@@ -68,10 +68,16 @@ def meta_self_audit():
         elif agent["memory_health"] == "critical":
             status_color = "red"
 
-        console.print(f"\nAuditing agent: [green]{agent['id']}[/green] ([{status_color}]{agent['memory_health']}[/{status_color}])")
+        console.print(
+            f"\nAuditing agent: [green]{agent['id']}[/green] "
+            f"([{status_color}]{agent['memory_health']}[/{status_color}])"
+        )
         console.print(f"  Role: {agent['role']}")
         stats = agent["playbook_stats"]
-        console.print(f"  Playbook: [dim]{stats['strategies']} strategies, {stats['pitfalls']} pitfalls, {stats['decisions']} decisions[/dim]")
+        console.print(
+            f"  Playbook: [dim]{stats['strategies']} strategies, "
+            f"{stats['pitfalls']} pitfalls, {stats['decisions']} decisions[/dim]"
+        )
         console.print(f"  Ownership: [dim]{agent.get('owned_paths_count', 0)} paths[/dim]")
 
         if agent["issues"]:
@@ -1359,26 +1365,27 @@ def spec_show(id: str = typer.Argument(..., help="Spec ID")):
     if spec.verification:
         console.print(f"\n[bold]Verification:[/bold]\n{spec.verification}")
 
-    @spec_app.command("update")
-    def spec_update(
-        id: str = typer.Argument(..., help="Spec ID"),
-        status: Optional[str] = typer.Option(None, "--status", "-s"),
-        implementation: Optional[str] = typer.Option(None, "--impl", "-m"),
-        verification: Optional[str] = typer.Option(None, "--verify", "-v"),
-    ):
-        """Update an existing Living Spec."""
-        svc = get_service()
-        spec = svc.get_spec(id)
-        if not spec:
-            console.print(f"[red]Spec {id} not found.[/red]")
-            return
 
-        if status:
-            spec.status = status
-        if implementation:
-            spec.implementation = implementation
-        if verification:
-            spec.verification = verification
+@spec_app.command("update")
+def spec_update(
+    id: str = typer.Argument(..., help="Spec ID"),
+    status: Optional[str] = typer.Option(None, "--status", "-s"),
+    implementation: Optional[str] = typer.Option(None, "--impl", "-m"),
+    verification: Optional[str] = typer.Option(None, "--verify", "-v"),
+):
+    """Update an existing Living Spec."""
+    svc = get_service()
+    spec = svc.get_spec(id)
+    if not spec:
+        console.print(f"[red]Spec {id} not found.[/red]")
+        return
+
+    if status:
+        spec.status = status
+    if implementation:
+        spec.implementation = implementation
+    if verification:
+        spec.verification = verification
 
     svc.save_spec(spec)
     console.print(f"Updated Living Spec: [green]{spec.id}[/green]")
