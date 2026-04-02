@@ -1,42 +1,42 @@
 import pytest
 import os
-import shutil
+import yaml
 from pathlib import Path
 from datetime import datetime
-from ruamel.yaml import YAML
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import (
     MailMessage, 
     Subscription, 
     SubscriptionsConfig, 
-    MACPProposal, 
-    ConsensusStatus, 
-    OwnershipConfig, 
+    NotificationPriority,
+    OwnershipConfig,
     OwnershipModule,
-    NotificationPriority
+    MACPProposal,
+    ConsensusStatus
 )
 
-yaml = YAML()
-yaml.preserve_quotes = True
+# --- Fixtures ---
 
 @pytest.fixture
 def temp_ace_env(tmp_path):
-    """Sets up a temporary ACE environment structure."""
+    """Sets up a temporary ACE environment for coordination testing."""
     base_path = tmp_path / "project"
     base_path.mkdir()
-    
-    # Create .ace structure
-    ace_dir = base_path / ".ace"
-    (ace_dir / "mail").mkdir(parents=True)
-    (ace_dir / "macp").mkdir(parents=True)
-    
     service = ACEService(base_path=base_path)
+    
+    # Initialize directory structure
+    service.ace_dir.mkdir()
+    service.mail_dir.mkdir()
+    service.macp_dir.mkdir()
+    
     return service, base_path
+
+# --- Test Cases ---
 
 class TestMultiAgentCoordination:
     """
     Test suite for Multi-Agent Coordination & Messaging (REQ-005).
-    Verifies Mail System, Subscriptions, and Consensus Protocol triggers.
+    Verifies asynchronous messaging, subscriptions, and consensus triggers.
     """
 
     def test_mail_system_storage_and_retrieval(self, temp_ace_env):
@@ -50,8 +50,8 @@ class TestMultiAgentCoordination:
         
         message = MailMessage(
             id=msg_id,
-            sender_id=sender_id,
-            recipient_id=recipient_id,
+            from_agent=sender_id,
+            to_agent=recipient_id,
             subject="Coordination Request",
             body="Please review the auth module changes.",
             timestamp=datetime.now().isoformat()
@@ -63,18 +63,18 @@ class TestMultiAgentCoordination:
         mail_file = recipient_mail_dir / f"{msg_id}.yaml"
         
         with open(mail_file, "w", encoding="utf-8") as f:
-            yaml.dump(message.dict(), f)
+            yaml.dump(message.model_dump(mode="json"), f)
 
         # Verify storage
         assert mail_file.exists()
 
         # Verify retrieval
         with open(mail_file, "r", encoding="utf-8") as f:
-            data = yaml.load(f)
+            data = yaml.safe_load(f)
             retrieved_msg = MailMessage(**data)
         
         assert retrieved_msg.id == msg_id
-        assert retrieved_msg.sender_id == sender_id
+        assert retrieved_msg.from_agent == sender_id
         assert retrieved_msg.body == "Please review the auth module changes."
 
     def test_agent_subscription_logic(self, temp_ace_env):
@@ -94,12 +94,12 @@ class TestMultiAgentCoordination:
         config = SubscriptionsConfig(subscriptions=[sub])
         
         with open(sub_file, "w", encoding="utf-8") as f:
-            yaml.dump(config.dict(), f)
+            yaml.dump(config.model_dump(mode="json"), f)
 
         # Verify subscription is recorded
         assert sub_file.exists()
         with open(sub_file, "r", encoding="utf-8") as f:
-            loaded_data = yaml.load(f)
+            loaded_data = yaml.safe_load(f)
             loaded_config = SubscriptionsConfig(**loaded_data)
             
         assert len(loaded_config.subscriptions) == 1
@@ -123,7 +123,7 @@ class TestMultiAgentCoordination:
             "src/core": OwnershipModule(agent_id="agent-a")
         })
         with open(ownership_file, "w", encoding="utf-8") as f:
-            yaml.dump(ownership.dict(), f)
+            yaml.dump(ownership.model_dump(mode="json"), f)
 
         # 2. Simulate Agent-B attempting a change in Agent-A's territory
         acting_agent_id = "agent-b"
@@ -150,7 +150,7 @@ class TestMultiAgentCoordination:
             # Save proposal to .ace/macp/
             prop_file = service.macp_dir / f"{proposal.id}.yaml"
             with open(prop_file, "w", encoding="utf-8") as f:
-                yaml.dump(proposal.dict(), f)
+                yaml.dump(proposal.model_dump(mode="json"), f)
 
         # 4. Assertions
         assert owner_id == "agent-a"

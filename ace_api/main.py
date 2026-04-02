@@ -19,6 +19,8 @@ from ace_lib.models.schemas import (
     OwnershipConfig,
     MailMessage,
     SubscriptionsConfig,
+    Plugin,
+    PluginType,
 )
 
 # Configure logging
@@ -323,6 +325,38 @@ async def subscribe(
     return service.subscribe(
         agent_id, path, priority, notify_on_success, notify_on_failure
     )
+
+
+# --- Marketplace Endpoints ---
+
+@app.get("/marketplace/plugins", response_model=List[Plugin])
+async def list_plugins(
+    type: Optional[PluginType] = None,
+    query: Optional[str] = None,
+    category: Optional[str] = None,
+):
+    return service.list_plugins(type, query, category)
+
+
+@app.get("/marketplace/plugins/{plugin_id}", response_model=Plugin)
+async def get_plugin(plugin_id: str):
+    plugin = service.get_plugin(plugin_id)
+    if not plugin:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+    return plugin
+
+
+@app.post("/marketplace/plugins", response_model=Plugin)
+async def publish_plugin(plugin: Plugin):
+    return service.publish_plugin(plugin)
+
+
+@app.post("/marketplace/plugins/{plugin_id}/download", response_model=Plugin)
+async def download_plugin(plugin_id: str):
+    plugin = service.download_plugin(plugin_id)
+    if not plugin:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+    return plugin
 
 
 if __name__ == "__main__":

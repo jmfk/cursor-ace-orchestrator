@@ -16,7 +16,7 @@ def temp_workspace(tmp_path):
     (workspace / ".ace").mkdir()
     (workspace / ".ace/mail").mkdir()
     (workspace / ".ace/sessions").mkdir()
-    (workspace / ".cursor/rules").mkdir(parents=True)
+    (workspace / "rules").mkdir(parents=True)
     return workspace
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def test_onboarding_sop_generation_success(service, temp_workspace):
     assert "src/core, src/utils" in content
 
     # Assertions: Playbook Initialization
-    playbook_path = temp_workspace / ".cursor/rules/developer.mdc"
+    playbook_path = temp_workspace / "rules/developer.mdc"
     assert playbook_path.exists(), "Agent playbook (.mdc) should be initialized during onboarding."
 
     # Assertions: Notification

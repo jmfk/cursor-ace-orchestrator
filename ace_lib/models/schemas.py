@@ -162,6 +162,40 @@ class MACPProposal(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class PluginType(str, Enum):
+    """Type of plugin in the marketplace."""
+
+    SOP = "sop"
+    AGENT = "agent"
+    MDC = "mdc"
+
+
+class Plugin(BaseModel):
+    """A plugin (SOP, Agent, or MDC template) in the marketplace."""
+
+    id: str
+    name: str
+    type: PluginType
+    description: str
+    author: str
+    version: str = "1.0.0"
+    content: str  # The actual SOP markdown, Agent YAML, or MDC content
+    tags: List[str] = Field(default_factory=list)
+    downloads: int = 0
+    rating: float = 0.0
+    category: str = "General"  # e.g., "Auth", "UI", "Database"
+    compatibility: List[str] = Field(default_factory=list)  # e.g., ["ACE v1", "Cursor v0.40"]
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class MarketplaceConfig(BaseModel):
+    """Configuration for the ACE Plugin Marketplace."""
+
+    version: str = "1"
+    plugins: List[Plugin] = Field(default_factory=list)
+
+
 class NotificationPriority(str, Enum):
     """Priority level for notifications."""
 

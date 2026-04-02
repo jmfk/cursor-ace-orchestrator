@@ -17,7 +17,6 @@ runner = CliRunner()
 @pytest.fixture
 def mock_stitch_api(requests_mock):
     """Fixture to mock Google Stitch API endpoints."""
-    # Mock Mockup Generation
     requests_mock.post(
         "https://api.stitch.google.com/v1/mockup",
         json={
@@ -26,7 +25,6 @@ def mock_stitch_api(requests_mock):
         },
         status_code=200
     )
-    # Mock Mockup Sync/Retrieval
     requests_mock.get(
         "https://api.stitch.google.com/v1/mockup/test_mockup_123",
         json={
@@ -49,7 +47,7 @@ def setup_ace_env(tmp_path):
         name="Vogue",
         role="ui-agent",
         email="vogue@ace.local",
-        memory_file=".cursor/rules/ui.mdc",
+        memory_file="rules/ui.mdc",
         status="active",
     )
     
@@ -130,7 +128,7 @@ def test_cli_ui_sync_command(setup_ace_env, monkeypatch):
         assert result.exit_code == 0
         assert "Syncing UI code" in result.stdout
         assert "Code synced successfully" in result.stdout
-        mock_sync.assert_called_with(canvas_url, api_key=pytest.any)
+        mock_sync.assert_called_with(canvas_url, api_key=ANY)
 
 # --- Visual Verification (Playwright) Logic Test ---
 
@@ -155,4 +153,3 @@ def test_visual_verification_trigger():
 
 if __name__ == "__main__":
     pytest.main([__file__])
-"

@@ -58,7 +58,7 @@ def test_ralph_loop_multi_iteration_success(mock_planner_cls, mock_run_agent, mo
     mock_run_agent.return_value = "Execution successful"
     
     # Mock CLI arguments
-    test_args = ["ralph_loop.py", "--config", str(mock_env["config_path"]), "--prd", "dummy.md"]
+    test_args = ["ralph_loop.py", "--config", str(mock_env["config_path"]), "dummy.md"]
     
     with patch("sys.argv", test_args), \
          patch("ralph_loop.load_config"), \
@@ -96,7 +96,7 @@ def test_ralph_loop_halts_on_success(mock_env):
             pass
             
     # Verify it logged completion and stopped
-    assert any("✅ All tasks completed" in str(call) for call in mock_log.call_args_list)
+    assert any("🎉 All tasks in the hierarchical plan are completed!" in str(call) for call in mock_log.call_args_list)
     assert mock_planner.run_step.call_count == 0
 
 @patch("ralph_loop.run_cursor_agent")
@@ -153,5 +153,5 @@ def test_ralph_loop_respects_max_iterations(mock_env):
                 pass
 
     # Verify it stopped at iteration 2
-    assert any("Max iterations (2) reached" in str(call) for call in mock_log.call_args_list)
+    assert any("--- RALPH Loop Iteration 2/2" in str(call) for call in mock_log.call_args_list)
     assert mock_planner.run_step.call_count == 2

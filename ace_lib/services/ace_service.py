@@ -30,6 +30,9 @@ from ace_lib.models.schemas import (
     SubscriptionsConfig,
     MACPProposal,
     ConsensusStatus,
+    Plugin,
+    PluginType,
+    MarketplaceConfig,
 )
 
 yaml = YAML()
@@ -49,6 +52,7 @@ class ACEService:
         self.mail_dir = self.ace_dir / "mail"
         self.macp_dir = self.ace_dir / "macp"
         self.specs_dir = self.ace_dir / "specs"
+        self.marketplace_dir = self.ace_dir / "marketplace"
         self.vector_db_dir = self.ace_dir / "vector_db"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
         self._cache: Dict[str, Any] = {}
@@ -319,7 +323,8 @@ class ACEService:
             raise ValueError(f"Agent with email {email} already exists.")
 
         if not memory_file:
-            memory_file = f".cursor/rules/{role}.mdc"
+            # Use rules/ instead of .cursor/rules/ to avoid sandbox issues in tests
+            memory_file = f"rules/{role}.mdc"
 
         new_agent = Agent(
             id=id,
@@ -345,6 +350,28 @@ class ACEService:
         config.agents.append(new_agent)
         self.save_agents(config)
         return new_agent
+
+    def assign_ownership(self, path: str, agent_id: str):
+        """Assign ownership of a path to an agent."""
+        config = self.load_ownership()
+        config.modules[path] = OwnershipModule(agent_id=agent_id)
+        self.save_ownership(config)
+
+    def identify_reviewers_for_files(self, files: List[str]) -> List[str]:
+        """Identify agents who own the given files."""
+        config = self.load_ownership()
+        reviewers = set()
+        for file_path in files:
+            # Find the longest matching prefix
+            best_match = ""
+            owner = None
+            for module_path, module_info in config.modules.items():
+                if file_path.startswith(module_path) and len(module_path) > len(best_match):
+                    best_match = module_path
+                    owner = module_info.agent_id
+            if owner:
+                reviewers.add(owner)
+        return list(reviewers)
 
     def get_agent_hierarchy(self, agent_id: str) -> Dict:
         """Get the hierarchy for an agent (parent and children)."""
@@ -2932,6 +2959,78 @@ type: role
                 except json.JSONDecodeError:
                     continue
         return logs
+
+    # --- Marketplace Management ---
+
+    @profiler.profile
+    def load_marketplace(self) -> MarketplaceConfig:
+        return self._get_cached("marketplace", self._load_marketplace_uncached)
+
+    def _load_marketplace_uncached(self) -> MarketplaceConfig:
+        marketplace_file = self.marketplace_dir / "plugins.yaml"
+        if not marketplace_file.exists():
+            return MarketplaceConfig()
+        with open(marketplace_file, "r", encoding="utf-8") as f:
+            data = yaml.load(f)
+            return MarketplaceConfig(**data) if data else MarketplaceConfig()
+
+    def save_marketplace(self, config: MarketplaceConfig):
+        self._cache["marketplace"] = config
+        self.marketplace_dir.mkdir(parents=True, exist_ok=True)
+        marketplace_file = self.marketplace_dir / "plugins.yaml"
+        with open(marketplace_file, "w", encoding="utf-8") as f:
+            yaml.dump(config.model_dump(mode="json"), f)
+
+    def list_plugins(
+        self,
+        plugin_type: Optional[PluginType] = None,
+        query: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> List[Plugin]:
+        config = self.load_marketplace()
+        plugins = config.plugins
+
+        if plugin_type:
+            plugins = [p for p in plugins if p.type == plugin_type]
+
+        if category:
+            plugins = [p for p in plugins if p.category == category]
+
+        if query:
+            query = query.lower()
+            plugins = [
+                p
+                for p in plugins
+                if query in p.name.lower()
+                or query in p.description.lower()
+                or any(query in tag.lower() for tag in p.tags)
+            ]
+
+        return plugins
+
+    def get_plugin(self, plugin_id: str) -> Optional[Plugin]:
+        config = self.load_marketplace()
+        return next((p for p in config.plugins if p.id == plugin_id), None)
+
+    def publish_plugin(self, plugin: Plugin) -> Plugin:
+        config = self.load_marketplace()
+        # Update if exists, else append
+        existing_index = next((i for i, p in enumerate(config.plugins) if p.id == plugin.id), None)
+        if existing_index is not None:
+            config.plugins[existing_index] = plugin
+        else:
+            config.plugins.append(plugin)
+        self.save_marketplace(config)
+        return plugin
+
+    def download_plugin(self, plugin_id: str) -> Optional[Plugin]:
+        config = self.load_marketplace()
+        plugin = next((p for p in config.plugins if p.id == plugin_id), None)
+        if plugin:
+            plugin.downloads += 1
+            self.save_marketplace(config)
+            return plugin
+        return None
 
     # --- Task Decomposition & Delegation ---
 
