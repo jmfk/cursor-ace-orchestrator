@@ -1177,7 +1177,10 @@ def loop(
                 console.print(
                     f"[RALPH] [red]Iteration {iteration} failed. Retrying...[/red]"
                 )
-                prompt = f"Previous attempt failed. Test output:\n{test_result.stdout}\n{test_result.stderr}\n\nOriginal task: {prompt}"
+                prompt = (
+                    f"Previous attempt failed. Test output:\n{test_result.stdout}\n"
+                    f"{test_result.stderr}\n\nOriginal task: {prompt}"
+                )
 
         finally:
             if os.path.exists(context_file):
