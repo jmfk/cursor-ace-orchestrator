@@ -43,7 +43,7 @@ install-ralph-exe: build-ralph-exe
 	@echo "Successfully installed 'ralph' command."
 
 eval:
-	python3 commit_evaluator.py --limit 10
+	python3 commit_evaluator.py 
 
 eval-llm:
 	python3 commit_evaluator.py --limit 5 --llm

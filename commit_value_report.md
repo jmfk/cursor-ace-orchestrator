@@ -1,10 +1,14 @@
 # Git Commit Value Report
-Generated on: 2026-04-02 04:39:06
-Analysis Depth: None commits
+Generated on: 2026-04-02 04:45:13
+Analysis Depth: 207 commits
 LLM Analysis: Disabled
+
+## Value Trend
+![Commit Value Graph](commit_value_graph.png)
 
 ## Value Distribution (ASCII Graph)
 ```
+51023bf9 [12.75] | 
 ec08f7a4 [12.75] | 
 7c45d1ce [15.09] | 
 b5fec878 [10.27] | 
@@ -216,6 +220,7 @@ d0438f58 [ 5.57] |
 ## Commit Details
 | Hash | Score | Subject | Analysis |
 | :--- | :--- | :--- | :--- |
+| `51023bf9` | **12.75** | Roadmap: Define next Phase 11 advanced features | Files: 6, Changes: 842 |
 | `ec08f7a4` | **12.75** | chore: 11.7 Roadmap task placeholder | Files: 7, Changes: 839 |
 | `7c45d1ce` | **15.09** | Define advanced features for Phase 11 roadmap | Files: 7, Changes: 882 |
 | `b5fec878` | **10.27** | Add 11.5 future roadmap task placeholder | Files: 3, Changes: 341 |

@@ -355,7 +355,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--all", action="store_true", help="Analyze full history and aggregate by milestone")
-    parser.add_argument("--limit", type=int, default=None, help="Number of commits to analyze for standard report (default: all)")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Number of commits to analyze for standard report (default: all)")
     parser.add_argument("--report", action="store_true", help="Generate standard markdown report")
     parser.add_argument("--llm", action="store_true", help="Use Gemini Flash for evaluation")
     parser.add_argument("--output", type=str, default="commit_value_report.md", help="Report output file")
