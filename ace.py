@@ -945,156 +945,28 @@ def loop(
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
     """
     console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
-    
-    # Check for API keys
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    if not anthropic_key:
-        # Try to load from credentials
-        cred_file = Path.home() / ".ace" / "credentials"
-        if cred_file.exists():
-            for line in cred_file.read_text(encoding="utf-8").splitlines():
-                if line.startswith("ANTHROPIC_API_KEY="):
-                    anthropic_key = line.split("=", 1)[1].strip()
-                    os.environ["ANTHROPIC_API_KEY"] = anthropic_key
-                    break
-
-    if not anthropic_key:
-        console.print(
-            "[yellow]Warning: ANTHROPIC_API_KEY not set. "
-            "Reflection will be skipped.[/yellow]"
-        )
-
-    # Check for CURSOR_API_KEY
-    cursor_key = os.getenv("CURSOR_API_KEY")
-    if not cursor_key:
-        cred_file = Path.home() / ".ace" / "credentials"
-        if cred_file.exists():
-            for line in cred_file.read_text(encoding="utf-8").splitlines():
-                if line.startswith("CURSOR_API_KEY="):
-                    cursor_key = line.split("=", 1)[1].strip()
-                    os.environ["CURSOR_API_KEY"] = cursor_key
-                    break
-
     svc = get_service()
     
-    iteration = 0
-    success = False
-    state_history = []
-    import hashlib
+    success, iterations = svc.run_loop(
+        prompt=prompt,
+        test_cmd=test_cmd,
+        max_iterations=max_iterations,
+        path=path,
+        agent_id=agent_id,
+        git_commit=git_commit,
+        prd_path=prd,
+        plan_file=plan_file,
+        max_spend=max_spend,
+        model=model,
+        spec_id=spec_id,
+    )
     
-    while iteration < max_iterations:
-        iteration += 1
-        console.print(f"\n[bold blue]--- Iteration {iteration} ---[/bold blue]")
-        
-        # 1. Context Refresh
-        context, resolved_agent_id = svc.build_context(path, TaskType.IMPLEMENT, agent_id, prompt)
-        
-        # Stagnation detection (Phase 10.4)
-        try:
-            status_out = subprocess.run(
-                ["git", "status", "--porcelain"], capture_output=True, text=True
-            ).stdout
-            state_hash = hashlib.sha256(status_out.encode()).hexdigest()
-            if len(state_history) >= 3 and all(h == state_hash for h in state_history[-3:]):
-                console.print("[yellow]⚠️ Stagnation detected! State has not changed for 3 iterations.[/yellow]")
-                prompt = (
-                    f"STAGNATION DETECTED. You are stuck in the same state. "
-                    "Analyze why and try a different approach.\n\n"
-                    f"{prompt}"
-                )
-                # Re-build context with stagnation warning
-                context, resolved_agent_id = svc.build_context(path, TaskType.IMPLEMENT, agent_id, prompt)
-            state_history.append(state_hash)
-        except Exception:
-            pass
-
-        # 2. Execute
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
-            tmp.write(context)
-            context_file = tmp.name
-            
-        # Prepare cursor-agent command
-        cursor_cmd = [
-            "cursor-agent",
-            "--api-key", cursor_key or "",
-            "--model", model,
-            "--trust",
-            f"--context-file {context_file}",
-            prompt
-        ]
-        
-        full_cmd = " ".join(cursor_cmd)
-        console.print(f"Executing: [dim]{full_cmd}[/dim]")
-        
-        try:
-            process = subprocess.run(full_cmd, shell=True, capture_output=True, text=True)
-            output = process.stdout + process.stderr
-            console.print(output)
-        except Exception as e:
-            console.print(f"[red]Execution error: {e}[/red]")
-            continue
-            
-        # 3. Verify (Tests)
-        console.print(f"Verifying with: [italic]{test_cmd}[/italic]")
-        test_process = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
-        test_output = test_process.stdout + test_process.stderr
-        test_exit_code = test_process.returncode
-        
-        if test_exit_code == 0:
-            console.print("[green]Tests passed![/green]")
-            success = True
-        else:
-            console.print("[red]Tests failed.[/red]")
-            console.print(test_output)
-            
-        # 4. Reflect & Update Playbook
-        if anthropic_key:
-            reflection_text = svc.reflect_on_session(output)
-            updates = svc.parse_reflection_output(reflection_text)
-            if updates:
-                playbook_path = svc.cursor_rules_dir / "_global.mdc"
-                if resolved_agent_id:
-                    agents_config = svc.load_agents()
-                    agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
-                    if agent:
-                        playbook_path = Path(agent.memory_file)
-                
-                svc.update_playbook(playbook_path, updates)
-                console.print(f"[green]Playbook updated: {playbook_path}[/green]")
-        
-        if success:
-            if git_commit:
-                subprocess.run("git add . && git commit -m 'RALPH Loop success'", shell=True)
-            
-            # Update plan.md and changelog.md if they exist (Phase 6.7)
-            if plan_file and os.path.exists(plan_file):
-                console.print(f"Updating {plan_file}...")
-                update_plan_prompt = (
-                    f"Update '{plan_file}' and 'changelog.md' based on the "
-                    f"successful completion of: {prompt[:100]}"
-                )
-                # Use cursor-agent to update the plan
-                cursor_update_cmd = [
-                    "cursor-agent",
-                    "--api-key", cursor_key or "",
-                    "--model", model,
-                    "--trust",
-                    f'"{update_plan_prompt}"'
-                ]
-                subprocess.run(" ".join(cursor_update_cmd), shell=True)
-
-            # Update Living Spec if applicable (Phase 10.23)
-            if spec_id:
-                console.print(f"Automating Living Spec update for {spec_id}...")
-                svc.automate_spec_update(spec_id, output)
-
-            break
-            
     if success:
-        console.print(f"\n✅ [bold green]RALPH Loop completed successfully in {iteration} iterations![/bold green]")
+        console.print(f"\n✅ [bold green]RALPH Loop completed successfully in {iterations} iterations![/bold green]")
     else:
-        console.print(f"\n❌ [bold red]RALPH Loop failed after {iteration} iterations.[/bold red]")
+        console.print(f"\n❌ [bold red]RALPH Loop failed after {iterations} iterations.[/bold red]")
         raise typer.Exit(code=1)
+
 
 
 @app.command()

@@ -1,7 +1,6 @@
 import pytest
-from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType, Agent
+from ace_lib.models.schemas import TaskType
 
 @pytest.fixture
 def ace_service(tmp_path):

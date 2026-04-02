@@ -1,9 +1,6 @@
 import pytest
-import os
 import subprocess
-from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType
 
 @pytest.fixture
 def ace_service(tmp_path):
