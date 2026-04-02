@@ -85,7 +85,7 @@ def test_ui_mockup_integration(service, temp_workspace, monkeypatch):
     # Mock stitch engine generate_mockup
     import ace_lib.stitch.stitch_engine as stitch_engine
     monkeypatch.setattr(stitch_engine, "generate_mockup",
-                        lambda desc, aid, key: (f"https://stitch.google.com/canvas/test_id",
+                        lambda desc, aid, key: ("https://stitch.google.com/canvas/test_id",
                                                 "export const Button = () => <button>Click</button>;"))
 
     url = service.ui_mockup("A simple button", "test-agent")
