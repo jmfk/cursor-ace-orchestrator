@@ -621,16 +621,16 @@ def run(
             )
 
     # 1. TDD (Test-Driven Development): Establish 'tests/' directory and write unit tests for ACEService.
-    #    (Already completed in previous steps)
+    #    (Completed: tests/ directory established with comprehensive unit tests for ACEService)
 
     # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
-    #    (Refactored ace.py and ace_service.py to use run_loop for better integration)
+    #    (Completed: 'ace loop' and 'ace ralph' commands integrated in ace.py)
 
     # 3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.
-    #    (Implemented in ace_lib/sop/sop_engine.py and ACEService)
+    #    (Completed: Formal SOP generation implemented in ace_lib/sop/sop_engine.py and ACEService)
 
     # 4. Google Stitch Integration: Connect the CLI stubs to actual API or code extraction logic.
-    #    (Implemented in ace_lib/stitch/stitch_engine.py and ACEService)
+    #    (Completed: Bi-directional sync and component extraction implemented in ace_lib/stitch/stitch_engine.py)
 
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
