@@ -1,0 +1,124 @@
+{
+  "project_name": "Cursor ACE Orchestrator",
+  "overview": "A thin orchestration layer designed to provide coding agents with long-term memory, architectural context, and modular ownership. It utilizes Cursor's native primitives (.mdc files) and a write-back loop to ensure consistency across sessions and multi-agent coordination.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Ownership Registry & Agent Management",
+      "description": "Establish a centralized system to define agent roles and map specific code modules to dedicated agent teams.",
+      "priority": "High",
+      "success_criteria": [
+        "CLI command `ace own <path> --agent <id>` correctly maps a directory to an agent in `.ace/ownership.yaml`.",
+        "CLI command `ace who <file>` correctly identifies the owner using longest-prefix matching.",
+        "Agent metadata is persistently stored in `.ace/agents.yaml` including ID, name, role, and responsibilities."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-001.1",
+          "title": "Agent Creation",
+          "description": "Mechanism to create named agents manually or autonomously.",
+          "priority": "Medium",
+          "success_criteria": [
+            "New agents are appended to `agents.yaml` with unique IDs and dedicated `.mdc` memory files."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Context Builder & Memory Slicing",
+      "description": "Dynamically compose the context injected into the agent's prompt based on the specific task, owner, and architectural history.",
+      "priority": "High",
+      "success_criteria": [
+        "Context composition includes `_global.mdc`, the specific `<role>.mdc`, and recent ADRs.",
+        "Task-specific framing (implement, review, debug) is prepended to the final prompt.",
+        "Token usage is optimized by only including relevant subsystem context (Contextual Specialization)."
+      ]
+    },
+    {
+      "id": "REQ-003",
+      "title": "Write-back Pipeline",
+      "description": "An automated reflection process that extracts lessons learned and architectural decisions from agent output and updates the playbook.",
+      "priority": "High",
+      "success_criteria": [
+        "Orchestrator runs a reflection prompt against agent output post-task.",
+        "Successful tasks increment `helpful` counters in `.mdc` files; failures increment `harmful` counters.",
+        "New strategies or pitfalls are appended to the `.mdc` file in the correct section without overwriting existing content."
+      ]
+    },
+    {
+      "id": "REQ-004",
+      "title": "RALPH Loop Engine (Iterative Loop)",
+      "description": "A Reasoning-Action-Learning-Progress-Halt motor that drives the agent until tests pass or max iterations are reached.",
+      "priority": "High",
+      "success_criteria": [
+        "The `ace loop` command executes the agent and evaluates results against a provided test command.",
+        "The system performs a 'Context Refresh' between iterations to incorporate failures as new learnings.",
+        "The loop halts automatically when tests pass or the `--max` iteration count is hit."
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "title": "Agent Messaging System (Agent Mail)",
+      "description": "Internal asynchronous communication system allowing agents to exchange context, proposals, and coordination messages.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Each agent has a functional `inbox/` and `sent/` folder in `.ace/mail/` using Markdown files.",
+        "Messages support threading via `thread_id` to maintain conversation context.",
+        "Agents can 'attach' files or code snippets to messages for shared review."
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "title": "Multi-Agent Consensus & Debate",
+      "description": "A protocol for multiple agents to resolve conflicts when changes cross ownership boundaries.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Conflict detection flags tasks requiring multiple owners.",
+        "Consensus-flow triggers an LLM-referee to evaluate debates and reach a decision.",
+        "Escalation to human users occurs if consensus isn't reached within 3 rounds."
+      ]
+    },
+    {
+      "id": "REQ-007",
+      "title": "Token Consumption Modes",
+      "description": "Global settings to control the depth of agent reasoning and debate to manage API costs.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Switching to 'Low' mode disables multi-agent debate and minimizes context.",
+        "Switching to 'High' mode enables pro-active refactoring suggestions and deep context analysis."
+      ]
+    },
+    {
+      "id": "REQ-008",
+      "title": "Google Stitch Integration",
+      "description": "Integration with Google Labs AI-native design tools for UI/UX mockup generation and code extraction.",
+      "priority": "Low",
+      "success_criteria": [
+        "Agent can generate 'Vibe Design' prompts to be used with Stitch.",
+        "CLI command `ace ui sync <url>` extracts Tailwind/Flutter code from a Stitch canvas into the local codebase."
+      ]
+    },
+    {
+      "id": "REQ-009",
+      "title": "Global Project Memory (AGENTS.md)",
+      "description": "Maintain a root-level markdown file to provide cross-tool context for all agents and human developers.",
+      "priority": "High",
+      "success_criteria": [
+        "File contains a table of agent roles, responsibilities, and rule file paths.",
+        "Architectural decisions (ADRs) are summarized and updated automatically.",
+        "The file is readable and usable by non-ACE tools (Cursor, Claude Code, Copilot)."
+      ]
+    },
+    {
+      "id": "REQ-010",
+      "title": "Standard Operating Procedures (SOPs)",
+      "description": "Formalize agent interactions through predefined workflows for common tasks.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Implementation of an 'Onboarding' SOP that generates a status summary for new agents.",
+        "Implementation of a 'QA-audit' SOP where agents scan subsystems for DRY/YAGNI violations."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "project_name": "Cursor ACE Orchestrator",
+  "test_run_results": [
+    {
+      "requirement_id": "REQ-OWN-001",
+      "test_file": "sqe/tests/test_ownership_registry.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-001.1",
+      "test_file": "sqe/tests/tests/test_agent_registry.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-002",
+      "test_file": "sqe/tests/test_dynamic_context_builder.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-003",
+      "test_file": "sqe/tests/test_writeback_pipeline.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-004",
+      "test_file": "sqe/tests/test_ralph_loop_engine.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-004.1",
+      "test_file": "sqe/tests/test_headless_executor.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-005",
+      "test_file": "sqe/tests/test_multi_agent_coordination.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-005.1",
+      "test_file": "sqe/tests/test_sop_implementation.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-006",
+      "test_file": "sqe/tests/test_stitch_integration.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-007",
+      "test_file": "sqe/tests/test_agents_memory.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    },
+    {
+      "requirement_id": "REQ-008",
+      "test_file": "sqe/tests/tests/test_quality_assurance_framework.py",
+      "exit_code": 4,
+      "stdout": "",
+      "stderr": "ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]\npytest: error: unrecognized arguments: --json-report --json-report-file=sqe/data/last_test_report.json\n  inifile: /Users/jmfk/code/ACE/pyproject.toml\n  rootdir: /Users/jmfk/code/ACE\n\n",
+      "passed": false
+    }
+  ]
+}

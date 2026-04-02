@@ -35,8 +35,8 @@ class PlanNode:
         }
 
 class PlanTree:
-    """Manages the hierarchical plan tree stored in .ace/plans/."""
-    def __init__(self, prd_path: str, base_dir: str = ".ace/plans", max_depth: int = 4):
+    """Manages the hierarchical plan tree stored in .ralph/plans/."""
+    def __init__(self, prd_path: str, base_dir: str = ".ralph/plans", max_depth: int = 4):
         self.prd_path = prd_path
         self.base_dir = Path(base_dir)
         self.nodes_dir = self.base_dir / "nodes"
@@ -84,9 +84,11 @@ class PlanTree:
         return not self.root_ids
 
     def add_root_nodes(self, nodes_data: List[Dict[str, Any]]):
-        for i, data in enumerate(nodes_data):
-            node_id = f"{i+1:04d}"
-            node = PlanNode(id=node_id, depth=0, **data)
+        for data in nodes_data:
+            node_id = f"{len(self.root_ids) + 1:04d}"
+            # Carry over status if provided (useful for migration)
+            status = data.pop("status", "pending")
+            node = PlanNode(id=node_id, depth=0, status=status, **data)
             self.nodes[node_id] = node
             self.root_ids.append(node_id)
             self.save_node(node)
@@ -103,7 +105,9 @@ class PlanTree:
 
         for i, data in enumerate(children_data):
             child_id = f"{parent_id}_{i+1:03d}"
-            child = PlanNode(id=child_id, parent_id=parent_id, depth=parent.depth + 1, **data)
+            # Carry over status if provided (useful for migration)
+            status = data.pop("status", "pending")
+            child = PlanNode(id=child_id, parent_id=parent_id, depth=parent.depth + 1, status=status, **data)
             self.nodes[child_id] = child
             parent.children.append(child_id)
             self.save_node(child)
@@ -195,7 +199,7 @@ class PlanTree:
         return ancestors
 
     @classmethod
-    def load_or_create(cls, prd_path: str, base_dir: str = ".ace/plans") -> 'PlanTree':
+    def load_or_create(cls, prd_path: str, base_dir: str = ".ralph/plans") -> 'PlanTree':
         return cls(prd_path, base_dir)
 
     def ingest_flat_plan(self, md_content: str):
@@ -217,13 +221,20 @@ class PlanTree:
             if task_match and current_phase:
                 status = "completed" if task_match.group(1).lower() == "x" else "pending"
                 title = task_match.group(2).strip()
+                
+                # Auto-detect completion from title if not already marked
+                if "(Completed)" in title:
+                    status = "completed"
+                
                 phase_tasks[current_phase].append({"title": title, "status": status})
 
-        # Add phases as root nodes
-        self.add_root_nodes(phases)
-        
-        # Add tasks as children of their respective phases
         for i, phase in enumerate(phases):
             root_id = f"{i+1:04d}"
             tasks = phase_tasks[phase["title"]]
+            
+            # Auto-detect phase completion from title
+            if "(Completed)" in phase["title"]:
+                phase["status"] = "completed"
+                
+            self.add_root_nodes([phase])
             self.add_children(root_id, tasks)

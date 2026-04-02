@@ -336,10 +336,11 @@ app.add_typer(agent_app, name="agent")
 
 @agent_app.command("create")
 def agent_create(
+    id: str = typer.Option(..., "--id", "-i", help="Agent unique ID"),
     name: str = typer.Option(..., "--name", "-n", help="Agent name"),
     role: str = typer.Option(..., "--role", "-r", help="Agent role"),
-    id: str = typer.Option(..., "--id", "-i", help="Agent unique ID"),
     email: Optional[str] = typer.Option(None, "--email", "-e", help="Agent email"),
+    memory: Optional[str] = typer.Option(None, "--memory", "-m", help="Memory file path"),
     responsibilities: Optional[List[str]] = typer.Option(
         None, "--resp", "-p", help="Agent responsibilities"
     ),
@@ -353,6 +354,7 @@ def agent_create(
             "name": name,
             "role": role,
             "email": email,
+            "memory_file": memory,
             "responsibilities": responsibilities or [],
         },
     )
@@ -360,7 +362,7 @@ def agent_create(
         console.print(f"Created agent [green]{res['name']}[/green] (ID: {res['id']})")
     else:
         try:
-            agent = get_service().create_agent(id, name, role, email, responsibilities)
+            agent = get_service().create_agent(id, name, role, email, responsibilities, memory_file=memory)
             console.print(f"Created agent [green]{agent.name}[/green] (ID: {agent.id})")
         except ValueError as e:
             console.print(f"[red]Error: {e}[/red]")

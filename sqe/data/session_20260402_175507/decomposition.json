@@ -1,0 +1,120 @@
+{
+  "project_name": "Cursor ACE Orchestrator",
+  "overview": "A thin orchestration layer for Cursor agents providing long-term memory, module ownership, and multi-agent coordination. It utilizes .mdc files for modular memory, a write-back loop for learning, and a RALPH-style iterative engine to ensure task completion through testing and architectural consistency.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Module Ownership Registry",
+      "description": "Establish a system to map specific code modules to dedicated Agent Teams to maintain architectural consistency and contextual expertise.",
+      "priority": "High",
+      "success_criteria": [
+        "Registry accurately maps file paths to agent IDs using longest-prefix matching.",
+        "System prevents a single file from having more than one primary owner.",
+        "Changes to ownership are persisted in a git-trackable .ace/ownership.yaml file."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-001.1",
+          "title": "Ownership CLI",
+          "description": "CLI tools to assign, query, and list owners (ace own, ace who, ace list-owners).",
+          "priority": "Medium",
+          "success_criteria": [
+            "CLI returns the correct owner for a nested file based on its parent directory ownership."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Dynamic Context Builder",
+      "description": "Compose a specialized 'Memory Slice' for every agent call by combining global rules, agent-specific playbooks, recent ADRs, and session history.",
+      "priority": "High",
+      "success_criteria": [
+        "Context composition logic correctly prioritizes .mdc files based on the target module.",
+        "Injected context includes the 3 most recent relevant architectural decisions (ADRs).",
+        "Prompt-prefixing varies correctly based on task type (implement, review, debug, refactor, plan)."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-003",
+      "title": "Write-back Learning Pipeline",
+      "description": "An automated reflection process where agents extract lessons learned, new strategies, and pitfalls after completing a task and update their .mdc playbooks.",
+      "priority": "High",
+      "success_criteria": [
+        "Orchestrator successfully extracts delta-updates in JSON format from agent output.",
+        "The .mdc files are updated incrementally without losing existing structure or metadata.",
+        "Helpful/Harmful counters for strategies are correctly incremented based on task outcomes."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-004",
+      "title": "RALPH Loop Engine",
+      "description": "Implement a Reasoning, Action, Learning, Progress, Halt cycle to iteratively run the agent until defined tests pass.",
+      "priority": "High",
+      "success_criteria": [
+        "Engine terminates execution when user-defined tests pass or max_iterations is reached.",
+        "Each iteration refreshes context with learnings captured from the previous failed attempt.",
+        "Failed test logs are fed back into the 'Reasoning' phase of the next iteration."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-005",
+      "title": "Multi-Agent Coordination & Consensus",
+      "description": "Facilitate communication and architectural debate between different specialized agents when tasks cross ownership boundaries.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Agent Mail system allows agents to send and receive markdown-based messages in .ace/mail/.",
+        "Consensus Protocol triggers when a task affects modules owned by different agents.",
+        "LLM-referee or Arch-agent can resolve or escalate debates to human users after 3 rounds."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-005.1",
+          "title": "Token Consumption Modes",
+          "description": "Control operational costs by limiting context and debate depth (Low, Medium, High).",
+          "priority": "Medium",
+          "success_criteria": [
+            "Low mode restricts context to single-task focus with no async debate.",
+            "High mode enables proactive refactoring suggestions and deep context analysis."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "title": "UI/UX Orchestration (Google Stitch)",
+      "description": "Integrate Google Stitch to enable AI-driven design mockups and code generation within the ACE workflow.",
+      "priority": "Low",
+      "success_criteria": [
+        "ACE can generate a 'Vibe Design' prompt for Google Stitch.",
+        "CLI command 'ace ui sync' successfully imports code (Tailwind/Flutter) from a Stitch canvas URL."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-007",
+      "title": "Standard Operating Procedures (SOPs)",
+      "description": "Implement formal protocols for agent onboarding, PR reviews, and subsystem audits.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Onboarding SOP generates a markdown summary of technical debt and subsystem status.",
+        "Cross-agent PR reviews identify deviations from the agent's playbook strategies."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-008",
+      "title": "Agent Memory Management",
+      "description": "Maintain a central AGENTS.md for cross-tool visibility and provide tools for memory pruning.",
+      "priority": "Medium",
+      "success_criteria": [
+        "AGENTS.md is updated automatically to reflect the current agent registry and roles.",
+        "The 'ace memory prune' command successfully removes strategies where 'harmful' counts exceed 'helpful' counts."
+      ],
+      "sub_requirements": []
+    }
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "project_name": "Cursor ACE Orchestrator",
+  "overview": "A modular orchestration layer for AI coding agents designed to provide long-term memory, code ownership, and multi-agent coordination within the Cursor ecosystem. It utilizes .mdc files for agent playbooks, a RALPH-style iterative loop for task execution, and an internal messaging system for agent collaboration.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Ownership Registry System",
+      "description": "A centralized system to map specific code modules and directories to dedicated Agent Teams/Roles to ensure architectural consistency.",
+      "priority": "High",
+      "success_criteria": [
+        "The system correctly resolves ownership using longest-prefix matching for any given file path.",
+        "CLI commands 'ace own', 'ace who', and 'ace list-owners' accurately reflect the state of .ace/ownership.yaml.",
+        "Each file is restricted to one primary owner while allowing secondary dependencies to be logged."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-001.1",
+          "title": "Agent Registry",
+          "description": "Maintain a registry of all agents (manual or autonomous) in .ace/agents.yaml including metadata like ID, role, and memory file.",
+          "priority": "High",
+          "success_criteria": [
+            "New agents can be created via 'ace agent create' and persist in the YAML registry.",
+            "Agent metadata includes unique email addresses for the Agent Mail system."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Dynamic Context Builder",
+      "description": "A component that composes a specific 'context slice' for each agent call based on the task, the agent's role, and relevant project history.",
+      "priority": "High",
+      "success_criteria": [
+        "Context composition includes global rules, agent-specific playbooks, recent ADRs, and session continuity data.",
+        "The 'ace context show' command outputs the exact string that would be prepended to a prompt.",
+        "Task-type framing (implement, review, debug, etc.) correctly modifies the prompt instructions."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-003",
+      "title": "Write-back Pipeline",
+      "description": "An automated feedback loop where the orchestrator extracts lessons learned from an agent's output and updates the agent's .mdc playbook.",
+      "priority": "High",
+      "success_criteria": [
+        "The reflection prompt successfully extracts new strategies [str-XXX] and pitfalls [mis-XXX] in JSON format.",
+        "The orchestrator performs incremental updates to .mdc files without overwriting existing manual content.",
+        "Helpful/Harmful counters are updated based on the success or failure of the task."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-004",
+      "title": "RALPH Loop Engine",
+      "description": "An iterative execution motor (Reasoning, Action, Learning, Progress, Halt) that runs the agent until tests pass or limits are reached.",
+      "priority": "Medium",
+      "success_criteria": [
+        "The 'ace loop' command successfully executes multiple iterations, refreshing context between each.",
+        "The engine halts immediately upon a successful test run (TDD approach).",
+        "The engine captures failure reasons in the learning phase to inform the next iteration."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-004.1",
+          "title": "Headless Executor Integration",
+          "description": "Integration with cursor-agent or Claude Code CLI to execute tasks programmatically.",
+          "priority": "High",
+          "success_criteria": [
+            "The system handles headless execution timeouts and retries gracefully.",
+            "Output is captured and streamed for real-time processing by the write-back pipeline."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "title": "Multi-Agent Coordination & Messaging",
+      "description": "Systems for asynchronous communication and consensus-building between different specialized agents.",
+      "priority": "Medium",
+      "success_criteria": [
+        "The Agent Mail system correctly stores and retrieves messages in .ace/mail/ folders.",
+        "Agents can 'subscribe' to changes in modules they depend on.",
+        "The Consensus Protocol triggers a debate when changes cross ownership boundaries."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-005.1",
+          "title": "Standard Operating Procedures (SOPs)",
+          "description": "Formal instructions for agent interactions such as onboarding, PR reviews, and audits.",
+          "priority": "Medium",
+          "success_criteria": [
+            "The 'ace agent onboard' command generates a valid onboarding.md for new agents.",
+            "PR reviews are automatically triggered and logged when cross-module changes occur."
+          ]
+        },
+        {
+          "id": "REQ-005.2",
+          "title": "Token Consumption Modes",
+          "description": "Global settings (Low, Medium, High) to control the depth of context and debate to manage costs.",
+          "priority": "Low",
+          "success_criteria": [
+            "Switching to 'Low' mode disables multi-agent debate and minimizes context slices.",
+            "Switching to 'High' mode enables proactive refactoring suggestions and deep context analysis."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "title": "UI/UX Orchestration (Google Stitch)",
+      "description": "Integration with Google Stitch for AI-driven design mockups and code generation.",
+      "priority": "Low",
+      "success_criteria": [
+        "The 'ace ui mockup' command generates a design description based on project constraints.",
+        "The 'ace ui sync' command successfully imports Tailwind/Flutter code from a Stitch canvas URL.",
+        "Visual verification tests (Playwright) can validate the implemented UI against the mockup intent."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-007",
+      "title": "Global Project Memory (AGENTS.md)",
+      "description": "A cross-tool project memory file located at the root to provide high-level context to any AI tool (Cursor, Claude, etc.).",
+      "priority": "High",
+      "success_criteria": [
+        "AGENTS.md contains a current table of agent roles, responsibilities, and active ADRs.",
+        "The file includes a standardized 'Write-back Protocol' instruction for all agents to follow."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-008",
+      "title": "Quality Assurance & TDD Framework",
+      "description": "A strict testing regime to ensure the stability of the orchestrator and the quality of agent-generated code.",
+      "priority": "High",
+      "success_criteria": [
+        "100% test pass rate on critical modules (Registry, Context Builder) in CI/CD.",
+        "Automated 'Agentic Experience' (AX) tests measure context relevance and write-back accuracy.",
+        "CLI ergonomics are validated to ensure low friction for developers (DX)."
+      ],
+      "sub_requirements": []
+    }
+  ]
+}

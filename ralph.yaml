@@ -13,3 +13,7 @@ max_iterations: 50
 quit_on_rate_limit: true
 price_input_1m: 0.10
 price_output_1m: 0.40
+planner_model: "gemini-3-flash"
+validator_model: "gemini-3-flash-preview"
+context_model: "gemini-3-flash-preview"
+executor_model: "gemini-3-flash"

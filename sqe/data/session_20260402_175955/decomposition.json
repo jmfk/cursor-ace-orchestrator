@@ -1,0 +1,166 @@
+{
+  "project_name": "Cursor ACE Orchestrator",
+  "overview": "A thin orchestration layer designed to provide coding agents (like Cursor) with long-term memory, architectural context, and modular ownership. It implements a write-back loop for continuous learning, a multi-agent coordination system via internal messaging, and an iterative execution engine (RALPH) to ensure code quality through testing.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Ownership Registry & Management",
+      "description": "Establish a system to map specific code modules and directories to dedicated Agent Teams/Roles to preserve architectural intent and specialized knowledge.",
+      "priority": "High",
+      "success_criteria": [
+        "Registry resolves file ownership using longest-prefix-match logic.",
+        "The system prevents ownership conflicts (one primary owner per file).",
+        "CLI supports 'ace own', 'ace who', and 'ace list-owners' with sub-second response times."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-001.1",
+          "title": "Agent Registry (agents.yaml)",
+          "description": "Centralized YAML store for agent metadata (ID, name, role, email, memory file).",
+          "priority": "High",
+          "success_criteria": [
+            "Manual and autonomous agent creation is logged correctly in .ace/agents.yaml."
+          ]
+        },
+        {
+          "id": "REQ-001.2",
+          "title": "Module Mapping (ownership.yaml)",
+          "description": "Mapping of file paths to agent IDs.",
+          "priority": "High",
+          "success_criteria": [
+            "Changes to ownership are reflected immediately in the registry and persist across CLI restarts."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Dynamic Context Builder",
+      "description": "A component that composes a context-slice (Memory Slice) for agent calls based on target files, roles, and task types.",
+      "priority": "High",
+      "success_criteria": [
+        "Injected context includes global rules, agent playbook, recent ADRs, and session history.",
+        "The system generates different prompt-prefixes for 'implement', 'review', 'debug', 'refactor', and 'plan' tasks."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-002.1",
+          "title": "Task Type Framing",
+          "description": "Specific instructional wrappers for different development activities.",
+          "priority": "Medium",
+          "success_criteria": [
+            "Agent output format varies predictably based on the task type framing (e.g., debug mode focuses on [mis-XXX] extraction)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-003",
+      "title": "Write-back Learning Pipeline",
+      "description": "A mechanism to extract lessons, strategies, and pitfalls from agent outputs and update the agent's specific .mdc playbook.",
+      "priority": "High",
+      "success_criteria": [
+        "The orchestrator correctly identifies and parses [str-XXX], [mis-XXX], and [dec-XXX] tags from LLM responses.",
+        "Delta updates to .mdc files preserve existing file structure and frontmatter.",
+        "Helpful/Harmful counters are incremented/decremented based on task success/failure."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-003.1",
+          "title": "Reflection Engine",
+          "description": "Secondary LLM pass to analyze task results and generate structured JSON updates.",
+          "priority": "High",
+          "success_criteria": [
+            "Reflection accurately identifies why a strategy failed by correlating it with test results."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-004",
+      "title": "Execution & RALPH Loop Motor",
+      "description": "The engine responsible for running the agent, capturing output, and iterating until tests pass.",
+      "priority": "High",
+      "success_criteria": [
+        "CLI can execute cursor-agent in a headless mode and capture JSON-streamed output.",
+        "The RALPH loop successfully executes the sequence: Reason -> Action -> Learn -> Progress -> Halt.",
+        "Execution terminates automatically when user-defined tests pass or max iterations are reached."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-004.1",
+          "title": "Session Logging",
+          "description": "Persistent storage of every interaction in .ace/sessions/ for audit and continuity.",
+          "priority": "Medium",
+          "success_criteria": [
+            "Sessions are saved as Git-trackable Markdown files with timestamps."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "title": "Multi-Agent Coordination & Communication",
+      "description": "System for agents to interact, debate architectural changes, and manage dependencies via formal messaging.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Agent Mail (inbox/sent) persists as Markdown files in .ace/mail/.",
+        "The system can detect conflicts when a task spans multiple agent ownership boundaries."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-005.1",
+          "title": "Consensus Protocol",
+          "description": "A debate mechanism where agents propose changes and a referee resolves conflicts.",
+          "priority": "Medium",
+          "success_criteria": [
+            "The system escalates to a human user if consensus isn't reached within 3 rounds."
+          ]
+        },
+        {
+          "id": "REQ-005.2",
+          "title": "SOP Implementation",
+          "description": "Standard Operating Procedures for onboarding, reviews, and audits.",
+          "priority": "Medium",
+          "success_criteria": [
+            "Onboarding generates a status summary for a subsystem that is usable by a new agent."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "title": "Token Consumption Control",
+      "description": "Configurable modes to control token usage and operational costs.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Low mode disables multi-agent debate and minimizes context injection.",
+        "High mode enables proactive refactoring suggestions and deep context analysis.",
+        "CLI command 'ace config tokens --mode' updates the behavior globally."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-007",
+      "title": "UI/UX Integration (Google Stitch)",
+      "description": "Integration with Google Stitch for AI-driven design mockups and code extraction.",
+      "priority": "Low",
+      "success_criteria": [
+        "UI agents can generate 'Vibe Design' prompts suitable for Stitch.",
+        "CLI supports syncing code (Tailwind/Flutter) from a Stitch canvas URL into the codebase."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-008",
+      "title": "Global Memory & Standards (AGENTS.md)",
+      "description": "Maintenance of a project-root AGENTS.md file as a cross-tool communication hub.",
+      "priority": "High",
+      "success_criteria": [
+        "AGENTS.md contains an up-to-date table of agent roles and their .mdc file mappings.",
+        "Global standards and recent ADRs are automatically reflected in the AGENTS.md file."
+      ],
+      "sub_requirements": []
+    }
+  ]
+}

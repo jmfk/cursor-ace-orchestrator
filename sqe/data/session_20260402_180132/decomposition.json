@@ -1,0 +1,123 @@
+{
+  "project_name": "Cursor ACE Orchestrator",
+  "overview": "A stateful orchestration layer for coding agents (like Cursor Agent CLI) designed to provide long-term memory, modular code ownership, and multi-agent coordination. It utilizes native Cursor primitives (.mdc files) and a custom metadata structure (.ace/) to implement a write-back loop, iterative testing (RALPH), and asynchronous agent communication.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Core Infrastructure and Project Initialization",
+      "description": "The system must establish a standardized file structure to store agent metadata, ownership records, and session logs.",
+      "priority": "High",
+      "success_criteria": [
+        "Command 'ace init' successfully creates the .ace/ directory and sub-folders (mail, sessions, decisions).",
+        "The system generates a valid AGENTS.md in the project root as a global memory file.",
+        "The .ace/agents.yaml and .ace/ownership.yaml files are initialized with correct versioning schemas."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-001.1",
+          "title": "Agent Registry Management",
+          "description": "Maintain a central registry of all active agents, their roles, and contact details.",
+          "priority": "High",
+          "success_criteria": [
+            "Command 'ace agent create' adds a new entry to agents.yaml with unique ID and email.",
+            "Command 'ace agent list' accurately displays all registered agents and their status."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Ownership Registry",
+      "description": "A mechanism to map specific code modules or file paths to dedicated Agent Teams to ensure contextual consistency.",
+      "priority": "High",
+      "success_criteria": [
+        "The system resolves ownership using a longest-prefix-match algorithm for file paths.",
+        "Command 'ace who <file>' returns the correct agent ID assigned to that module.",
+        "Ownership conflicts are prevented by allowing only one primary owner per file."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-003",
+      "title": "Dynamic Context Builder",
+      "description": "Compose a specific 'memory slice' for each agent call based on the task type and module ownership.",
+      "priority": "High",
+      "success_criteria": [
+        "The builder successfully aggregates _global.mdc, the specific <role>.mdc, and recent ADRs into a single prompt prefix.",
+        "Task-specific framing (implement, review, debug) is correctly prepended to the agent prompt.",
+        "Command 'ace context show' outputs the exact string that would be injected into the LLM."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-004",
+      "title": "Write-back Pipeline",
+      "description": "An automated loop where the agent's output is analyzed to extract lessons, strategies, and pitfalls to update its long-term memory (.mdc).",
+      "priority": "High",
+      "success_criteria": [
+        "The system extracts [str-XXX] and [mis-XXX] tags from agent output using a reflection prompt.",
+        "The .mdc files are updated incrementally without overwriting existing manual notes or structure.",
+        "Helpful/Harmful counters are correctly incremented/decremented based on task success or failure."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-005",
+      "title": "RALPH Loop Engine",
+      "description": "An iterative execution motor (Reasoning, Action, Learning, Progress, Halt) that runs the agent until tests pass.",
+      "priority": "Medium",
+      "success_criteria": [
+        "The engine automatically triggers a re-run if the specified test command fails.",
+        "The system halts execution and alerts the user if 'max_iterations' is reached.",
+        "Each iteration includes a 'Learning' phase where the failure reason is written back to the agent's memory before the next attempt."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-006",
+      "title": "Multi-Agent Coordination and Messaging",
+      "description": "Enable asynchronous communication and consensus-building between different specialized agents.",
+      "priority": "Medium",
+      "success_criteria": [
+        "Agent Mail system correctly stores messages in .ace/mail/<agent-id>/inbox as Markdown files.",
+        "The system detects cross-module dependencies and triggers a 'Consensus Protocol' debate.",
+        "A neutral 'arch-agent' or LLM-referee can resolve debates or escalate to a human after 3 rounds."
+      ],
+      "sub_requirements": [
+        {
+          "id": "REQ-006.1",
+          "title": "Token Consumption Modes",
+          "description": "Control operational costs by limiting context and debate depth.",
+          "priority": "Medium",
+          "success_criteria": [
+            "Low mode disables asynchronous debates and minimizes context injection.",
+            "High mode enables full multi-agent audits and proactive refactoring suggestions."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "REQ-007",
+      "title": "UI/UX Orchestration (Google Stitch)",
+      "description": "Integration with Google Stitch for AI-driven design-to-code workflows.",
+      "priority": "Low",
+      "success_criteria": [
+        "The system can generate a 'Vibe Design' prompt for Google Stitch based on project constraints.",
+        "Command 'ace ui sync <url>' successfully imports Tailwind/Flutter code from a Stitch canvas into the local codebase."
+      ],
+      "sub_requirements": []
+    },
+    {
+      "id": "REQ-008",
+      "title": "Quality Assurance and TDD Framework",
+      "description": "The orchestrator itself must be developed and validated using strict TDD and DX/AX metrics.",
+      "priority": "High",
+      "success_criteria": [
+        "100% pass rate on unit tests for Context Builder and Ownership Registry logic.",
+        "Automated CI/CD pipeline prevents merges if test coverage on critical modules drops below 90%.",
+        "Agentic Experience (AX) is validated by a 'Context Relevance Score' measuring agent success rate with vs. without ACE context."
+      ],
+      "sub_requirements": []
+    }
+  ]
+}
