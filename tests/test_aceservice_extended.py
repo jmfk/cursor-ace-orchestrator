@@ -99,6 +99,8 @@ def test_ui_mockup_generation_fallback(ace_service, monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", mock_run)
     monkeypatch.setattr(ace_service, "get_stitch_key", lambda: None)
+    # Ensure we don't trigger the test environment bypass in ace_service.py
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
     mockup_url = ace_service.ui_mockup("A simple button", "designer-01")
 
