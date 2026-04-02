@@ -31,10 +31,17 @@ class CommitAnalyzer:
         "ralph_stats.json"
     }
 
+    # Cost configuration (USD per 1M tokens)
+    INPUT_COST_PER_1M = 0.25
+    OUTPUT_COST_PER_1M = 1.50
+
     def __init__(self, model: str = "gemini-3-flash-preview"):
         load_dotenv()
         self.model_name = model
         self.api_key = self._get_api_key()
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_cost = 0.0
         if self.api_key:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(self.model_name)
@@ -142,6 +149,18 @@ Return the result in JSON format:
 """
         try:
             response = self.model.generate_content(prompt)
+            
+            # Track usage and cost
+            if hasattr(response, 'usage_metadata'):
+                in_tokens = response.usage_metadata.prompt_token_count
+                out_tokens = response.usage_metadata.candidates_token_count
+                self.total_input_tokens += in_tokens
+                self.total_output_tokens += out_tokens
+                
+                cost = (in_tokens / 1_000_000 * self.INPUT_COST_PER_1M) + \
+                       (out_tokens / 1_000_000 * self.OUTPUT_COST_PER_1M)
+                self.total_cost += cost
+
             # Extract JSON from response (handling potential markdown blocks)
             text = response.text
             match = re.search(r'\{.*\}', text, re.DOTALL)
@@ -186,6 +205,12 @@ Return the result in JSON format:
         report = [
             "# Feature Improvement Analysis Report",
             f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "",
+            "## Summary",
+            f"- **Total Commits Analyzed**: {len(results)}",
+            f"- **Total Input Tokens**: {self.total_input_tokens:,}",
+            f"- **Total Output Tokens**: {self.total_output_tokens:,}",
+            f"- **Estimated Total Cost**: ${self.total_cost:.4f} USD",
             "",
             "## Improvement Trend",
             "![Improvement Graph](improvement_graph.png)" if MATPLOTLIB_AVAILABLE else "Graph not available (matplotlib missing)",
