@@ -1,0 +1,13 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:15.847237'
+depth: 1
+description: ''
+id: '0001_001'
+parent_id: '0001'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**1.1 Environment Setup**: Initialize Python project with `poetry` or `pip`
+  + `venv`. Install dependencies: `typer`, `ruamel.yaml`, `pydantic`, `rich`, `anthropic`,
+  `fastapi`, `uvicorn`.'

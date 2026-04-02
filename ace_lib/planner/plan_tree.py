@@ -67,15 +67,21 @@ class PlanTree:
             yaml.safe_dump(meta, f)
 
     def _load_nodes(self):
+        if not self.nodes_dir.exists():
+            return
         for node_file in self.nodes_dir.glob("*.yaml"):
-            with open(node_file, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-                if data:
-                    node = PlanNode(**data)
-                    self.nodes[node.id] = node
+            try:
+                with open(node_file, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                    if data:
+                        node = PlanNode(**data)
+                        self.nodes[node.id] = node
+            except Exception as e:
+                print(f"Error loading node file {node_file}: {e}")
 
     def save_node(self, node: PlanNode):
         self.nodes[node.id] = node
+        self.nodes_dir.mkdir(parents=True, exist_ok=True)
         node_file = self.nodes_dir / f"{node.id}.yaml"
         with open(node_file, "w", encoding="utf-8") as f:
             yaml.safe_dump(node.to_dict(), f)
@@ -205,36 +211,75 @@ class PlanTree:
     def ingest_flat_plan(self, md_content: str):
         import re
         lines = md_content.splitlines()
-        current_phase = None
         phases = []
         phase_tasks = {}
 
+        current_phase_title = None
+        current_phase_num = 0
+
         for line in lines:
-            phase_match = re.match(r"^##\s+(.*)", line)
-            if phase_match:
-                current_phase = phase_match.group(1).strip()
-                phases.append({"title": current_phase, "description": ""})
-                phase_tasks[current_phase] = []
+            # Match any "## Phase X: Title" or "## X. Title" or "## Title"
+            if line.startswith("## "):
+                phase_title_raw = line[3:].strip()
+                
+                # Try to extract phase number
+                num_match = re.search(r"(?:Phase\s+)?(\d+)", phase_title_raw)
+                if num_match:
+                    current_phase_num = int(num_match.group(1))
+                else:
+                    current_phase_num += 1
+                
+                current_phase_title = f"Phase {current_phase_num}: {phase_title_raw}"
+                phases.append({"title": current_phase_title, "description": "", "phase_num": current_phase_num})
+                phase_tasks[current_phase_title] = []
                 continue
             
+            # Match "- [ ] Task" or "- [x] Task"
             task_match = re.match(r"^\s*-\s*\[([ xX])\]\s+(.*)", line)
-            if task_match and current_phase:
+            if task_match:
                 status = "completed" if task_match.group(1).lower() == "x" else "pending"
                 title = task_match.group(2).strip()
                 
-                # Auto-detect completion from title if not already marked
-                if "(Completed)" in title:
-                    status = "completed"
-                
-                phase_tasks[current_phase].append({"title": title, "status": status})
+                # Try to detect phase change from task title (e.g. "12.1 Task")
+                task_num_match = re.match(r"(?:(\d+)\.\d+)", title.replace("**", ""))
+                if task_num_match:
+                    new_phase_num = int(task_num_match.group(1))
+                    if not current_phase_title or new_phase_num != current_phase_num:
+                        current_phase_num = new_phase_num
+                        current_phase_title = f"Phase {current_phase_num}: Auto-detected Phase"
+                        phases.append({"title": current_phase_title, "description": "", "phase_num": current_phase_num})
+                        phase_tasks[current_phase_title] = []
 
-        for i, phase in enumerate(phases):
-            root_id = f"{i+1:04d}"
+                if current_phase_title:
+                    if "(Completed)" in title:
+                        status = "completed"
+                    
+                    phase_tasks[current_phase_title].append({"title": title, "status": status})
+
+        # Clear existing state to avoid ID conflicts
+        self.root_ids = []
+        self.nodes = {}
+        if self.nodes_dir.exists():
+            import shutil
+            shutil.rmtree(self.nodes_dir)
+        self.nodes_dir.mkdir(parents=True, exist_ok=True)
+
+        for phase in phases:
+            root_id = f"{phase['phase_num']:04d}"
             tasks = phase_tasks[phase["title"]]
             
-            # Auto-detect phase completion from title
+            status = "pending"
             if "(Completed)" in phase["title"]:
-                phase["status"] = "completed"
+                status = "completed"
                 
-            self.add_root_nodes([phase])
+            # Create root node
+            node = PlanNode(id=root_id, depth=0, status=status, title=phase["title"], description=phase["description"])
+            self.nodes[root_id] = node
+            if root_id not in self.root_ids:
+                self.root_ids.append(root_id)
+            self.save_node(node)
+            
+            # Add children
             self.add_children(root_id, tasks)
+        
+        self._save_meta()

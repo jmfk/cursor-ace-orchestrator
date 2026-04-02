@@ -191,6 +191,15 @@ class HierarchicalPlanner:
         if not node:
             return None
             
+        # Verify node file exists to prevent FileNotFoundError during save
+        node_file = self.tree.nodes_dir / f"{node.id}.yaml"
+        if not node_file.exists():
+            print(f"⚠️ Warning: Node file {node_file} missing. Attempting to recover by saving current state.")
+            try:
+                self.tree.save_node(node)
+            except Exception as e:
+                self.exit_with_analysis(f"Critical failure: Could not recover missing node file {node.id}.yaml: {e}")
+
         # Stagnation monitoring
         if node.id == self.last_node_id:
             self.node_visit_count += 1

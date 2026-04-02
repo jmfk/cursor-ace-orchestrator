@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:36.243931'
+depth: 1
+description: ''
+id: '0003_005'
+parent_id: '0003'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**3.5 ADR Management**: Implement `ace decision add` and `ace decision list`
+  to manage Architectural Decision Records in `.ace/decisions/`.'

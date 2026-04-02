@@ -1,0 +1,3 @@
+[console_scripts]
+ace = ace:app
+ralph = ralph_loop:app

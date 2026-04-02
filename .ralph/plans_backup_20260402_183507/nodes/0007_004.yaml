@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:50.508211'
+depth: 1
+description: ''
+id: '0007_004'
+parent_id: '0007'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**7.4 Profiling & Performance**: Implement `ace_lib/utils/profiler.py` to
+  profile core service methods.'

@@ -1,0 +1,89 @@
+Metadata-Version: 2.4
+Name: cursor-ace
+Version: 0.1.0
+Summary: Cursor ACE Orchestrator - Long-term memory and ownership for coding agents
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: typer
+Requires-Dist: rich
+Requires-Dist: requests
+Requires-Dist: ruamel.yaml
+Requires-Dist: anthropic
+Requires-Dist: pydantic
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+
+# ACE: Automated Coding Environment Orchestrator
+
+ACE is a modular, event-driven orchestration layer for specialized coding agents. It implements the **RALPH Cycle** (Reasoning, Action, Learning, Progress, Halt) to manage complex development tasks autonomously.
+
+## 🚀 Vision
+ACE transforms the standard coding experience into a **Multi-Agent System (MAS)** where specialized agents own specific parts of your codebase, learn from every interaction, and collaborate through formal protocols.
+
+## 🛠 Installation
+
+### Prerequisites
+- Python 3.10+
+- [Cursor](https://cursor.com/) (recommended)
+- Anthropic and/or Google AI API Keys
+
+### Quick Install
+```bash
+# Clone the repository
+git clone https://github.com/your-repo/ACE.git
+cd ACE
+
+# Install in editable mode
+make install
+```
+
+## 🏁 Quick Start
+
+1. **Initialize ACE**:
+   ```bash
+   ace init
+   ```
+   This sets up the `.ace/` directory and prompts for necessary API keys.
+
+2. **Run a RALPH Loop**:
+   ```bash
+   ace loop "Implement a new feature X" --test "pytest tests/test_x.py"
+   ```
+   ACE will iteratively build, test, and reflect on the task until completion.
+
+3. **Check Token Usage**:
+   ```bash
+   ace token-stats
+   ```
+
+## 🧠 Core Concepts
+
+### 1. The RALPH Cycle
+Every task follows a structured loop:
+- **Reasoning**: Analyze the prompt and build context.
+- **Action**: Execute coding tasks via agents.
+- **Learning**: Reflect on the output and extract new strategies or pitfalls.
+- **Progress**: Update long-term memory (Playbooks).
+- **Halt**: Stop when the task is verified or limits are reached.
+
+### 2. Specialized Agents
+Agents are defined in `.ace/agents.yaml` and own specific directories. They maintain their own "Playbooks" in `.cursor/rules/*.mdc` files, which act as their long-term memory.
+
+### 3. Memory & Reflection
+ACE automatically extracts learnings from successful and failed sessions, updating agent playbooks to ensure they get smarter over time.
+
+## 🏗 Architecture Summary
+
+```mermaid
+graph TD
+    User[User/CLI] --> Orchestrator[ACE Orchestrator]
+    Orchestrator --> ContextBuilder[Context Builder]
+    Orchestrator --> Executor[Agent Executor]
+    Executor --> Filesystem[Codebase]
+    Executor --> Tests[Test Runner]
+    Tests --> Reflection[Reflection Engine]
+    Reflection --> Playbooks[.cursor/rules/*.mdc]
+    Playbooks --> ContextBuilder
+```
+
+For more details, see [ARCHITECTURE.md](ARCHITECTURE.md).

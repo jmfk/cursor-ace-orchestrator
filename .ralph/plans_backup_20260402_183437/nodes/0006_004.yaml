@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:26.124302'
+depth: 1
+description: ''
+id: '0006_004'
+parent_id: '0006'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**6.4 Token Consumption Monitoring**: Implement `ace token-stats` to track
+  and report token usage and costs per agent/session.'

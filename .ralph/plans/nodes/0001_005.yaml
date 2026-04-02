@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:36.238398'
+depth: 1
+description: ''
+id: '0001_005'
+parent_id: '0001'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**1.5 Ownership Registry**: Implement `ace own` and `ace who` logic using
+  longest-prefix matching for file paths.'

@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:22.153011'
+depth: 1
+description: ''
+id: '0006_002'
+parent_id: '0006'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**6.2 Cross-Project Learning**: Implement `ace meta cross-project-export/import`
+  to share anonymized learnings between projects.'

@@ -3,16 +3,19 @@ import json
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from ace_lib.models.schemas import TaskType, TokenMode, Agent, Decision
+from ace_lib.models.schemas import TaskType, TokenMode, Agent
 from ace_lib.services.ace_service import ACEService
 
-# Mocking the ContextBuilder as it would exist within or alongside ACEService
+# --- Implementation of ContextBuilder based on REQ-002 ---
+# This class is included here to ensure the test is standalone and verifies the logic
+# described in the requirement success criteria.
+
 class ContextBuilder:
     def __init__(self, service: ACEService):
         self.service = service
 
     def build_context(self, agent_id: str, task: str, task_type: TaskType, token_mode: TokenMode) -> str:
-        """Implementation logic based on REQ-002 requirements."""
+        """Composes the context slice for an agent call."""
         context_parts = []
 
         # 1. Global Rules (from AGENTS.md)
@@ -28,28 +31,30 @@ class ContextBuilder:
             if playbook_path.exists():
                 context_parts.append(f"### AGENT PLAYBOOK ({agent.role}) ###\n{playbook_path.read_text()}")
 
-        # 3. Recent ADRs
-        adr_files = list(self.service.decisions_dir.glob("*.json"))
-        if adr_files:
-            context_parts.append("### RECENT ADRs ###")
-            for adr_file in adr_files[:3]: # Recent 3
-                with open(adr_file, 'r') as f:
-                    adr = json.load(f)
-                    context_parts.append(f"- {adr['title']}: {adr['decision']}")
+        # 3. Recent ADRs (Architectural Decision Records)
+        adr_dir = self.service.base_path / ".ace" / "decisions"
+        if adr_dir.exists():
+            adr_files = sorted(list(adr_dir.glob("*.json")), reverse=True)
+            if adr_files:
+                context_parts.append("### RECENT ADRs ###")
+                for adr_file in adr_files[:3]:  # Limit to 3 most recent
+                    with open(adr_file, 'r') as f:
+                        adr = json.load(f)
+                        context_parts.append(f"- {adr.get('title', 'Untitled')}: {adr.get('decision', 'No decision')}")
 
-        # 4. Session Continuity (Mocked logic for last session)
-        session_dir = self.service.sessions_dir
+        # 4. Session Continuity Data
+        session_dir = self.service.base_path / ".ace" / "sessions"
         if session_dir.exists():
             sessions = sorted(session_dir.glob("*.json"), reverse=True)
             if sessions:
-                context_parts.append(f"### SESSION CONTINUITY ###\nLast task: {sessions[0].stem}")
+                context_parts.append(f"### SESSION CONTINUITY ###\nLast session: {sessions[0].stem}")
 
         # 5. Task-type Framing
         framing = {
             TaskType.IMPLEMENT: "INSTRUCTION: Implement the following feature with TDD.",
             TaskType.REVIEW: "INSTRUCTION: Review the following code for security and style.",
             TaskType.DEBUG: "INSTRUCTION: Identify and fix the root cause of the reported bug.",
-            TaskType.REFACTOR: "INSTRUCTION: Refactor the code for better maintainability without changing behavior."
+            TaskType.REFACTOR: "INSTRUCTION: Refactor the code for better maintainability."
         }
         context_parts.append(f"### TASK FRAMING ###\n{framing.get(task_type, 'Execute task.')}")
         
@@ -57,86 +62,121 @@ class ContextBuilder:
 
         return "\n\n".join(context_parts)
 
+# --- Pytest Fixtures ---
+
 @pytest.fixture
 def mock_ace_env(tmp_path):
-    """Sets up a mock ACE environment with necessary files."""
+    """Sets up a mock ACE environment with the required file structure."""
     ace_dir = tmp_path / ".ace"
     ace_dir.mkdir()
     (ace_dir / "decisions").mkdir()
     (ace_dir / "sessions").mkdir()
-    (tmp_path / "rules").mkdir(parents=True)
+    (tmp_path / ".cursor" / "rules").mkdir(parents=True)
 
-    # Create AGENTS.md
+    # Create AGENTS.md (Global Rules)
     (tmp_path / "AGENTS.md").write_text("Global Rule: Always use type hints.")
 
-    # Create Agent Playbook
-    playbook = tmp_path / "rules" / "coder.mdc"
+    # Create Agent Playbook (.mdc)
+    playbook = tmp_path / ".cursor" / "rules" / "coder.mdc"
     playbook.write_text("Playbook: Prefer composition over inheritance.")
 
     # Create an ADR
-    adr = {"id": "ADR-001", "title": "Use FastAPI", "decision": "Accepted", "context": "Need speed"}
+    adr = {"id": "ADR-001", "title": "Use FastAPI", "decision": "Accepted"}
     with open(ace_dir / "decisions" / "adr_001.json", "w") as f:
         json.dump(adr, f)
 
     # Create a Session log
-    with open(ace_dir / "sessions" / "session_prev.json", "w") as f:
+    with open(ace_dir / "sessions" / "session_2026_01.json", "w") as f:
         json.dump({"status": "success"}, f)
 
     return tmp_path
 
 @pytest.fixture
 def ace_service(mock_ace_env):
+    """Initializes ACEService with mocked agent loading."""
     service = ACEService(base_path=mock_ace_env)
-    # Mock load_agents to return a dummy config
-    service.load_agents = MagicMock(return_value=MagicMock(agents=[
-        Agent(id="agent-001", name="Coder", role="Senior Dev", email="c@ace.ai", memory_file="rules/coder.mdc")
-    ]))
+    # Mock load_agents to return a dummy config matching our setup
+    mock_agent = Agent(
+        id="agent-001", 
+        name="Coder", 
+        role="Senior Dev", 
+        email="c@ace.ai", 
+        memory_file=".cursor/rules/coder.mdc"
+    )
+    service.load_agents = MagicMock(return_value=MagicMock(agents=[mock_agent]))
     return service
 
+# --- Test Cases ---
+
 def test_context_composition_includes_all_required_elements(ace_service):
-    """Success Criteria: Context includes global rules, playbooks, ADRs, and session data."""
+    """
+    Verifies Success Criteria: Context composition includes global rules, 
+    agent-specific playbooks, recent ADRs, and session continuity data.
+    """
     builder = ContextBuilder(ace_service)
     context = builder.build_context("agent-001", "Fix login", TaskType.DEBUG, TokenMode.MEDIUM)
 
-    assert "Global Rule: Always use type hints." in context
-    assert "Playbook: Prefer composition over inheritance." in context
-    assert "Use FastAPI" in context
-    assert "SESSION CONTINUITY" in context
+    # Check for Global Rules
+    assert "### GLOBAL RULES ###" in context
+    assert "Always use type hints." in context
+
+    # Check for Agent Playbook
+    assert "### AGENT PLAYBOOK (Senior Dev) ###" in context
+    assert "Prefer composition over inheritance." in context
+
+    # Check for ADRs
+    assert "### RECENT ADRs ###" in context
+    assert "Use FastAPI: Accepted" in context
+
+    # Check for Session Continuity
+    assert "### SESSION CONTINUITY ###" in context
+    assert "Last session: session_2026_01" in context
+
+    # Check for Task
     assert "Fix login" in context
 
 def test_task_type_framing_modifies_instructions(ace_service):
-    """Success Criteria: Task-type framing correctly modifies the prompt instructions."""
+    """
+    Verifies Success Criteria: Task-type framing (implement, review, debug, etc.) 
+    correctly modifies the prompt instructions.
+    """
     builder = ContextBuilder(ace_service)
     
-    implement_context = builder.build_context("agent-001", "Task", TaskType.IMPLEMENT, TokenMode.LOW)
-    review_context = builder.build_context("agent-001", "Task", TaskType.REVIEW, TokenMode.LOW)
-    debug_context = builder.build_context("agent-001", "Task", TaskType.DEBUG, TokenMode.LOW)
+    # Test IMPLEMENT framing
+    impl_ctx = builder.build_context("agent-001", "Task", TaskType.IMPLEMENT, TokenMode.LOW)
+    assert "Implement the following feature with TDD." in impl_ctx
 
-    assert "Implement the following feature with TDD" in implement_context
-    assert "Review the following code" in review_context
-    assert "Identify and fix the root cause" in debug_context
+    # Test REVIEW framing
+    rev_ctx = builder.build_context("agent-001", "Task", TaskType.REVIEW, TokenMode.LOW)
+    assert "Review the following code for security and style." in rev_ctx
 
-def test_ace_context_show_output_consistency(ace_service):
-    """Success Criteria: 'ace context show' outputs the exact string prepended to a prompt."""
+    # Test DEBUG framing
+    dbg_ctx = builder.build_context("agent-001", "Task", TaskType.DEBUG, TokenMode.LOW)
+    assert "Identify and fix the root cause" in dbg_ctx
+
+def test_ace_context_show_output_is_exact_string(ace_service):
+    """
+    Verifies Success Criteria: The output is the exact string that would be 
+    prepended to a prompt (no extra wrapping or JSON if requested as raw).
+    """
     builder = ContextBuilder(ace_service)
-    expected_string = builder.build_context("agent-001", "Test Task", TaskType.PLAN, TokenMode.HIGH)
-
-    # Simulate the CLI command logic
-    def ace_context_show_cmd():
-        return builder.build_context("agent-001", "Test Task", TaskType.PLAN, TokenMode.HIGH)
-
-    assert ace_context_show_cmd() == expected_string
-
-def test_context_builder_handles_missing_files(tmp_path):
-    """Verify robustness when optional context files are missing."""
-    # Empty environment
-    service = ACEService(base_path=tmp_path)
-    service.load_agents = MagicMock(return_value=MagicMock(agents=[]))
-    builder = ContextBuilder(service)
+    context = builder.build_context("agent-001", "Task", TaskType.IMPLEMENT, TokenMode.LOW)
     
-    context = builder.build_context("unknown", "Task", TaskType.IMPLEMENT, TokenMode.LOW)
+    assert isinstance(context, str)
+    # Ensure it starts with a relevant header and isn't empty
+    assert context.startswith("### GLOBAL RULES ###")
+    assert "### CURRENT TASK ###" in context
+
+def test_graceful_degradation_missing_files(ace_service, mock_ace_env):
+    """
+    Verifies that the builder doesn't crash if optional context files are missing.
+    """
+    # Remove AGENTS.md
+    os.remove(mock_ace_env / "AGENTS.md")
     
-    # Should still contain the task and framing even if history/rules are missing
-    assert "INSTRUCTION: Implement" in context
+    builder = ContextBuilder(ace_service)
+    context = builder.build_context("agent-001", "Task", TaskType.IMPLEMENT, TokenMode.LOW)
+    
+    assert "### GLOBAL RULES ###" not in context
+    assert "### CURRENT TASK ###" in context
     assert "Task" in context
-    assert "GLOBAL RULES" not in context # Should not be present if file missing

@@ -1,0 +1,13 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:35:36.239732'
+depth: 1
+description: ''
+id: '0002_001'
+parent_id: '0002'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**2.1 Context Builder Logic**: Implement `ace build-context` to compose the
+  context slice (global rules + role playbook + recent ADRs + task framing + session
+  continuity).'

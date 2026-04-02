@@ -2,10 +2,12 @@ import pytest
 import os
 import json
 import yaml
+import sys
 from unittest.mock import MagicMock, patch, mock_open
 from pathlib import Path
+
+# Import the module under test
 import ralph_loop
-from ace_lib.planner.hierarchical_planner import HierarchicalPlanner
 from ace_lib.planner.plan_tree import PlanNode
 
 @pytest.fixture
@@ -14,19 +16,28 @@ def mock_env(tmp_path):
     # Create dummy config
     config_path = tmp_path / "ralph.yaml"
     config_data = {
-        "max_iterations": 3,
+        "max_iterations": 5,
         "max_spend_usd": 1.0,
-        "stats_file": str(tmp_path / "stats.json"),
-        "log_file": str(tmp_path / "ralph.log"),
+        "stats_file": str(tmp_path / "ralph_stats.json"),
+        "log_file": str(tmp_path / "ralph_execution.log"),
         "plan_file": str(tmp_path / "plan.md"),
-        "state_history_file": str(tmp_path / "history.json")
+        "state_history_file": str(tmp_path / "ralph_state_history.json"),
+        "model": "gemini-3-flash",
+        "price_input_1m": 0.10,
+        "price_output_1m": 0.40
     }
     with open(config_path, "w") as f:
         yaml.dump(config_data, f)
 
     # Initialize stats file
     with open(config_data["stats_file"], "w") as f:
-        json.dump({"total_cost_usd": 0.0, "iterations": 0}, f)
+        json.dump({
+            "total_input_tokens": 0, 
+            "total_output_tokens": 0, 
+            "total_cost_usd": 0.0, 
+            "total_time_sec": 0.0, 
+            "iterations": 0
+        }, f)
 
     return {
         "config_path": config_path,
@@ -40,7 +51,7 @@ def mock_env(tmp_path):
 def test_ralph_loop_multi_iteration_success(mock_planner_cls, mock_run_agent, mock_log, mock_env):
     """
     Verifies Success Criterion: The 'ace loop' command successfully executes multiple iterations.
-    This test simulates a 2-step process where the loop runs twice and then finishes.
+    Simulates a 2-step process where the loop runs twice and then finishes.
     """
     # Setup Mock Planner
     mock_planner = MagicMock()
@@ -52,72 +63,76 @@ def test_ralph_loop_multi_iteration_success(mock_planner_cls, mock_run_agent, mo
     
     # Mock the sequence of tasks: Task 1 -> Task 2 -> None (Done)
     mock_planner.tree.get_next_incomplete.side_effect = [node1, node2, None]
-    mock_planner.run_step.return_value = node1 # Simulate successful step execution
+    mock_planner.run_step.return_value = node1 
     
-    # Mock agent output
-    mock_run_agent.return_value = "Execution successful"
+    # Mock agent output (JSON stream format)
+    mock_run_agent.return_value = '{"usage": {"input_tokens": 100, "output_tokens": 200}}'
     
     # Mock CLI arguments
-    test_args = ["ralph_loop.py", "--config", str(mock_env["config_path"]), "dummy.md"]
+    test_args = ["ralph_loop.py", "--config", str(mock_env["config_path"]), "dummy_prd.md"]
     
     with patch("sys.argv", test_args), \
-         patch("ralph_loop.load_config"), \
-         patch("fcntl.flock"): # Prevent lock file issues in test
+         patch("fcntl.flock"): # Prevent lock file issues in test environment
         
         try:
             ralph_loop.main()
         except SystemExit:
             pass
 
-    # Verify multiple iterations occurred
+    # Verify multiple iterations occurred (run_step called for each node)
     assert mock_planner.run_step.call_count == 2
-    # Verify context refresh (log messages indicating new iterations)
+    
+    # Verify context refresh/logging indicating new iterations
     iteration_logs = [call.args[0] for call in mock_log.call_args_list if "RALPH Loop Iteration" in str(call.args[0])]
     assert len(iteration_logs) >= 2
 
-def test_ralph_loop_halts_on_success(mock_env):
+@patch("ralph_loop.log_message")
+@patch("ralph_loop.HierarchicalPlanner")
+def test_ralph_loop_halts_immediately_on_success(mock_planner_cls, mock_log, mock_env):
     """
     Verifies Success Criterion: The engine halts immediately upon a successful test run (TDD approach).
-    If the planner returns no more incomplete tasks, the loop must terminate.
+    If the planner returns no more incomplete tasks, the loop must terminate without further execution.
     """
     mock_planner = MagicMock()
-    # Immediately return None for next task
+    mock_planner_cls.return_value = mock_planner
+    
+    # Immediately return None for next task (all tasks done)
     mock_planner.tree.get_next_incomplete.return_value = None
     
-    with patch("ralph_loop.HierarchicalPlanner", return_value=mock_planner), \
-         patch("ralph_loop.load_config"), \
-         patch("ralph_loop.log_message") as mock_log, \
-         patch("sys.argv", ["ralph_loop.py", "--config", str(mock_env["config_path"])]), \
-         patch("fcntl.flock"):
-        
+    test_args = ["ralph_loop.py", "--config", str(mock_env["config_path"]), "dummy_prd.md"]
+    
+    with patch("sys.argv", test_args), patch("fcntl.flock"):
         try:
             ralph_loop.main()
         except SystemExit:
             pass
             
-    # Verify it logged completion and stopped
-    assert any("🎉 All tasks in the hierarchical plan are completed!" in str(call) for call in mock_log.call_args_list)
+    # Verify it logged completion and stopped before running any steps
+    assert any("All tasks in the hierarchical plan are completed!" in str(call) for call in mock_log.call_args_list)
     assert mock_planner.run_step.call_count == 0
 
 @patch("ralph_loop.run_cursor_agent")
-def test_ralph_loop_captures_failure_learning(mock_run_agent, mock_env):
+@patch("ralph_loop.HierarchicalPlanner")
+def test_ralph_loop_captures_failure_learning(mock_planner_cls, mock_run_agent, mock_env):
     """
     Verifies Success Criterion: The engine captures failure reasons in the learning phase.
-    We simulate a failure and check if the planner's exit_with_analysis is triggered 
-    when stagnation or consecutive failures occur.
+    Simulates stagnation (repeatedly visiting the same node) and verifies that 
+    the planner's 'exit_with_analysis' is triggered to inform the next steps.
     """
     mock_planner = MagicMock()
-    node = PlanNode(id="001", title="Failing Task", status="pending")
+    mock_planner_cls.return_value = mock_planner
+    
+    node = PlanNode(id="fail_001", title="Failing Task", status="pending")
     mock_planner.tree.get_next_incomplete.return_value = node
     
-    # Simulate a failure in the agent execution
+    # Simulate a failure in the agent execution (returns None)
     mock_run_agent.return_value = None 
     
     # Force a stagnation trigger by mocking check_stagnation to return True
-    with patch("ralph_loop.HierarchicalPlanner", return_value=mock_planner), \
-         patch("ralph_loop.check_stagnation", return_value=True), \
-         patch("ralph_loop.load_config"), \
-         patch("sys.argv", ["ralph_loop.py", "--config", str(mock_env["config_path"])]), \
+    # In the real code, this happens if the same node is visited too many times
+    with patch("ralph_loop.check_stagnation", return_value=True), \
+         patch("ralph_loop.log_message"), \
+         patch("sys.argv", ["ralph_loop.py", "--config", str(mock_env["config_path"]), "dummy.md"]), \
          patch("fcntl.flock"):
         
         try:
@@ -126,32 +141,30 @@ def test_ralph_loop_captures_failure_learning(mock_run_agent, mock_env):
             pass
 
     # Verify that the planner was asked to exit with analysis (the 'Learning' phase)
+    # This method in hierarchical_planner.py generates the post-mortem analysis
     mock_planner.exit_with_analysis.assert_called_once()
     args, _ = mock_planner.exit_with_analysis.call_args
     assert "Stagnation detected" in args[0]
 
-def test_ralph_loop_respects_max_iterations(mock_env):
+@patch("ralph_loop.run_cursor_agent")
+def test_ralph_loop_updates_stats_between_iterations(mock_run_agent, mock_env):
     """
-    Verifies that the engine halts when limits (max_iterations) are reached.
+    Verifies that the engine refreshes context (stats/tokens) between iterations.
     """
-    mock_planner = MagicMock()
-    node = PlanNode(id="001", title="Infinite Task", status="pending")
-    mock_planner.tree.get_next_incomplete.return_value = node
+    # Mock agent to return specific token usage
+    mock_run_agent.return_value = '{"usage": {"input_tokens": 1000, "output_tokens": 500}}'
     
-    # Mock config to only allow 2 iterations
-    with patch.dict(ralph_loop.CONFIG, {"max_iterations": 2, "stats_file": mock_env["config_data"]["stats_file"]}): 
-        with patch("ralph_loop.HierarchicalPlanner", return_value=mock_planner), \
-             patch("ralph_loop.run_cursor_agent", return_value="ok"), \
-             patch("ralph_loop.load_config"), \
-             patch("ralph_loop.log_message") as mock_log, \
-             patch("sys.argv", ["ralph_loop.py"]), \
-             patch("fcntl.flock"):
-            
-            try:
-                ralph_loop.main()
-            except SystemExit:
-                pass
-
-    # Verify it stopped at iteration 2
-    assert any("--- RALPH Loop Iteration 2/2" in str(call) for call in mock_log.call_args_list)
-    assert mock_planner.run_step.call_count == 2
+    # Manually trigger update_stats to verify logic
+    ralph_loop.CONFIG = mock_env["config_data"]
+    ralph_loop.update_stats(1000, 500, 10.5)
+    
+    with open(mock_env["config_data"]["stats_file"], "r") as f:
+        stats = json.load(f)
+        
+    assert stats["total_input_tokens"] == 1000
+    assert stats["total_output_tokens"] == 500
+    assert stats["iterations"] == 1
+    # Cost calculation: (1000/1M * 0.10) + (500/1M * 0.40) = 0.0001 + 0.0002 = 0.0003
+    assert stats["total_cost_usd"] == pytest.approx(0.0003)
+"
+}

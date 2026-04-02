@@ -1,0 +1,12 @@
+actionable: false
+children: []
+created_at: '2026-04-02T18:34:15.853118'
+depth: 1
+description: ''
+id: '0003_002'
+parent_id: '0003'
+reasoning: ''
+retry_count: 0
+status: completed
+title: '**3.2 Delta Update Parser**: Create logic to parse structured reflection output
+  and handle ID assignment for new entries.'

@@ -10,8 +10,9 @@ import argparse
 import fcntl
 import signal
 from datetime import datetime
+from ace_lib.planner.hierarchical_planner import HierarchicalPlanner
 
-LOOP_LOCK_FILE = ".ace/loop.lock"
+LOOP_LOCK_FILE = ".ralph/loop.lock"
 
 # Try to import yaml, but provide a fallback or install it if missing
 try:
@@ -373,8 +374,20 @@ def check_stagnation(current_hash: str, current_task: str):
     history_file = CONFIG["state_history_file"]
     history = []
     if os.path.exists(str(history_file)):
-        with open(str(history_file), "r") as f:
-            history = json.load(f)
+        try:
+            with open(str(history_file), "r") as f:
+                history = json.load(f)
+        except (json.JSONDecodeError, Exception):
+            history = []
+
+    # Ensure all elements in history are dictionaries
+    new_history = []
+    for h in history:
+        if isinstance(h, dict) and "hash" in h:
+            new_history.append(h)
+        elif isinstance(h, str):
+            new_history.append({"hash": h, "task": "Unknown"})
+    history = new_history
 
     # Track both hash and task
     history.append({"hash": current_hash, "task": current_task})
@@ -388,10 +401,10 @@ def check_stagnation(current_hash: str, current_task: str):
     if len(history) >= threshold:
         last_n = history[-threshold:]
         # Check if hash is identical across last N iterations
-        if all(h["hash"] == last_n[0]["hash"] for h in last_n):
+        if all(isinstance(h, dict) and h.get("hash") == last_n[0].get("hash") for h in last_n):
             return True
         # Check if task is identical across last N iterations (task stagnation)
-        if all(h["task"] == last_n[0]["task"] for h in last_n):
+        if all(isinstance(h, dict) and h.get("task") == last_n[0].get("task") for h in last_n):
             log_message(f"⚠️ Task stagnation detected for: {current_task}")
             return True
             
@@ -466,101 +479,76 @@ def main():
         return
 
     log_message(
-        f"🚀 Starting RALPH Loop using {prd_path} (Model: {CONFIG['model']})..."
+        f"🚀 Starting Hierarchical RALPH Loop using {prd_path}..."
     )
 
-    # Step 0: Initial State Analysis
-    log_message("Step 0: Analyzing current project state...")
-    plan_file = CONFIG["plan_file"]
-    plan_content = get_file_content(plan_file)
-
-    analysis_prompt = (
-        f"Analyze the current codebase and project structure relative to {prd_path}. "
-        f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
-        f"1. Identify implemented features. 2. Identify missing parts. 3. Update '{plan_file}'."
+    # 3. Initialize Planner
+    planner = HierarchicalPlanner(
+        prd_path=prd_path,
+        run_cursor_agent_fn=run_cursor_agent,
+        planner_model=CONFIG.get("planner_model", "gemini-3-flash"),
+        validator_model=CONFIG.get("validator_model", "gemini-3-flash-preview"),
+        context_model=CONFIG.get("context_model", "gemini-3-flash-preview"),
+        executor_model=CONFIG.get("executor_model", "gemini-3-flash")
     )
-    run_cursor_agent(analysis_prompt)
 
-    max_iter = int(CONFIG.get("max_iterations", 50))
-    for iteration in range(1, max_iter + 1):
-        if PAID_ACCOUNT_REQUIRED and CONFIG["quit_on_rate_limit"]:
-            log_message("🚨 STOPPED: Rate limit exceeded.")
-            break
+    iteration = 0
+    max_iterations = int(str(CONFIG.get("max_iterations", 50)))
+    max_spend = float(str(CONFIG.get("max_spend_usd", 20.0)))
 
-        current_cost = get_total_cost()
-        if current_cost >= float(str(CONFIG.get("max_spend_usd", 20.0))):
-            log_message(
-                f"Reached maximum spending limit (${CONFIG['max_spend_usd']}). Stopping."
-            )
-            break
+    try:
+        while iteration < max_iterations:
+            total_cost = get_total_cost()
+            if total_cost >= max_spend:
+                log_message(f"Reached maximum spending limit (${max_spend}). Stopping.")
+                break
 
-        log_message(f"=== Iteration {iteration}/{max_iter} (Cost: ${current_cost:.4f}) ===")
+            iteration += 1
+            log_message(f"\n--- RALPH Loop Iteration {iteration}/{max_iterations} (Cost: ${total_cost:.4f}) ---")
 
-        current_task = get_current_task()
-        log_message(f"📍 Current Task: {current_task}")
+            # Get next task from hierarchical planner
+            node = planner.tree.get_next_incomplete()
+            if not node:
+                log_message("🎉 All tasks in the hierarchical plan are completed!")
+                break
 
-        # Step 1: Planning
-        plan_content = get_file_content(plan_file)
-        if not plan_content or "[ ]" not in plan_content:
-            log_message("Step 1: Planning...")
-            prompt = f"Update '{plan_file}' based on {prd_path} and SPECS.md."
-            run_cursor_agent(prompt)
-            plan_content = get_file_content(plan_file)
-            if not plan_content:
-                continue
+            # Stagnation check
+            current_hash = get_project_state_hash()
+            if check_stagnation(current_hash, node.title):
+                log_message(f"🚨 STAGNATION DETECTED on task: {node.title}")
+                planner.exit_with_analysis("Stagnation detected in RALPH loop.")
+                break
 
-        # Step 2: Build, Verify, and Update Plan
-        log_message("Step 2: Building, Verifying, and Updating Plan...")
-        current_hash = get_project_state_hash()
-        if check_stagnation(current_hash, current_task):
-            log_message("⚠️ Stagnation detected!")
-            prompt = (
-                f"Stagnation detected for task '{current_task}'. Analyze {prd_path} and {plan_file} to recover. "
-                f"Implement the next necessary change, run tests/linter to verify, and update '{plan_file}'."
-            )
-        else:
-            prompt = (
-                f"Implement the next task from {plan_file}: '{current_task}'. "
-                f"Target PRD: {prd_path}. "
-                f"After implementation, run all tests and linter, fix any failures, "
-                f"and mark the task as completed in '{plan_file}' and update '{CONFIG['changelog_file']}'."
-            )
-        run_cursor_agent(prompt)
-
-        # Step 3: Commit
-        log_message("Step 3: Committing...")
-        try:
-            status = subprocess.run(
-                ["git", "status", "--porcelain"], capture_output=True, text=True
-            )
-            if status.stdout.strip():
-                commit_msg = generate_commit_message(current_task)
+            # Run one step of the planner
+            node_executed = planner.run_step()
+            
+            # After run_step finishes, check for changes
+            from ace_lib.planner.diff_gate import evaluate as evaluate_diff
+            diff_result = evaluate_diff()
+            if diff_result.is_meaningful:
+                task_title = node_executed.title if node_executed else "Hierarchical Planning Update"
+                commit_msg = generate_commit_message(task_title)
+                log_message(f"Committing changes: {commit_msg}")
                 subprocess.run(["git", "add", "."], check=True)
                 subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-                subprocess.run(["git", "push"], check=True)
-                log_message(f"Committed: {commit_msg}")
-        except Exception as e:
-            log_message(f"Git failed: {e}")
-
-        # Check for completion
-        plan_content = get_file_content(plan_file)
-        if "[ ]" not in plan_content:
-            log_message("🎉 Plan complete! Checking PRD...")
-            gap_result = run_cursor_agent(
-                f"Is {prd_path} fully implemented? Respond 'PRD_COMPLETE' if yes."
-            )
-            if gap_result and "PRD_COMPLETE" in gap_result:
-                log_message("✅ PRD Complete!")
+                # subprocess.run(["git", "push"], check=True) # Optional: push
+            
+            # If run_step returned None but there are still tasks, it was a decomposition step
+            if not node_executed and planner.tree.get_next_incomplete() is None:
+                log_message("🎉 All tasks in the hierarchical plan are completed!")
                 break
-    else:
-        log_message(f"Reached maximum iterations ({max_iter}). Stopping.")
 
-    fcntl.flock(lock_fd, fcntl.LOCK_UN)
-    lock_fd.close()
-    try:
-        os.remove(LOOP_LOCK_FILE)
-    except OSError:
-        pass
+    except Exception as e:
+        log_message(f"🚨 Hierarchical Planner failed: {e}")
+        import traceback
+        log_message(traceback.format_exc())
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
+        try:
+            os.remove(LOOP_LOCK_FILE)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
