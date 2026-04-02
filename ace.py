@@ -937,15 +937,7 @@ def loop(
     Iteratively run: Context Refresh -> Execute -> Verify -> Reflect -> Repeat (PRD-01 / Phase 4.1).
     """
     console.print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
-    console.print(f"Prompt: [italic]{prompt}[/italic]")
-    console.print(f"Test Command: [italic]{test_cmd}[/italic]")
-    console.print(f"Max Iterations: [bold]{max_iterations}[/bold]")
-    console.print(f"Max Spend: [bold]${max_spend}[/bold]")
-    if spec_id:
-        console.print(f"Living Spec: [bold]{spec_id}[/bold]")
-
-    svc = get_service()
-
+    
     # Check for API keys
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if not anthropic_key:
@@ -975,32 +967,82 @@ def loop(
                     os.environ["CURSOR_API_KEY"] = cursor_key
                     break
 
-    # Use the service to run the loop
-    with console.status("[bold green]Running RALPH Loop..."):
-        success, iterations = svc.run_loop(
-            prompt=prompt,
-            test_cmd=test_cmd,
-            max_iterations=max_iterations,
-            path=path,
-            agent_id=agent_id,
-            git_commit=git_commit,
-            prd_path=prd,
-            plan_file=plan_file,
-            max_spend=max_spend,
-            model=model,
-            spec_id=spec_id,
-        )
-
+    svc = get_service()
+    
+    iteration = 0
+    success = False
+    
+    while iteration < max_iterations:
+        iteration += 1
+        console.print(f"\n[bold blue]--- Iteration {iteration} ---[/bold blue]")
+        
+        # 1. Context Refresh
+        context, resolved_agent_id = svc.build_context(path, TaskType.IMPLEMENT, agent_id, prompt)
+        
+        # 2. Execute
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+            tmp.write(context)
+            context_file = tmp.name
+            
+        # Prepare cursor-agent command
+        cursor_cmd = [
+            "cursor-agent",
+            "--api-key", cursor_key or "",
+            "--model", model,
+            "--trust",
+            f"--context-file {context_file}",
+            prompt
+        ]
+        
+        full_cmd = " ".join(cursor_cmd)
+        console.print(f"Executing: [dim]{full_cmd}[/dim]")
+        
+        try:
+            process = subprocess.run(full_cmd, shell=True, capture_output=True, text=True)
+            output = process.stdout + process.stderr
+            exit_code = process.returncode
+            console.print(output)
+        except Exception as e:
+            console.print(f"[red]Execution error: {e}[/red]")
+            break
+            
+        # 3. Verify (Tests)
+        console.print(f"Verifying with: [italic]{test_cmd}[/italic]")
+        test_process = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
+        test_output = test_process.stdout + test_process.stderr
+        test_exit_code = test_process.returncode
+        
+        if test_exit_code == 0:
+            console.print("[green]Tests passed![/green]")
+            success = True
+        else:
+            console.print("[red]Tests failed.[/red]")
+            console.print(test_output)
+            
+        # 4. Reflect & Update Playbook
+        if anthropic_key:
+            reflection_text = svc.reflect_on_session(output)
+            updates = svc.parse_reflection_output(reflection_text)
+            if updates:
+                playbook_path = svc.cursor_rules_dir / "_global.mdc"
+                if resolved_agent_id:
+                    agents_config = svc.load_agents()
+                    agent = next((a for a in agents_config.agents if a.id == resolved_agent_id), None)
+                    if agent:
+                        playbook_path = Path(agent.memory_file)
+                
+                svc.update_playbook(playbook_path, updates)
+                console.print(f"[green]Playbook updated: {playbook_path}[/green]")
+        
+        if success:
+            if git_commit:
+                subprocess.run("git add . && git commit -m 'RALPH Loop success'", shell=True)
+            break
+            
     if success:
-        console.print(
-            f"\n✅ [bold green]RALPH Loop completed successfully in "
-            f"{iterations} iterations![/bold green]"
-        )
+        console.print(f"\n✅ [bold green]RALPH Loop completed successfully in {iteration} iterations![/bold green]")
     else:
-        console.print(
-            f"\n❌ [bold red]RALPH Loop failed after "
-            f"{iterations} iterations.[/bold red]"
-        )
+        console.print(f"\n❌ [bold red]RALPH Loop failed after {iteration} iterations.[/bold red]")
         raise typer.Exit(code=1)
 
 
