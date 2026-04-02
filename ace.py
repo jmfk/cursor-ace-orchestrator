@@ -635,6 +635,9 @@ def run(
     # 5. RBAC for Agents: Implement fine-grained Role-Based Access Control for agent operations.
     #    (Completed: Path and command restrictions implemented in ACEService.run_agent_task)
 
+    # 6. Consensus Protocol (MACP): Implement multi-agent consensus protocol with LLM mediation.
+    #    (Completed: MACP debate and consensus logic implemented in ACEService)
+
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
