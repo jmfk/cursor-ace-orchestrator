@@ -179,23 +179,30 @@ def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout:
         try:
             stdout, stderr = proc.communicate(timeout=timeout)
             elapsed = time.time() - start_time
+            if stdout is None:
+                stdout = ""
+            if stderr is None:
+                stderr = ""
         except subprocess.TimeoutExpired:
-            if hasattr(os, "killpg"):
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            else:
-                proc.terminate()
+            proc.kill()
             stdout, stderr = proc.communicate()
-            log_message(f"❌ Cursor Agent timed out after {timeout}s and was killed.")
+            if stdout is None:
+                stdout = ""
+            if stderr is None:
+                stderr = ""
+            log_message("⏳ Cursor agent timed out.")
             return None
-        finally:
-            # Ensure cleanup even on unexpected errors
-            try:
-                if hasattr(os, "killpg"):
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                else:
-                    proc.terminate()
-            except (ProcessLookupError, OSError):
-                pass
+        
+        try:
+            if proc.poll() is None:
+                proc.kill()
+        except (ProcessLookupError, OSError):
+            pass
+        try:
+            if proc.poll() is None:
+                proc.kill()
+        except (ProcessLookupError, OSError):
+            pass
 
         if proc.returncode != 0:
             CONSECUTIVE_FAILURES += 1
@@ -436,11 +443,16 @@ def main():
     args = parser.parse_args()
 
     # 1. Load YAML config
-    load_config(args.config)
+    if args.config:
+        load_config(args.config)
 
     # 2. Override with CLI parameters
     if args.prd:
         CONFIG["default_prd"] = args.prd
+    else:
+        # If no PRD provided via CLI or config, use default
+        if "default_prd" not in CONFIG:
+            CONFIG["default_prd"] = DEFAULTS["default_prd"]
     if args.model:
         CONFIG["model"] = args.model
     if args.max_spend:
