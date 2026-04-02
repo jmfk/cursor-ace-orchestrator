@@ -625,45 +625,8 @@ def run(
         else:
             console.print(
                 "[yellow]Skipping reflection: "
-                "ANTHROPIC_API_KEY not set and not in "
-                "~/.ace/credentials.[/yellow]"
+                "ANTHROPIC_API_KEY not set.[/yellow]"
             )
-
-    # 1. TDD (Test-Driven Development): Establish 'tests/' and write unit tests for ACEService.
-    #    (Completed: Comprehensive unit tests added in tests/test_ace_service_core.py)
-
-    # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py'.
-    #    (Completed: 'ace loop' and 'ace ralph' commands integrated in ace.py)
-
-    # 3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.
-    #    (Completed: Formal SOP generation implemented in ace_lib/sop/sop_engine.py)
-
-    # 4. Google Stitch Integration: Connect CLI stubs to actual API or code extraction logic.
-    #    (Completed: Bi-directional sync and component extraction implemented in stitch_engine.py)
-
-    # 11.38 Next Roadmap Step: Establish 'tests/' and write unit tests for ACEService,
-    #    integrate RALPH loop, and finalize SOP/Stitch logic. (Completed: Finalized PRD-01)
-
-    # 5. RBAC for Agents: Implement fine-grained Role-Based Access Control for agent operations.
-    #    (Completed: Path and command restrictions implemented in ACEService.run_agent_task)
-
-    # 6. Consensus Protocol (MACP): Implement multi-agent consensus protocol with LLM mediation.
-    #    (Completed: MACP debate and consensus logic implemented in ACEService)
-
-    # 7. Distributed Memory: Implement a distributed vector store for cross-team learning.
-    #    (Completed: Distributed memory sync and search implemented in ACEService)
-
-    # 8. Living Specs Automation: Automate living specs updates based on implementation changes.
-    #    (Completed: automate_spec_update implemented in ACEService)
-
-    # 9. Task Decomposition & Delegation: Decompose complex tasks and delegate to agents.
-    #    (Completed: decompose_task and delegate_tasks implemented in ACEService)
-
-    # 10. Memory Synthesis: Synthesize shared memories from individual experiences.
-    #    (Completed: synthesize_memories implemented in ACEService)
-
-    # 11. Adaptive Memory Pruning: Automatically archive low-utility memories.
-    #    (Completed: adaptive_memory_prune implemented in ACEService)
 
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
