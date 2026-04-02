@@ -1040,10 +1040,17 @@ def loop(
 
     # Phase 4.1: Native ace loop integration
     success, iterations = svc.run_loop(
-        prompt=prompt, test_cmd=test_cmd, max_iterations=max_iterations,
-        path=path, agent_id=agent_id, git_commit=git_commit,
-        prd_path=prd, plan_file=plan_file, max_spend=max_spend,
-        model=model, spec_id=spec_id,
+        prompt=prompt,
+        test_cmd=test_cmd,
+        max_iterations=max_iterations,
+        path=path,
+        agent_id=agent_id,
+        git_commit=git_commit,
+        prd_path=prd,
+        plan_file=plan_file,
+        max_spend=max_spend,
+        model=model,
+        spec_id=spec_id,
     )
 
     if success:
