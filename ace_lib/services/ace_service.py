@@ -168,6 +168,43 @@ class ACEService:
     def clear_cache(self):
         self._cache.clear()
 
+    # --- SSO & Authentication (Phase 10.3) ---
+
+    def authenticate_sso(self, token: str) -> bool:
+        """
+        Authenticate a user/agent via SSO (Phase 10.3).
+        In a real implementation, this would verify the JWT/OAuth token
+        against the configured SSO provider (Okta, GitHub, Google).
+        """
+        config = self.load_config()
+        if not config.sso_enabled:
+            return True  # SSO not enabled, allow all
+
+        # Mock SSO verification logic
+        if token == "valid-sso-token":
+            return True
+
+        # In a real scenario:
+        # if config.sso_provider == "github":
+        #     return self._verify_github_token(token)
+        # ...
+
+        return False
+
+    def get_sso_login_url(self) -> str:
+        """Get the SSO login URL based on configuration."""
+        config = self.load_config()
+        if not config.sso_enabled or not config.sso_provider:
+            return ""
+
+        # Mock URL generation
+        if config.sso_provider == "github":
+            return f"https://github.com/login/oauth/authorize?client_id={config.sso_client_id}"
+        elif config.sso_provider == "google":
+            return f"https://accounts.google.com/o/oauth2/v2/auth?client_id={config.sso_client_id}"
+
+        return ""
+
     # --- Config Management ---
 
     @profiler.profile
@@ -610,18 +647,85 @@ class ACEService:
         return session_file.read_text(encoding="utf-8")
 
     def get_anthropic_client(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            # Fallback to ~/.ace/credentials
-            cred_file = Path.home() / ".ace" / "credentials"
-            if cred_file.exists():
-                for line in cred_file.read_text(encoding="utf-8").splitlines():
-                    if line.startswith("ANTHROPIC_API_KEY="):
-                        api_key = line.split("=", 1)[1].strip()
-                        break
-        if not api_key:
-            return None  # Return None instead of raising error
-        return anthropic.Anthropic(api_key=api_key)
+        if not self._anthropic_client:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                # Fallback to ~/.ace/credentials
+                cred_file = Path.home() / ".ace" / "credentials"
+                if cred_file.exists():
+                    for line in cred_file.read_text(encoding="utf-8").splitlines():
+                        if line.startswith("ANTHROPIC_API_KEY="):
+                            api_key = line.split("=", 1)[1].strip()
+                            break
+            if not api_key:
+                return None  # Return None instead of raising error
+            self._anthropic_client = anthropic.Anthropic(api_key=api_key)
+        return self._anthropic_client
+
+    def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """
+        Call the configured LLM provider (Phase 11.1).
+        Supports Anthropic, Google, and OpenAI providers.
+        """
+        config = self.load_config()
+        provider = config.model_provider
+        model = config.model_name
+
+        if provider == "anthropic":
+            client = self.get_anthropic_client()
+            if not client:
+                return "Error: ANTHROPIC_API_KEY not set."
+
+            message = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system_prompt or "",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            if isinstance(message.content, list):
+                return "".join(
+                    [block.text for block in message.content if hasattr(block, "text")]
+                )
+            return str(message.content)
+
+        elif provider == "google":
+            import google.generativeai as genai
+
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                # Fallback to ~/.ace/credentials
+                cred_file = Path.home() / ".ace" / "credentials"
+                if cred_file.exists():
+                    for line in cred_file.read_text(encoding="utf-8").splitlines():
+                        if line.startswith("GOOGLE_API_KEY="):
+                            api_key = line.split("=", 1)[1].strip()
+                            break
+            if not api_key:
+                return "Error: GOOGLE_API_KEY not set."
+            genai.configure(api_key=api_key)
+            model_instance = genai.GenerativeModel(model)
+            response = model_instance.generate_content(
+                prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+            )
+            return response.text
+
+        elif provider == "openai":
+            from openai import OpenAI
+
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return "Error: OPENAI_API_KEY not set."
+            client = OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt or ""},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return response.choices[0].message.content
+
+        return f"Error: Unsupported model provider {provider}"
 
     def get_google_client(self):
         api_key = os.getenv("GOOGLE_API_KEY")
@@ -665,10 +769,7 @@ class ACEService:
         return api_key
 
     def reflect_on_session(self, session_output: str) -> str:
-        client = self.get_anthropic_client()
-        if not client:
-            return "No new learnings (Anthropic client not available)."
-        prompt = (
+        system_prompt = (
             "You are an ACE Reflection Engine. Your task is to analyze the "
             "output of a coding agent session and extract structured "
             "learnings.\n\n"
@@ -685,20 +786,12 @@ class ACEService:
             "[dec-NEW] :: <description of the decision>\n\n"
             "Only include items that are clearly supported by the session "
             "output. If no new learnings are found, "
-            'return "No new learnings."\n\n'
-            f"Session Output:\n{session_output}\n"
+            'return "No new learnings."'
         )
+        prompt = f"Session Output:\n{session_output}\n"
+
         try:
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            if isinstance(message.content, list):
-                return "".join(
-                    [block.text for block in message.content if hasattr(block, "text")]
-                )
-            return str(message.content)
+            return self.call_llm(prompt, system_prompt)
         except Exception:
             return "Error during reflection."
 

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body, Request
+from fastapi import FastAPI, HTTPException, Body, Request, Depends, Header
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from typing import List, Optional, Dict
@@ -32,6 +32,33 @@ service = ACEService()
 templates = Jinja2Templates(directory="ace_api/templates")
 
 
+# --- SSO & Authentication (Phase 10.3) ---
+
+async def verify_sso(authorization: Optional[str] = Header(None)):
+    """Middleware-style dependency to verify SSO tokens (Phase 10.3)."""
+    config = service.load_config()
+    if not config.sso_enabled:
+        return True
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid SSO token")
+
+    token = authorization.split(" ")[1]
+    if not service.authenticate_sso(token):
+        raise HTTPException(status_code=403, detail="SSO authentication failed")
+
+    return True
+
+
+@app.get("/auth/login-url")
+async def get_login_url():
+    """Get the SSO login URL for the configured provider."""
+    url = service.get_sso_login_url()
+    if not url:
+        raise HTTPException(status_code=400, detail="SSO not enabled or provider not configured")
+    return {"url": url}
+
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -54,12 +81,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/agents", response_model=List[Agent])
+@app.get("/agents", response_model=List[Agent], dependencies=[Depends(verify_sso)])
 async def list_agents():
     return service.load_agents().agents
 
 
-@app.post("/agents", response_model=Agent)
+@app.post("/agents", response_model=Agent, dependencies=[Depends(verify_sso)])
 async def create_agent(
     id: str = Body(...),
     name: str = Body(...),

@@ -30,6 +30,13 @@ class Config(BaseModel):
     token_mode: TokenMode = TokenMode.LOW
     distributed_memory_url: Optional[str] = None
     distributed_memory_api_key: Optional[str] = None
+    sso_enabled: bool = False
+    sso_provider: Optional[str] = None  # e.g., "okta", "github", "google"
+    sso_client_id: Optional[str] = None
+    sso_client_secret: Optional[str] = None
+    sso_tenant_id: Optional[str] = None
+    model_provider: str = "anthropic"  # "anthropic", "google", "openai", "local"
+    model_name: str = "claude-3-5-sonnet-20240620"
 
 
 class Decision(BaseModel):

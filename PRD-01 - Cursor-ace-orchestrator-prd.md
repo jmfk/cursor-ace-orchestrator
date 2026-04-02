@@ -74,6 +74,7 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 **SOP (Standard Operating Procedure)** — Formella instruktioner som styr hur agenter utför specifika uppgifter (t.ex. `onboarding`, `pr-review`, `consensus-debate`). SOPs håller kommunikationen fokuserad och minskar token-waste.
 
 **Token Consumption Mode** — En global inställning som styr agenternas beteende:
+
 - **Low (Default)**: Minimal kontext, ingen asynkron debatt, fokus på enskilda tasks.
 - **Medium**: Tillåter korta debatter, grundläggande QA-audits och prenumerationer.
 - **High**: Full multi-agent debatt, omfattande QA, djup kontext-analys och proaktiva refactoring-förslag.
@@ -91,6 +92,7 @@ Bygga ett tunt orchestration-lager — **Cursor ACE Orchestrator** — som ger c
 **Playbook** — Agentens ackumulerade kunskaps-dokument. Lever i `.cursor/rules/<role>.mdc`. Uppdateras inkrementellt, aldrig skrivs om från scratch.
 
 **RALPH Loop (Reasoning, Action, Learning, Progress, Halt)** — En iterativ cykel där agenten:
+
 1. **Reason:** Analyserar task och befintlig kontext.
 2. **Action:** Utför kodändringar.
 3. **Learning:** Kör tester och fångar fel/lärdomar.
@@ -367,6 +369,7 @@ ace run "implementera refresh token rotation" --file src/auth/token.ts
 **Ansvar:** Hantera den iterativa processen där agenten försöker lösa en task genom flera försök.
 
 **Flöde per iteration:**
+
 1. **Context Refresh:** Hämta senaste `.mdc` (inklusive lärdomar från föregående iteration).
 2. **Execute:** Kör `cursor-agent` med den uppdaterade kontexten.
 3. **Verify:** Kör de relevanta testerna (TDD).
@@ -374,6 +377,7 @@ ace run "implementera refresh token rotation" --file src/auth/token.ts
 5. **Repeat:** Gå till steg 1 om tester misslyckas och `max_iterations` inte är nådd.
 
 **CLI-interface:**
+
 ```bash
 ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 ```
@@ -383,11 +387,13 @@ ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 **Ansvar:** Hantera interaktioner mellan olika subsystem-agenter när ändringar korsar ägarskapsgränser.
 
 **Agent Creation & Registry:**
+
 - Agenter kan skapas **manuellt** av användaren (`ace agent create`) eller **autonomt** av systemet när en ny modul eller ett bibliotek identifieras.
 - Varje agent får ett unikt namn, en dedikerad e-postadress (för Agent Mail) och en egen långtidsminnes-fil (`.mdc`).
 - Alla agenter och deras metadata (id, namn, roll, ansvarsområden) dokumenteras centralt i `.ace/agents.yaml`.
 
 **SOP:er (Standard Operating Procedures):**
+
 - **Onboarding/Handover**: När en agent byts ut eller skapas, genereras en `onboarding.md` som sammanfattar subsystemets status och tekniska skulder.
 - **PR Review**: Agenter utför automatiskt reviews på varandras ändringar. En `ui-agent` kan granska en `api-agent`s ändringar om de påverkar frontend-kontraktet.
 - **Subsystem Health Monitoring**: Agenter kör periodiska "audits" för att hitta brott mot DRY/YAGNI eller prestandaproblem.
@@ -395,23 +401,27 @@ ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 - **Shared "Coffee Break" Context**: Ett sätt för agenter att dela generella lärdomar (cross-pollination) via en delad `.ace/shared-learnings.mdc`.
 
 **Multi-Agent Debate & Consensus:**
+
 - Inspirerat av "Debate as Fact-Checking" för att minska hallucinationer.
 - Agenter utbyter formella förslag via Agent Mail.
 - En neutral `arch-agent` (eller LLM-referee) utvärderar tråden.
 - **Token Management**: Debatt-längd och djup styrs av det valda Token Consumption Mode (L/M/H).
 
 **Logik för Agent Teams:**
+
 - Varje subsystem (t.ex. `lib/ui-components`, `services/payment`) tilldelas en dedikerad agent.
 - En agent kan "lära sig" och ta ansvar för närliggande moduler om det finns en logisk koppling (t.ex. `auth-agent` tar även ansvar för `session-management`).
 - Ägarskapshistorik lagras i `.ace/ownership.yaml` för att bevara expertis.
 
 **Agent Mail (Internal Messaging):**
+
 - Agenter kommunicerar via ett trådat e-post-liknande system lagrat i `.ace/mail/`.
 - Varje agent har en `inbox/` och `sent/` mapp (Markdown-filer).
 - Stöd för **Attachments**: Agenter kan bifoga kodsnuttar, loggar eller spec-filer till sina meddelanden.
 - **Threading**: Meddelanden grupperas via `thread_id` för att bevara kontext i debatter.
 
 **Consensus-flöde:**
+
 1. **Conflict Detection:** Om en task i `src/api` kräver ändringar i `src/db`, flaggar systemet att både `api-agent` och `db-agent` är involverade.
 2. **Debate (Agent Mail):** Agenter skickar "Architectural Proposals" till varandras inboxar.
 3. **Consensus Check:** En neutral `arch-agent` (eller LLM-referee) utvärderar tråden för att se om båda parter är nöjda.
@@ -422,12 +432,14 @@ ace loop "Fixa buggen i token rotation" --test "npm test auth" --max 5
 **Ansvar:** Integrera Google Stitch för att generera mockups och UI-kod som en del av utvecklingsflödet.
 
 **Arbetsflöde:**
+
 1. **Vibe Prompting:** En `ui-agent` genererar en "Vibe Design"-beskrivning baserat på `intent.md` och `constraints.md`.
 2. **Mockup Generation:** ACE anropar Google Stitch API (eller instruerar användaren att öppna en genererad länk) för att skapa mockups.
 3. **Code Extraction:** Agenten extraherar Tailwind/Flutter-kod från Stitch och sparar den i `implementation.md` eller direkt i källkoden.
 4. **Visual Verification:** E2E-tester (Playwright) validerar att den implementerade koden matchar Stitch-mockupen.
 
 **CLI-interface:**
+
 ```bash
 ace ui mockup "Skapa en dashboard för admin" --agent ui-expert-01
 ace ui sync <stitch-canvas-url>              # Importera kod från Stitch
@@ -526,14 +538,16 @@ ace context show --file src/auth/token.ts  # Visa vad som skulle injiceras
 
 ## 9. Teknisk stack (föreslagen)
 
-| Komponent | Val | Motivering |
-|---|---|---|
-| CLI-ramverk | Python + Typer | Snabb iteration, bra argparsing |
-| Filoperationer | Pathlib + ruamel.yaml | YAML-preserving för .mdc frontmatter |
+
+| Komponent        | Val                                        | Motivering                                         |
+| ---------------- | ------------------------------------------ | -------------------------------------------------- |
+| CLI-ramverk      | Python + Typer                             | Snabb iteration, bra argparsing                    |
+| Filoperationer   | Pathlib + ruamel.yaml                      | YAML-preserving för .mdc frontmatter               |
 | LLM (reflection) | Claude claude-sonnet-4-6 via Anthropic API | Bättre instruction-following för structured output |
-| Executor | cursor-agent (headless) | Codebase-tools inbyggda |
-| Session-lagring | Markdown-filer i .ace/sessions/ | Enkelt, läsbart, gittrackbart |
-| Config | .ace/config.yaml | |
+| Executor         | cursor-agent (headless)                    | Codebase-tools inbyggda                            |
+| Session-lagring  | Markdown-filer i .ace/sessions/            | Enkelt, läsbart, gittrackbart                      |
+| Config           | .ace/config.yaml                           |                                                    |
+
 
 **Alternativ executor:** Om cursor-agent headless fortsätter vara instabilt — byt till Claude Code CLI (`claude -p`) som executor. Context-builder och write-back-pipeline är identiska.
 
@@ -542,41 +556,46 @@ ace context show --file src/auth/token.ts  # Visa vad som skulle injiceras
 ## 10. Milstolpar
 
 ### M0 — Grund (v0.1)
-- [ ] `ace init` — skapar `.ace/`-struktur
-- [ ] `ace own` / `ace who` — ownership registry (JSON + CLI)
-- [ ] Manuell context builder (CLI: `ace context show`)
-- [ ] Grundläggande `.mdc`-templates per roll
-- [ ] **TDD Setup:** Integrera Vitest/Pytest och definiera test-patterns för ACE-komponenter
+
+- `ace init` — skapar `.ace/`-struktur
+- `ace own` / `ace who` — ownership registry (JSON + CLI)
+- Manuell context builder (CLI: `ace context show`)
+- Grundläggande `.mdc`-templates per roll
+- **TDD Setup:** Integrera Vitest/Pytest och definiera test-patterns för ACE-komponenter
 
 ### M1 — Executor-integration (v0.2)
-- [ ] `ace run` — kör cursor-agent med injicerad kontext
-- [ ] Session-logging till `.ace/sessions/`
-- [ ] `--output-format stream-json` parsing och error handling
-- [ ] Headless-stabilitet workarounds (timeout, retry)
-- [ ] **Installation & Deployment Test:** Automatiserade tester för `ace install` och deployment-flöden
+
+- `ace run` — kör cursor-agent med injicerad kontext
+- Session-logging till `.ace/sessions/`
+- `--output-format stream-json` parsing och error handling
+- Headless-stabilitet workarounds (timeout, retry)
+- **Installation & Deployment Test:** Automatiserade tester för `ace install` och deployment-flöden
 
 ### M2 — Write-back (v0.3)
-- [ ] Reflection-prompt mot Claude API
-- [ ] Delta-update parser
-- [ ] Inkrementell `.mdc`-uppdatering (bevarar struktur)
-- [ ] `helpful/harmful`-räknare
-- [ ] **DX/AX Testing:** Validera att agentens reflektioner och write-backs förbättrar framtida DX/AX
+
+- Reflection-prompt mot Claude API
+- Delta-update parser
+- Inkrementell `.mdc`-uppdatering (bevarar struktur)
+- `helpful/harmful`-räknare
+- **DX/AX Testing:** Validera att agentens reflektioner och write-backs förbättrar framtida DX/AX
 
 ### M3 — Memory management (v0.4)
-- [ ] `ace memory prune` — ta bort inaktuella entries (harmful > helpful)
-- [ ] ADR-skapande från decisions
-- [ ] Session-continuity (hämta senaste sessionen per roll)
-- [ ] `ace memory history`
-- [ ] **UI/UX Testing:** Om ACE introducerar UI-komponenter, applicera Playwright/Cypress för E2E-tester
+
+- `ace memory prune` — ta bort inaktuella entries (harmful > helpful)
+- ADR-skapande från decisions
+- Session-continuity (hämta senaste sessionen per roll)
+- `ace memory history`
+- **UI/UX Testing:** Om ACE introducerar UI-komponenter, applicera Playwright/Cypress för E2E-tester
 
 ### M4 — Multi-agent, SOPs & Consensus (v0.5)
-- [ ] Parallell exekvering av oberoende roller
-- [ ] **Agent Teams & SOPs**: Implementera onboarding, PR-review och audit-SOPs.
-- [ ] **Agent Mail & Subscriptions**: Implementera prenumerationslogik för subsystem-ändringar.
-- [ ] **Consensus & Debate**: Implementera debatt-logik med LLM-referee.
-- [ ] **Token Manager**: Implementera L/M/H modes för att styra kontext och debatt-djup.
-- [ ] **Human-in-the-loop Escalation**: CLI-stöd för att lösa agent-konflikter.
-- [ ] **System-wide Integration Tests**: Verifiera multi-agent koordination och minnes-konsistens.
+
+- Parallell exekvering av oberoende roller
+- **Agent Teams & SOPs**: Implementera onboarding, PR-review och audit-SOPs.
+- **Agent Mail & Subscriptions**: Implementera prenumerationslogik för subsystem-ändringar.
+- **Consensus & Debate**: Implementera debatt-logik med LLM-referee.
+- **Token Manager**: Implementera L/M/H modes för att styra kontext och debatt-djup.
+- **Human-in-the-loop Escalation**: CLI-stöd för att lösa agent-konflikter.
+- **System-wide Integration Tests**: Verifiera multi-agent koordination och minnes-konsistens.
 
 ---
 
@@ -586,30 +605,36 @@ ACE Orchestrator följer en strikt **Test-Driven Development (TDD)** approach f�
 
 ### 11.1 Testnivåer
 
-| Testtyp | Verktyg | Fokus |
-|---|---|---|
-| **Unit Tests** | Vitest / Pytest | Logik i Context Builder, Ownership Registry, Delta-parsers. |
-| **Integration Tests** | Vitest / Pytest | Samspel mellan Registry, Context Builder och File System. |
-| **E2E / System Tests** | Playwright / CLI-test | Hela `ace run` flödet från prompt till write-back. |
-| **Installation Tests** | Custom Scripts | Verifiera att `pip install` / `npm install` fungerar på ren miljö (Docker). |
-| **Deployment Tests** | CI/CD (GitHub Actions) | Verifiera att ACE kan deployas och köras i en CI-miljö. |
+
+| Testtyp                | Verktyg                | Fokus                                                                       |
+| ---------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| **Unit Tests**         | Vitest / Pytest        | Logik i Context Builder, Ownership Registry, Delta-parsers.                 |
+| **Integration Tests**  | Vitest / Pytest        | Samspel mellan Registry, Context Builder och File System.                   |
+| **E2E / System Tests** | Playwright / CLI-test  | Hela `ace run` flödet från prompt till write-back.                          |
+| **Installation Tests** | Custom Scripts         | Verifiera att `pip install` / `npm install` fungerar på ren miljö (Docker). |
+| **Deployment Tests**   | CI/CD (GitHub Actions) | Verifiera att ACE kan deployas och köras i en CI-miljö.                     |
+
 
 ### 11.2 Upplevelsebaserad Testning (DX & AX)
 
 **Developer Experience (DX):**
+
 - **CLI Ergonomics:** Tester som mäter antal keystrokes och tydlighet i felmeddelanden.
 - **Documentation Coverage:** Automatiserad kontroll att alla CLI-kommandon är dokumenterade i `AGENTS.md` och `--help`.
 
 **Agentic Experience (AX):**
+
 - **Context Relevance Score:** Tester som utvärderar om den injicerade kontexten faktiskt hjälper agenten (mäts via success-rate i `ace run`).
 - **Write-back Accuracy:** Verifiera att agentens lärdomar är korrekta och inte introducerar hallucinationer i `.mdc`.
 - **Memory Coherence:** Tester som kollar att agenten inte "glömmer" tidigare beslut över flera sessioner.
 
 ### 11.3 UI/UX Testing
+
 - **Visual Regression:** Om ACE får ett web-gränssnitt, använd Playwright för att fånga layout-skift och visuella buggar.
 - **Accessibility (A11y):** Automatiska tester för WCAG-kompatibilitet i alla UI-komponenter.
 
 ### 11.4 Best Practices för Testning
+
 - **Red-Green-Refactor:** Ingen kod skrivs utan ett misslyckat test.
 - **YAGNI (You Ain't Gonna Need It):** Implementera endast det som krävs för att klara det aktuella testet. Undvik "future-proofing" som ökar komplexiteten.
 - **DRY (Don't Repeat Yourself):** Identifiera och extrahera gemensamma mönster (t.ex. filhantering, LLM-anrop) till delade utilities så fort de används på mer än ett ställe.
@@ -618,6 +643,7 @@ ACE Orchestrator följer en strikt **Test-Driven Development (TDD)** approach f�
 - **CI/CD Enforcement:** Inga PRs mergas utan 100% test-pass och täckning på kritiska moduler.
 
 ### 11.5 Kodgranskning & Arkitektur (YAGNI/DRY Enforcement)
+
 - **Complexity Lints:** Använd verktyg för att flagga hög cyklomatisk komplexitet (tecken på brott mot YAGNI).
 - **Duplication Checks:** Kör automatiserade verktyg (t.ex. `jscpd` eller liknande) i CI för att upptäcka kodduplicering.
 - **Agentic Review:** ACE-agenter instrueras att specifikt leta efter DRY-möjligheter och YAGNI-överträdelser under `review` tasks.
@@ -626,13 +652,15 @@ ACE Orchestrator följer en strikt **Test-Driven Development (TDD)** approach f�
 
 ## 12. Risker och begränsningar
 
-| Risk | Sannolikhet | Påverkan | Mitigering |
-|---|---|---|---|
-| cursor-agent headless hänger | Hög | Hög | Timeout + retry, fallback till Claude Code CLI |
-| Playbook växer sig för stor | Medium | Medium | `ace memory prune`, token-budget per .mdc |
-| Write-back skriver fel kontext | Medium | Hög | Human-in-the-loop flagga, diff-preview innan commit |
-| Glob-konflikter i .mdc | Låg | Medium | Valideringskommando vid `ace init` |
-| Agenten ignorerar injicerad kontext | Medium | Hög | Explicit taggning i prompt: `[PLAYBOOK START]...[PLAYBOOK END]` |
+
+| Risk                                | Sannolikhet | Påverkan | Mitigering                                                      |
+| ----------------------------------- | ----------- | -------- | --------------------------------------------------------------- |
+| cursor-agent headless hänger        | Hög         | Hög      | Timeout + retry, fallback till Claude Code CLI                  |
+| Playbook växer sig för stor         | Medium      | Medium   | `ace memory prune`, token-budget per .mdc                       |
+| Write-back skriver fel kontext      | Medium      | Hög      | Human-in-the-loop flagga, diff-preview innan commit             |
+| Glob-konflikter i .mdc              | Låg         | Medium   | Valideringskommando vid `ace init`                              |
+| Agenten ignorerar injicerad kontext | Medium      | Hög      | Explicit taggning i prompt: `[PLAYBOOK START]...[PLAYBOOK END]` |
+
 
 ---
 
