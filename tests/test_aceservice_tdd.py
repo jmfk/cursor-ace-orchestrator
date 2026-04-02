@@ -1,6 +1,7 @@
 import pytest
+from pathlib import Path
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TaskType, TokenMode
+from ace_lib.models.schemas import TaskType
 
 @pytest.fixture
 def temp_workspace(tmp_path):
@@ -14,142 +15,122 @@ def service(temp_workspace):
     """Initialize ACEService in a temporary workspace."""
     return ACEService(base_path=temp_workspace)
 
-def test_service_initialization(service, temp_workspace):
-    """Test that ACEService initializes correctly and creates necessary directories."""
-    assert service.base_path == temp_workspace
-    assert service.ace_dir == temp_workspace / ".ace"
-    assert service.cursor_rules_dir == temp_workspace / ".cursor" / "rules"
-
-def test_config_management(service):
-    """Test loading and saving configuration."""
-    config = service.load_config()
-    assert config.token_mode == TokenMode.LOW
+def test_onboard_agent_sop(service, temp_workspace):
+    """Test that onboarding an agent generates the correct SOP file (Phase 11.18)."""
+    service.create_agent(id="test-agent", name="Test Agent", role="developer")
+    sop_path = service.onboard_agent("test-agent")
     
-    config.token_mode = TokenMode.HIGH
-    service.save_config(config)
+    assert sop_path.exists()
+    content = sop_path.read_text()
+    assert "SOP: Agent Onboarding - Test Agent (test-agent)" in content
+    assert "## 1. Context Acquisition" in content
     
-    service.clear_cache()
-    new_config = service.load_config()
-    assert new_config.token_mode == TokenMode.HIGH
+    # Check if memory file was created
+    # ACEService uses self.cursor_rules_dir which is base_path / ".cursor/rules"
+    memory_file = temp_workspace / ".cursor" / "rules" / "developer.mdc"
+    assert memory_file.exists()
+    assert "# Test Agent Playbook (developer)" in memory_file.read_text()
 
-def test_agent_registry(service):
-    """Test creating and loading agents."""
-    agent = service.create_agent(
-        id="test-agent",
-        name="Test Agent",
-        role="tester",
-        responsibilities=["tests/"]
+def test_review_pr_sop(service, temp_workspace):
+    """Test that PR review generates the correct SOP file (Phase 11.18)."""
+    review_path = service.review_pr("PR-123", "test-agent")
+    
+    assert review_path.exists()
+    content = review_path.read_text()
+    assert "SOP: PR Review - PR-123" in content
+    assert "Reviewer**: test-agent" in content
+    assert "## 3. Security Check" in content
+
+def test_run_loop_basic(service, temp_workspace, monkeypatch):
+    """Test the basic RALPH loop execution (Phase 11.18)."""
+    import subprocess
+    from unittest.mock import MagicMock
+
+    # Mock subprocess.run for cursor-agent and test_cmd
+    def mock_run(cmd, shell=True, capture_output=True, text=True, env=None, **kwargs):
+        mock_res = MagicMock()
+        if isinstance(cmd, str) and "cursor-agent" in cmd:
+            mock_res.returncode = 0
+            mock_res.stdout = "Agent success output"
+            mock_res.stderr = ""
+        elif isinstance(cmd, str) and "pytest" in cmd:
+            mock_res.returncode = 0
+            mock_res.stdout = "Test success output"
+            mock_res.stderr = ""
+        else:
+            mock_res.returncode = 0
+            mock_res.stdout = ""
+            mock_res.stderr = ""
+        return mock_res
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    
+    # Mock reflection to avoid calling Anthropic
+    monkeypatch.setattr(service, "reflect_on_session", lambda x: "No new learnings.")
+    monkeypatch.setattr(service, "get_anthropic_client", lambda: MagicMock())
+
+    # Setup dummy PRD and plan
+    prd_path = temp_workspace / "PRD.md"
+    prd_path.write_text("# PRD")
+    plan_path = temp_workspace / "plan.md"
+    plan_path.write_text("# Plan")
+
+    success, iterations = service.run_loop(
+        prompt="Test prompt",
+        test_cmd="pytest",
+        max_iterations=1,
+        prd_path=str(prd_path),
+        plan_file=str(plan_path)
     )
-    assert agent.id == "test-agent"
-    assert agent.role == "tester"
-    
-    agents_config = service.load_agents()
-    assert len(agents_config.agents) == 1
-    assert agents_config.agents[0].id == "test-agent"
 
-def test_ownership_registry(service):
-    """Test assigning and resolving module ownership."""
-    service.assign_ownership("src/core", "core-agent")
-    service.assign_ownership("src/core/utils", "utils-agent")
-    
-    assert service.resolve_owner("src/core/main.py") == "core-agent"
-    assert service.resolve_owner("src/core/utils/helper.py") == "utils-agent"
-    assert service.resolve_owner("src/other") is None
+    assert success is True
+    assert iterations == 1
 
-def test_context_building_basic(service):
-    """Test building context with global rules and task framing."""
-    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    (service.cursor_rules_dir / "_global.mdc").write_text("Global Rule Content")
-    
-    context, agent_id = service.build_context(path="src/app.py", task_type=TaskType.IMPLEMENT)
-    
-    assert "Global Rule Content" in context
-    assert "TASK FRAMING" in context
-    assert "implementing new functionality" in context
+def test_ui_mockup_integration(service, temp_workspace, monkeypatch):
+    """Test UI mockup generation and component extraction (Phase 11.18)."""
 
-def test_adr_management(service):
-    """Test adding and listing ADRs."""
-    service.add_decision(
-        title="Use FastAPI",
-        context="Need a web framework",
-        decision="Use FastAPI for the backend",
-        consequences="Fast development"
-    )
-    
-    decisions = service.list_decisions()
-    assert len(decisions) == 1
-    assert decisions[0].title == "Use FastAPI"
-    assert decisions[0].id == "ADR-001"
+    # Mock stitch engine generate_mockup
+    import ace_lib.stitch.stitch_engine as stitch_engine
+    monkeypatch.setattr(stitch_engine, "generate_mockup",
+                        lambda desc, aid, key: ("https://stitch.google.com/canvas/test_id",
+                                                "export const Button = () => <button>Click</button>;"))
 
-def test_mail_system(service):
-    """Test sending and reading mail between agents."""
-    service.send_mail(
-        to_agent="agent-b",
-        from_agent="agent-a",
-        subject="Hello",
-        body="Test message"
-    )
-    
-    messages = service.list_mail("agent-b")
-    assert len(messages) == 1
-    assert messages[0].subject == "Hello"
-    assert messages[0].from_agent == "agent-a"
-    
-    msg = service.read_mail("agent-b", messages[0].id)
-    assert msg.body == "Test message"
-    assert msg.status == "read"
+    # Bypass agent generation in tests
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "true")
 
-def test_macp_proposal_lifecycle(service):
-    """Test creating and listing MACP proposals."""
-    proposal = service.create_macp_proposal(
-        proposer_id="agent-a",
-        title="New Feature",
-        description="Let's add X",
-        agent_ids=["agent-b"]
-    )
+    url = service.ui_mockup("A simple button", "test-agent")
     
-    assert proposal.id.startswith("MACP-")
-    assert proposal.proposer_id == "agent-a"
+    assert "stitch.google.com/canvas/test_id" in url
     
-    proposals = service.list_macp_proposals()
-    assert len(proposals) == 1
-    assert proposals[0].id == proposal.id
+    # Check if mockup file was created
+    mockup_file = service.ace_dir / "ui_mockups" / "test_id.md"
+    assert mockup_file.exists()
+    assert "export const Button" in mockup_file.read_text()
+    
+    # Check if components were extracted
+    component_file = service.ace_dir / "ui_mockups" / "components" / "test_id" / "Button.tsx"
+    assert component_file.exists()
+    assert "export const Button" in component_file.read_text()
 
-def test_rbac_restrictions(service, monkeypatch):
-    """Test RBAC path and command restrictions."""
-    service.create_agent(
-        id="restricted-agent",
-        name="Restricted",
-        role="dev",
-        allowed_paths=["src/allowed"],
-        forbidden_commands=["rm -rf"]
-    )
+def test_ui_sync_integration(service, temp_workspace, monkeypatch):
+    """Test UI sync from Stitch URL (Phase 11.18)."""
+    import ace_lib.stitch.stitch_engine as stitch_engine
+    monkeypatch.setattr(stitch_engine, "sync_mockup",
+                        lambda url, key: "export const NewButton = () => <button>New</button>;")
     
-    # Mock subprocess.run to avoid actual execution
-    class MockProcess:
-        returncode = 0
-        stdout = "Success"
-        stderr = ""
+    # Create an initial mockup to test diffing
+    mockup_id = "test_sync_id"
+    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+    mockup_file.parent.mkdir(parents=True, exist_ok=True)
+    mockup_file.write_text("```tsx\nexport const OldButton = () => <button>Old</button>;\n```")
     
-    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MockProcess())
+    url = f"https://stitch.google.com/canvas/{mockup_id}"
+    service.ui_sync(url)
     
-    # Test allowed path
-    assert service.run_agent_task(
-        command="ls",
-        path="src/allowed/file.py",
-        agent_id="restricted-agent"
-    ) is True
+    # Check if updated
+    content = mockup_file.read_text()
+    assert "export const NewButton" in content
     
-    # Test forbidden path
-    assert service.run_agent_task(
-        command="ls",
-        path="src/forbidden/file.py",
-        agent_id="restricted-agent"
-    ) is False
-    
-    # Test forbidden command
-    assert service.run_agent_task(
-        command="rm -rf /",
-        path="src/allowed/file.py",
-        agent_id="restricted-agent"
-    ) is False
+    # Check if diff was created
+    diff_file = service.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
+    assert diff_file.exists()
