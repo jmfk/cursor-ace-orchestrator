@@ -1163,6 +1163,7 @@ class ACEService:
 
         try:
             import requests
+
             headers = {}
             if config.distributed_memory_api_key:
                 headers["X-API-Key"] = config.distributed_memory_api_key
@@ -1185,6 +1186,7 @@ class ACEService:
 
         try:
             import requests
+
             headers = {}
             if config.distributed_memory_api_key:
                 headers["X-API-Key"] = config.distributed_memory_api_key
@@ -1785,7 +1787,9 @@ type: role
 
                 # Check for missing sections
                 if "## Strategier & patterns" not in content:
-                    agent_audit["issues"].append("Missing 'Strategier & patterns' section.")
+                    agent_audit["issues"].append(
+                        "Missing 'Strategier & patterns' section."
+                    )
                 if "## Kända fallgropar" not in content:
                     agent_audit["issues"].append("Missing 'Kända fallgropar' section.")
 
@@ -1793,13 +1797,17 @@ type: role
                     "healthy" if not agent_audit["issues"] else "needs_attention"
                 )
             else:
-                agent_audit["issues"].append(f"Playbook file missing: {agent.memory_file}")
+                agent_audit["issues"].append(
+                    f"Playbook file missing: {agent.memory_file}"
+                )
                 agent_audit["memory_health"] = "critical"
 
             # 2. Audit Ownership Consistency
             ownership_config = self.load_ownership()
             owned_paths = [
-                path for path, mod in ownership_config.modules.items() if mod.agent_id == agent.id
+                path
+                for path, mod in ownership_config.modules.items()
+                if mod.agent_id == agent.id
             ]
             agent_audit["owned_paths_count"] = len(owned_paths)
             if not owned_paths:
@@ -1811,7 +1819,9 @@ type: role
         # Check for unowned critical paths
         ownership_config = self.load_ownership()
         if not ownership_config.modules:
-            audit_results["recommendations"].append("No ownership defined. Run 'ace own' to assign modules.")
+            audit_results["recommendations"].append(
+                "No ownership defined. Run 'ace own' to assign modules."
+            )
 
         # Check for token spend
         token_usages = self.get_token_report()
@@ -1824,9 +1834,13 @@ type: role
 
         # Check for MACP stalemates
         proposals = self.list_macp_proposals()
-        stale_proposals = [p for p in proposals if p.status == ConsensusStatus.STALEMATE]
+        stale_proposals = [
+            p for p in proposals if p.status == ConsensusStatus.STALEMATE
+        ]
         if stale_proposals:
-            audit_results["recommendations"].append(f"Found {len(stale_proposals)} stale MACP proposals.")
+            audit_results["recommendations"].append(
+                f"Found {len(stale_proposals)} stale MACP proposals."
+            )
 
         return audit_results
 
@@ -2351,6 +2365,7 @@ type: role
                 messages=[{"role": "user", "content": prompt}],
             )
             import json
+
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
             json_match = re.search(r"\{.*\}", content, re.DOTALL)
             if json_match:
@@ -2755,6 +2770,7 @@ type: role
 
         try:
             import json
+
             message = client.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=1024,

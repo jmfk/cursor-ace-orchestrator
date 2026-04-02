@@ -116,11 +116,7 @@ def test_ui_mockup_generation_fallback(ace_service, monkeypatch):
 
     # Check if component was extracted
     component_file = (
-        ace_service.ace_dir
-        / "ui_mockups"
-        / "components"
-        / mockup_id
-        / "App.tsx"
+        ace_service.ace_dir / "ui_mockups" / "components" / mockup_id / "App.tsx"
     )
     assert component_file.exists()
     assert "export const App" in component_file.read_text()

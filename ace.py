@@ -78,7 +78,9 @@ def meta_self_audit():
             f"  Playbook: [dim]{stats['strategies']} strategies, "
             f"{stats['pitfalls']} pitfalls, {stats['decisions']} decisions[/dim]"
         )
-        console.print(f"  Ownership: [dim]{agent.get('owned_paths_count', 0)} paths[/dim]")
+        console.print(
+            f"  Ownership: [dim]{agent.get('owned_paths_count', 0)} paths[/dim]"
+        )
 
         if agent["issues"]:
             console.print("  [bold yellow]Issues:[/bold yellow]")
@@ -87,7 +89,9 @@ def meta_self_audit():
 
     # 2. System-wide Audit
     console.print("\n[bold blue]System-wide Audit[/bold blue]")
-    console.print(f"  Total Token Cost: [bold magenta]${results.get('total_token_cost', 0.0):.4f}[/bold magenta]")
+    console.print(
+        f"  Total Token Cost: [bold magenta]${results.get('total_token_cost', 0.0):.4f}[/bold magenta]"
+    )
 
     if results["recommendations"]:
         console.print("\n[bold yellow]Recommendations:[/bold yellow]")
@@ -1034,13 +1038,14 @@ def loop(
             if spec_id:
                 spec = svc.get_spec(spec_id)
                 if spec:
-                    spec_context = f"\n\nTarget Living Spec ({spec_id}):\nIntent: {spec.intent}\nConstraints: {', '.join(spec.constraints)}\n"
-
+                    spec_context = (
+                        f"\n\nTarget Living Spec ({spec_id}):\nIntent: {spec.intent}\n"
+                        f"Constraints: {', '.join(spec.constraints)}\n"
+                    )
             analysis_prompt = (
                 f"Analyze the current codebase and project structure relative to the PRD:\n{prd_content}\n\n"
                 f"The existing plan is:\n{plan_content if plan_content else 'No plan yet.'}\n\n"
-                f"{spec_context}"
-                "1. Identify implemented features. 2. Identify missing parts. "
+                f"{spec_context}1. Identify implemented features. 2. Identify missing parts. "
                 f"3. Update '{plan_file_path}' and 'changelog.md' with the current status. "
                 "Focus on identifying the very next actionable task."
             )
@@ -1048,9 +1053,7 @@ def loop(
             if prompt.lower().strip() == "analyze":
                 current_prompt = analysis_prompt
             else:
-                current_prompt = (
-                    f"{analysis_prompt}\n\nThen, proceed with the following task: {prompt}"
-                )
+                current_prompt = f"{analysis_prompt}\n\nThen, proceed with the following task: {prompt}"
         else:
             current_prompt = prompt
 
@@ -1066,9 +1069,7 @@ def loop(
         # 3. Execute
         console.print(f"[RALPH] Executing task: [dim]{current_prompt[:100]}...[/dim]")
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
             tmp.write(context)
             context_file = tmp.name
 
@@ -1077,7 +1078,10 @@ def loop(
         if cursor_key:
             env["CURSOR_API_KEY"] = cursor_key
 
-        agent_cmd = f'cursor-agent --print --model {model} --force --trust --context-file {context_file} "{current_prompt}"'
+        agent_cmd = (
+            f"cursor-agent --print --model {model} --force --trust "
+            f'--context-file {context_file} "{current_prompt}"'
+        )
 
         try:
             agent_proc = subprocess.run(
@@ -1134,7 +1138,10 @@ def loop(
             # 6. Reflect
             if svc.get_anthropic_client():
                 console.print(f"[RALPH] Reflecting on iteration {iteration}...")
-                reflection_input = f"STATUS: {'SUCCESS' if test_passed else 'FAILURE'}\nAGENT OUTPUT:\n{agent_proc.stdout}\nTEST OUTPUT:\n{test_result.stdout}"
+                reflection_input = (
+                    f"STATUS: {'SUCCESS' if test_passed else 'FAILURE'}\n"
+                    f"AGENT OUTPUT:\n{agent_proc.stdout}\nTEST OUTPUT:\n{test_result.stdout}"
+                )
                 reflection_text = svc.reflect_on_session(reflection_input)
                 updates = svc.parse_reflection_output(reflection_text)
 
