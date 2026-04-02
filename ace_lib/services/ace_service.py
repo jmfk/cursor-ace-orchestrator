@@ -498,9 +498,9 @@ class ACEService:
         context_parts.append(f"### TASK FRAMING\n{framing}")
 
         # 7. RALPH Loop Context (if applicable)
-        ralph_prompt = os.getenv("ACE_LOOP_PROMPT")
-        if ralph_prompt:
-            context_parts.append(f"### RALPH LOOP PROMPT\n{ralph_prompt}")
+        rolf_prompt = os.getenv("ACE_LOOP_PROMPT")
+        if rolf_prompt:
+            context_parts.append(f"### ROLF LOOP PROMPT\n{rolf_prompt}")
 
         full_context = "\n\n".join(context_parts)
         # 8. Adaptive Context Pruning (Phase 10.4)
