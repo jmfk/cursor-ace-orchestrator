@@ -59,6 +59,8 @@ class Agent(BaseModel):
     status: str = "active"
     parent_id: Optional[str] = None
     sub_agent_ids: List[str] = Field(default_factory=list)
+    allowed_paths: List[str] = Field(default_factory=list)  # RBAC: Paths the agent is allowed to modify
+    forbidden_commands: List[str] = Field(default_factory=list)  # RBAC: Commands the agent is not allowed to run
 
 
 class AgentsConfig(BaseModel):
