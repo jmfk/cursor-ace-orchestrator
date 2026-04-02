@@ -78,3 +78,49 @@ def test_run_loop_basic(service, temp_workspace, monkeypatch):
 
     assert success is True
     assert iterations == 1
+
+def test_ui_mockup_integration(service, temp_workspace, monkeypatch):
+    """Test UI mockup generation and component extraction (Phase 11.18)."""
+
+    # Mock stitch engine generate_mockup
+    import ace_lib.stitch.stitch_engine as stitch_engine
+    monkeypatch.setattr(stitch_engine, "generate_mockup",
+                        lambda desc, aid, key: (f"https://stitch.google.com/canvas/test_id",
+                                                "export const Button = () => <button>Click</button>;"))
+
+    url = service.ui_mockup("A simple button", "test-agent")
+    
+    assert "stitch.google.com/canvas/test_id" in url
+    
+    # Check if mockup file was created
+    mockup_file = service.ace_dir / "ui_mockups" / "test_id.md"
+    assert mockup_file.exists()
+    assert "export const Button" in mockup_file.read_text()
+    
+    # Check if components were extracted
+    component_file = service.ace_dir / "ui_mockups" / "components" / "test_id" / "Button.tsx"
+    assert component_file.exists()
+    assert "export const Button" in component_file.read_text()
+
+def test_ui_sync_integration(service, temp_workspace, monkeypatch):
+    """Test UI sync from Stitch URL (Phase 11.18)."""
+    import ace_lib.stitch.stitch_engine as stitch_engine
+    monkeypatch.setattr(stitch_engine, "sync_mockup",
+                        lambda url, key: "export const NewButton = () => <button>New</button>;")
+    
+    # Create an initial mockup to test diffing
+    mockup_id = "test_sync_id"
+    mockup_file = service.ace_dir / "ui_mockups" / f"{mockup_id}.md"
+    mockup_file.parent.mkdir(parents=True, exist_ok=True)
+    mockup_file.write_text("```tsx\nexport const OldButton = () => <button>Old</button>;\n```")
+    
+    url = f"https://stitch.google.com/canvas/{mockup_id}"
+    service.ui_sync(url)
+    
+    # Check if updated
+    content = mockup_file.read_text()
+    assert "export const NewButton" in content
+    
+    # Check if diff was created
+    diff_file = service.ace_dir / "ui_mockups" / f"{mockup_id}_diff.txt"
+    assert diff_file.exists()
