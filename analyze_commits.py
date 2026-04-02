@@ -79,7 +79,7 @@ class CommitAnalyzer:
             return []
 
     def get_commit_details(self, commit_hash: str) -> Dict[str, Any]:
-        """Get diff stats and specific file changes (plan.md, changelog.md)."""
+        """Get diff stats, specific file changes, and the actual code diff."""
         # Stats
         cmd_stats = ["git", "show", "--numstat", "--format=", commit_hash]
         stats: Dict[str, int] = {"added": 0, "deleted": 0, "files": 0}
@@ -103,6 +103,20 @@ class CommitAnalyzer:
         except subprocess.CalledProcessError:
             pass
 
+        # Actual code diff (excluding large/irrelevant files)
+        # We use -- . ':(exclude)path' syntax for git show
+        exclude_args = [f":(exclude){ex}" for ex in self.EXCLUDED_FILES]
+        cmd_diff = ["git", "show", "--format=", commit_hash, "--"] + ["."] + exclude_args
+        diff_content = ""
+        try:
+            res_diff = subprocess.run(cmd_diff, capture_output=True, text=True, check=True)
+            diff_content = res_diff.stdout
+            # Limit diff size to avoid blowing up the prompt
+            if len(diff_content) > 10000:
+                diff_content = diff_content[:10000] + "\n... [diff truncated] ..."
+        except subprocess.CalledProcessError:
+            pass
+
         # File contents (plan.md, changelog.md)
         files_content: Dict[str, str] = {}
         for target in ["plan.md", "changelog.md"]:
@@ -114,15 +128,30 @@ class CommitAnalyzer:
             except Exception:
                 pass
 
-        return {"stats": stats, "files": files_content}
+        return {"stats": stats, "files": files_content, "diff": diff_content}
 
     def analyze_improvement(self, commit: Dict[str, Any], details: Dict[str, Any]) -> Dict[str, Any]:
         """Use Gemini to measure improvement and suggest a better commit message."""
         if not self.model:
             return {"improvement_score": 0, "suggested_message": commit["subject"], "analysis": "LLM disabled"}
 
+        # Heuristic override for zero-change commits (Phase 12)
+        total_changes = details['stats']['added'] + details['stats']['deleted']
+        if total_changes == 0:
+            return {
+                "improvement_score": 0,
+                "analysis": "Administrative churn / No code changes (only excluded files or no changes).",
+                "suggested_message": commit["subject"]
+            }
+
         prompt = f"""
-Analyze the following git commit and its impact on the project based on changes in plan.md and changelog.md.
+Analyze the following git commit for system value and feature progress.
+
+RUBRIC (0-100):
+- 0-10: Administrative churn (logs, placeholders, roadmap increments, formatting).
+- 11-40: Documentation updates or minor refactoring with no functional change.
+- 41-70: Functional bug fixes or incremental features/improvements.
+- 71-100: Major architectural improvements or significant new features.
 
 Commit Subject: {commit['subject']}
 Files Changed: {details['stats']['files']}
@@ -135,9 +164,12 @@ Lines Deleted: {details['stats']['deleted']}
 --- changelog.md content in this commit ---
 {details['files'].get('changelog.md', 'Not changed or not found')}
 
+--- ACTUAL CODE DIFF ---
+{details.get('diff', 'No code diff available')}
+
 Tasks:
-1. Provide an improvement score from 0 to 100 based on feature progress and system value.
-2. Provide a brief (1-2 sentences) analysis of the improvement.
+1. Assign an improvement score (0-100) based on the RUBRIC.
+2. Provide a brief (1-2 sentences) analysis of the improvement. Evaluate if the code change actually improves the codebase.
 3. Suggest a better, more descriptive git commit message if the current one is vague.
 
 Return the result in JSON format:
