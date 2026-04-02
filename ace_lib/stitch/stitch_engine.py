@@ -10,7 +10,7 @@ def generate_mockup(
     """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
     mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
-    ui_code = f"// Mock UI code for: {description}\nexport const App = () => <div>{description}</div>;"
+    ui_code = None
 
     if api_key:
         try:

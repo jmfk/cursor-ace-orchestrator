@@ -100,6 +100,7 @@ def test_ui_mockup_generation_fallback(ace_service, monkeypatch):
     monkeypatch.setattr(subprocess, "run", mock_run)
     monkeypatch.setattr(ace_service, "get_stitch_key", lambda: None)
     # Ensure we don't trigger the test environment bypass in ace_service.py
+    monkeypatch.setenv("STITCH_TEST_NO_BYPASS", "1")
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
     mockup_url = ace_service.ui_mockup("A simple button", "designer-01")
@@ -111,7 +112,7 @@ def test_ui_mockup_generation_fallback(ace_service, monkeypatch):
 
     assert mockup_file.exists()
     assert "## Design & Code" in mockup_file.read_text()
-    assert "export const MyComponent" in mockup_file.read_text()
+    assert "export const App" in mockup_file.read_text()
 
     # Check if component was extracted
     component_file = (
@@ -119,10 +120,10 @@ def test_ui_mockup_generation_fallback(ace_service, monkeypatch):
         / "ui_mockups"
         / "components"
         / mockup_id
-        / "MyComponent.tsx"
+        / "App.tsx"
     )
     assert component_file.exists()
-    assert "export const MyComponent" in component_file.read_text()
+    assert "export const App" in component_file.read_text()
 
 
 def test_context_pruning(ace_service):

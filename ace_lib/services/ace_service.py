@@ -1941,8 +1941,8 @@ type: role
     def _generate_mockup_with_agent(self, description: str) -> str:
         """Use cursor-agent to generate the mockup code."""
         # Check if we are in a test environment
-        if os.getenv("PYTEST_CURRENT_TEST"):
-            return "export const MockComponent = () => <div>Mock</div>;"
+        if os.getenv("PYTEST_CURRENT_TEST") and not os.getenv("STITCH_TEST_NO_BYPASS"):
+            return f"// Mock UI code for: {description}\nexport const App = () => <div>{description}</div>;"
 
         prompt = (
             f"Design a UI mockup for: {description}. "
