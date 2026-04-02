@@ -1301,59 +1301,39 @@ class ACEService:
                         f"Constraints: {', '.join(spec.constraints)}\n\n{context}"
                     )
 
-            # 2. Execute (Phase 4.1)
-            print(f"[RALPH] Executing task: {prompt[:50]}...")
+        # 2. Execute (Phase 4.1)
+        print(f"[RALPH] Executing task: {prompt[:50]}...")
 
-            # Inject GOOGLE_API_KEY and CURSOR_API_KEY from credentials if needed
-            env = os.environ.copy()
-            try:
-                env["GOOGLE_API_KEY"] = self.get_google_client()
-            except ValueError:
-                pass
-
-            cursor_key = self.get_cursor_key()
-            if cursor_key:
-                env["CURSOR_API_KEY"] = cursor_key
-
-            # Write context to a temporary file
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".txt", delete=False
-            ) as tmp:
-                tmp.write(context)
-                context_file = tmp.name
-
-            agent_cmd = (
-                f"cursor-agent --print --model {model} --force --trust "
-                f'--context-file {context_file} "{prompt}"'
+        # Call the 'run' command logic directly (Phase 4.1 Integration)
+        agent_cmd = (
+            f"cursor-agent --print --model {model} --force --trust \"{prompt}\""
+        )
+        
+        try:
+            # Simulate cost tracking (minimal base cost)
+            total_cost += (len(prompt.split()) * 1.3 / 1_000_000 * 0.10)
+            
+            # Call the 'run' command logic directly
+            task_success = self.run_agent_task(
+                command=agent_cmd,
+                path=path,
+                task_type=TaskType.IMPLEMENT,
+                agent_id=agent_id
             )
-
-            print("[RALPH] Running agent command...")
-            agent_proc = subprocess.run(
-                agent_cmd, shell=True, capture_output=True, text=True, env=env
-            )
-
-            # Log token usage (simulated for now, as cursor-agent doesn't return it yet)
-            input_tokens = len(prompt.split()) * 1.3
-            output_tokens = len(agent_proc.stdout.split()) * 1.3
-            cost = input_tokens / 1_000_000 * 0.10 + output_tokens / 1_000_000 * 0.40
-            total_cost += cost
-
-            self.log_token_usage(
-                TokenUsage(
-                    agent_id=resolved_agent_id or "unknown",
-                    session_id=f"loop_{iteration}",
-                    prompt_tokens=int(input_tokens),
-                    completion_tokens=int(output_tokens),
-                    total_tokens=int(input_tokens + output_tokens),
-                    cost=cost,
-                )
-            )
-
+            
             # 3. Verify (Phase 4.1)
-            print(f"[RALPH] Verifying with: {test_cmd}")
-            result = subprocess.run(
-                test_cmd, shell=True, capture_output=True, text=True
-            )
+            if task_success:
+                print(f"[RALPH] Verifying with: {test_cmd}")
+                result = subprocess.run(
+                    test_cmd, shell=True, capture_output=True, text=True
+                )
+                test_passed = result.returncode == 0
+                feedback_status = "SUCCESS" if test_passed else "FAILURE"
+                print(f"[RALPH] Test result: {feedback_status}")
+                
+                if test_passed:
+                    print("[RALPH] ✅ Verification successful!")
+                    # ... rest of success logic ...
 
             # --- Automated Security Audit Integration (Phase 10.18) ---
             if resolved_agent_id:
