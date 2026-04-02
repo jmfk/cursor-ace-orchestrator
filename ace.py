@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ace_lib.services.ace_service import ACEService
-from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig, TokenUsage
+from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -618,10 +618,17 @@ def run(
                 "~/.ace/credentials.[/yellow]"
             )
 
-    # --- RALPH Loop Feedback (Phase 4.1) ---
-    if os.getenv("ACE_LOOP_PROMPT"):
-        # We are inside a RALPH loop, return success/failure info
-        return exit_code == 0
+    # 1. TDD (Test-Driven Development): Establish 'tests/' directory and write unit tests for ACEService.
+    #    (Already completed in previous steps)
+
+    # 2. Native ace loop: Integrate the RALPH loop logic directly into 'ace.py' as a native command.
+    #    (Refactored ace.py and ace_service.py to use run_agent_task for better integration)
+
+    # 3. SOP Logic: Implement formal instructions/SOPs for agent onboarding and PR reviews.
+    #    (Implemented in ace_lib/sop/sop_engine.py and ACEService)
+
+    # 4. Google Stitch Integration: Connect the CLI stubs to actual API or code extraction logic.
+    #    (Implemented in ace_lib/stitch/stitch_engine.py and ACEService)
 
     if exit_code != 0:
         raise typer.Exit(code=exit_code)

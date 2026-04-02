@@ -23,11 +23,15 @@ def generate_mockup(
             )
             if response.status_code == 200:
                 data = response.json()
-                ui_code = data.get("code", ui_code)
+                ui_code = data.get("code")
                 if data.get("url"):
                     mockup_url = data.get("url")
-        except Exception:
-            pass
+            elif response.status_code == 401:
+                print("[STITCH] Error: Invalid API key.")
+            else:
+                print(f"[STITCH] Error: API returned status {response.status_code}")
+        except Exception as e:
+            print(f"[STITCH] Error calling API: {e}")
 
     return mockup_url, ui_code
 
@@ -46,8 +50,12 @@ def sync_mockup(url: str, api_key: Optional[str] = None) -> str:
             )
             if response.status_code == 200:
                 ui_code = response.json().get("code")
-        except Exception:
-            pass
+            elif response.status_code == 404:
+                print(f"[STITCH] Error: Mockup {mockup_id} not found.")
+            else:
+                print(f"[STITCH] Error: API returned status {response.status_code}")
+        except Exception as e:
+            print(f"[STITCH] Error calling API: {e}")
 
     return ui_code or ""
 

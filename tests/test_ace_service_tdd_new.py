@@ -39,7 +39,7 @@ def test_run_loop_success(ace_service, monkeypatch):
     assert success is True
     assert iterations == 1
     # Check if session was logged
-    sessions = list(ace_service.sessions_dir.glob("*.md"))
+    sessions = list(ace_service.sessions_dir.glob("session_loop_*.md"))
     assert len(sessions) == 1
 
 

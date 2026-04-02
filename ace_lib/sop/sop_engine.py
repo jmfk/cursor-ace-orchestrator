@@ -69,6 +69,7 @@ def generate_pr_review_sop(pr_id: str, agent_id: str) -> str:
 - [ ] **Secrets**: No hardcoded secrets or API keys.
 - [ ] **Sanitization**: Input data is properly sanitized.
 - [ ] **Dependencies**: No new vulnerable dependencies introduced.
+- [ ] **ACE-SPECIFIC**: Verify that no `[str-XXX]`, `[mis-XXX]`, or `[dec-XXX]` tags are misused in comments.
 
 ## 4. Learning Extraction
 - [ ] **New Strategies**: Identify any new successful patterns: `[str-NEW] helpful=1 harmful=0 :: <desc>`

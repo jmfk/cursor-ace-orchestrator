@@ -1117,6 +1117,92 @@ class ACEService:
 
         return self.finalize_macp(proposal_id)
 
+    def run_agent_task(
+        self,
+        command: str,
+        path: Optional[str] = None,
+        task_type: TaskType = TaskType.IMPLEMENT,
+        agent_id: Optional[str] = None,
+    ) -> bool:
+        """Execute an agent command with ACE context and return success/failure."""
+        context, resolved_agent_id = self.build_context(path, task_type, agent_id)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+            tmp.write(context)
+            context_file = tmp.name
+
+        print(f"Running command: {command}")
+        print(f"Context injected from: {context_file}")
+
+        try:
+            env = os.environ.copy()
+            cursor_key = self.get_cursor_key()
+            if cursor_key:
+                env["CURSOR_API_KEY"] = cursor_key
+
+            # We use subprocess.run for simplicity here, similar to ace.py's run
+            process = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            print(process.stdout)
+            if process.stderr:
+                print(process.stderr)
+            exit_code = process.returncode
+            full_output = process.stdout + process.stderr
+        except Exception as e:
+            print(f"Error executing command: {e}")
+            exit_code = 1
+            full_output = str(e)
+        finally:
+            if os.path.exists(context_file):
+                os.remove(context_file)
+
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        session_file = self.sessions_dir / f"session_{session_id}.md"
+        session_content = f"""# Session {session_id}
+- **Command**: `{command}`
+- **Path**: `{path}`
+- **Agent ID**: `{resolved_agent_id}`
+- **Task Type**: `{task_type.value}`
+- **Exit Code**: {exit_code}
+- **Timestamp**: {datetime.now().isoformat()}
+
+## Context Provided
+{context}
+
+## Output
+```
+{full_output}
+```
+"""
+        session_file.write_text(session_content, encoding="utf-8")
+        print(f"Session logged to: {session_file}")
+
+        if exit_code == 0:
+            if self.get_anthropic_client():
+                # Note: This is internal, so we don't have _perform_reflection here
+                # but we can call reflect_on_session directly
+                reflection_text = self.reflect_on_session(full_output)
+                updates = self.parse_reflection_output(reflection_text)
+                if updates:
+                    playbook_path = self.cursor_rules_dir / "_global.mdc"
+                    if resolved_agent_id:
+                        agents_config = self.load_agents()
+                        agent = next(
+                            (a for a in agents_config.agents if a.id == resolved_agent_id),
+                            None,
+                        )
+                        if agent:
+                            playbook_path = self.base_path / agent.memory_file
+                    self.update_playbook(playbook_path, updates)
+
+        return exit_code == 0
+
     # --- Distributed Memory (Phase 10.1) ---
 
     @profiler.profile
@@ -1203,6 +1289,23 @@ class ACEService:
         return []
 
     # --- RALPH Loop Engine ---
+
+    def _perform_reflection_internal(self, session_file: Path, agent_id: Optional[str]):
+        session_content = session_file.read_text(encoding="utf-8")
+        output_match = re.search(r"## Output\n```\n(.*?)\n```", session_content, re.DOTALL)
+        if not output_match:
+            return
+
+        reflection_text = self.reflect_on_session(output_match.group(1))
+        updates = self.parse_reflection_output(reflection_text)
+        if updates:
+            playbook_path = self.cursor_rules_dir / "_global.mdc"
+            if agent_id:
+                agents_config = self.load_agents()
+                agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+                if agent:
+                    playbook_path = self.base_path / agent.memory_file
+            self.update_playbook(playbook_path, updates)
 
     @profiler.profile
     def run_loop(
@@ -1301,234 +1404,229 @@ class ACEService:
                         f"Constraints: {', '.join(spec.constraints)}\n\n{context}"
                     )
 
-        # 2. Execute (Phase 4.1)
-        print(f"[RALPH] Executing task: {prompt[:50]}...")
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+                tmp.write(context)
+                context_file = tmp.name
 
-        # Call the 'run' command logic directly (Phase 4.1 Integration)
-        agent_cmd = (
-            f"cursor-agent --print --model {model} --force --trust \"{prompt}\""
-        )
-        
-        try:
-            # Simulate cost tracking (minimal base cost)
-            total_cost += (len(prompt.split()) * 1.3 / 1_000_000 * 0.10)
-            
-            # Call the 'run' command logic directly
-            task_success = self.run_agent_task(
-                command=agent_cmd,
-                path=path,
-                task_type=TaskType.IMPLEMENT,
-                agent_id=agent_id
+            # 2. Execute (Phase 4.1)
+            print(f"[RALPH] Executing task: {prompt[:50]}...")
+
+            # Call the 'run' command logic directly (Phase 4.1 Integration)
+            agent_cmd = (
+                f"cursor-agent --print --model {model} --force --trust \"{prompt}\""
             )
             
-            # 3. Verify (Phase 4.1)
-            if task_success:
-                print(f"[RALPH] Verifying with: {test_cmd}")
-                result = subprocess.run(
-                    test_cmd, shell=True, capture_output=True, text=True
-                )
-                test_passed = result.returncode == 0
-                feedback_status = "SUCCESS" if test_passed else "FAILURE"
-                print(f"[RALPH] Test result: {feedback_status}")
+            try:
+                # Simulate cost tracking (minimal base cost)
+                total_cost += (len(prompt.split()) * 1.3 / 1_000_000 * 0.10)
                 
-                if test_passed:
-                    print("[RALPH] ✅ Verification successful!")
-                    # ... rest of success logic ...
-
-            # --- Automated Security Audit Integration (Phase 10.18) ---
-            if resolved_agent_id:
-                print(
-                    f"[RALPH] Running automated security audit for {resolved_agent_id}..."
+                # Call the 'run' command logic directly
+                task_success = self.run_agent_task(
+                    command=agent_cmd,
+                    path=path,
+                    task_type=TaskType.IMPLEMENT,
+                    agent_id=agent_id
                 )
-                from ace_lib.agents.security_audit import SecurityAuditService
+                
+                # 3. Verify (Phase 4.1)
+                if task_success:
+                    print(f"[RALPH] Verifying with: {test_cmd}")
+                    result = subprocess.run(
+                        test_cmd, shell=True, capture_output=True, text=True
+                    )
+                    test_passed = result.returncode == 0
+                    feedback_status = "SUCCESS" if test_passed else "FAILURE"
+                    print(f"[RALPH] Test result: {feedback_status}")
 
-                sec_service = SecurityAuditService(self)
-                try:
-                    sec_results = sec_service.run_automated_audit(resolved_agent_id)
-                    if sec_results["summary"]["failed"] > 0:
-                        print(
-                            f"[RALPH] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures."
-                        )
-                        # We don't necessarily fail the loop, but we log it
-                except Exception as e:
-                    print(f"[RALPH] Security audit error: {e}")
-
-            # --- Agentic Feedback Loop (Phase 6.7) ---
-            # Automatically flag success/failure based on test-output
-            test_passed = result.returncode == 0
-            feedback_status = "SUCCESS" if test_passed else "FAILURE"
-            print(f"[RALPH] Test result: {feedback_status}")
-
-            # Notify subscribers of failure if applicable
-            if not test_passed and path:
-                self.notify_subscribers(
-                    path, f"RALPH Loop failed for: {prompt}", success=False
-                )
-
-            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            session_file = (
-                self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
-            )
-            self.sessions_dir.mkdir(parents=True, exist_ok=True)
-
-            session_content = (
-                f"# Session Loop {session_id} (Iteration {iteration})\n"
-                f"- **Prompt**: `{prompt}`\n"
-                f"- **Test Command**: `{test_cmd}`\n"
-                f"- **Agent ID**: `{resolved_agent_id}`\n"
-                f"- **Agent Exit Code**: {agent_proc.returncode}\n"
-                f"- **Test Exit Code**: {result.returncode}\n"
-                f"- **Feedback Status**: {feedback_status}\n"
-            )
-            session_content += (
-                f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
-                f"## Agent Output\n"
-                f"### Stdout\n```\n{agent_proc.stdout}\n```\n"
-                f"### Stderr\n```\n{agent_proc.stderr}\n```\n\n"
-                f"## Test Output\n"
-                f"### Stdout\n```\n{result.stdout}\n```\n"
-                f"### Stderr\n```\n{result.stderr}\n```\n"
-            )
-            session_file.write_text(session_content, encoding="utf-8")
-
-            # 4. Reflection (Phase 4.1)
-            reflection_text = ""
-            if self.get_anthropic_client():
-                print(f"[RALPH] Performing reflection for iteration {iteration}...")
-                # Reflect on current iteration output, including test success/failure
-                reflection_input = (
-                    f"TASK STATUS: {feedback_status}\n"
-                    f"AGENT OUTPUT:\n{agent_proc.stdout}\n"
-                    f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
-                )
-                reflection_text = self.reflect_on_session(reflection_input)
-                updates = self.parse_reflection_output(reflection_text)
-
-                # If test failed, ensure we increment harmful for the strategy used
-                # and if it passed, increment helpful (Phase 3.4).
-                if updates:
-                    for update in updates:
-                        if test_passed:
-                            update["helpful"] = max(update.get("helpful", 0), 1)
-                            update["harmful"] = 0
-                        else:
-                            update["harmful"] = max(update.get("harmful", 0), 1)
-                            update["helpful"] = 0
-
-                    playbook_path = self.cursor_rules_dir / "_global.mdc"
+                    # --- Automated Security Audit Integration (Phase 10.18) ---
                     if resolved_agent_id:
-                        agents_config = self.load_agents()
-                        agent = next(
-                            (
-                                a
-                                for a in agents_config.agents
-                                if a.id == resolved_agent_id
-                            ),
-                            None,
+                        print(
+                            f"[RALPH] Running automated security audit for {resolved_agent_id}..."
                         )
-                        if agent:
-                            playbook_path = self.base_path / agent.memory_file
-                    self.update_playbook(playbook_path, updates)
-                    print(f"[RALPH] Updated playbook: {playbook_path.name}")
+                        from ace_lib.agents.security_audit import SecurityAuditService
 
-                # Update prompt with reflection insights if it failed
-                if not test_passed and reflection_text != "No new learnings.":
-                    prompt = (
-                        f"Previous attempt failed (Status: {feedback_status}). Reflection insights:\n"
-                        f"{reflection_text}\n\n"
-                        f"Original task: {prompt}"
-                    )
-                elif not test_passed:
-                    prompt = (
-                        f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
-                        f"{result.stdout}\n{result.stderr}\n\n"
-                        f"Original task: {prompt}"
-                    )
-            else:
-                if not test_passed:
-                    print(
-                        f"[RALPH] ❌ Verification failed "
-                        f"(Exit code: {result.returncode})"
-                    )
-                    # Update prompt for next iteration with failure info
-                    prompt = (
-                        f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
-                        f"{result.stdout}\n{result.stderr}\n\n"
-                        f"Original task: {prompt}"
-                    )
-
-            # 5. Git Commit (Optional)
-            if git_commit and test_passed:
-                print("[RALPH] Committing changes...")
-                try:
-                    status = subprocess.run(
-                        ["git", "status", "--porcelain"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
-                    if status.stdout.strip():
-                        commit_msg = f"RALPH Loop: {prompt[:50]}"
-                        # Try to generate a better commit message using LLM if available
-                        client = self.get_anthropic_client()
-                        if client:
-                            try:
-                                diff = subprocess.run(
-                                    ["git", "diff"],
-                                    capture_output=True,
-                                    text=True,
-                                    check=False,
-                                ).stdout
-                                msg_prompt = (
-                                    "Generate a concise, one-line git commit message "
-                                    f"for the following task: {prompt[:100]}\n\n"
-                                    f"Git Diff context:\n{diff[:2000]}\n\n"
-                                    "Output ONLY the commit message string."
+                        sec_service = SecurityAuditService(self)
+                        try:
+                            sec_results = sec_service.run_automated_audit(resolved_agent_id)
+                            if sec_results["summary"]["failed"] > 0:
+                                print(
+                                    f"[RALPH] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures."
                                 )
-                                message = client.messages.create(
-                                    model="claude-3-5-sonnet-20241022",
-                                    max_tokens=100,
-                                    messages=[{"role": "user", "content": msg_prompt}],
+                                # We don't necessarily fail the loop, but we log it
+                        except Exception as e:
+                            print(f"[RALPH] Security audit error: {e}")
+
+                    # Notify subscribers of failure if applicable
+                    if not test_passed and path:
+                        self.notify_subscribers(
+                            path, f"RALPH Loop failed for: {prompt}", success=False
+                        )
+
+                    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    session_file = (
+                        self.sessions_dir / f"session_loop_{session_id}_{iteration}.md"
+                    )
+                    self.sessions_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Note: We don't have agent_proc here anymore, but session info is in the run_agent_task logs
+                    session_content = (
+                        f"# Session Loop {session_id} (Iteration {iteration})\n"
+                        f"- **Prompt**: `{prompt}`\n"
+                        f"- **Test Command**: `{test_cmd}`\n"
+                        f"- **Agent ID**: `{resolved_agent_id}`\n"
+                        f"- **Test Exit Code**: {result.returncode}\n"
+                        f"- **Feedback Status**: {feedback_status}\n"
+                        f"- **Timestamp**: {datetime.now().isoformat()}\n\n"
+                        f"## Test Output\n"
+                        f"### Stdout\n```\n{result.stdout}\n```\n"
+                        f"### Stderr\n```\n{result.stderr}\n```\n"
+                    )
+                    session_file.write_text(session_content, encoding="utf-8")
+
+                    # 4. Reflection (Phase 4.1)
+                    reflection_text = ""
+                    if self.get_anthropic_client():
+                        print(f"[RALPH] Performing reflection for iteration {iteration}...")
+                        # Reflect on current iteration output, including test success/failure
+                        reflection_input = (
+                            f"TASK STATUS: {feedback_status}\n"
+                            f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
+                        )
+                        reflection_text = self.reflect_on_session(reflection_input)
+                        updates = self.parse_reflection_output(reflection_text)
+
+                        # If test failed, ensure we increment harmful for the strategy used
+                        # and if it passed, increment helpful (Phase 3.4).
+                        if updates:
+                            for update in updates:
+                                if test_passed:
+                                    update["helpful"] = max(update.get("helpful", 0), 1)
+                                    update["harmful"] = 0
+                                else:
+                                    update["harmful"] = max(update.get("harmful", 0), 1)
+                                    update["helpful"] = 0
+
+                            playbook_path = self.cursor_rules_dir / "_global.mdc"
+                            if resolved_agent_id:
+                                agents_config = self.load_agents()
+                                agent = next(
+                                    (
+                                        a
+                                        for a in agents_config.agents
+                                        if a.id == resolved_agent_id
+                                    ),
+                                    None,
                                 )
-                                if isinstance(message.content, list):
-                                    commit_msg = message.content[0].text.strip()
-                            except Exception:
-                                pass
+                                if agent:
+                                    playbook_path = self.base_path / agent.memory_file
+                            self.update_playbook(playbook_path, updates)
+                            print(f"[RALPH] Updated playbook: {playbook_path.name}")
 
-                        subprocess.run(["git", "add", "."], check=True)
-                        subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-                        print(f"[RALPH] Committed: {commit_msg}")
-                except Exception as e:
-                    print(f"[RALPH] Git commit failed: {e}")
+                        # Update prompt with reflection insights if it failed
+                        if not test_passed and reflection_text != "No new learnings.":
+                            prompt = (
+                                f"Previous attempt failed (Status: {feedback_status}). Reflection insights:\n"
+                                f"{reflection_text}\n\n"
+                                f"Original task: {prompt}"
+                            )
+                        elif not test_passed:
+                            prompt = (
+                                f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
+                                f"{result.stdout}\n{result.stderr}\n\n"
+                                f"Original task: {prompt}"
+                            )
+                    else:
+                        if not test_passed:
+                            print(
+                                f"[RALPH] ❌ Verification failed "
+                                f"(Exit code: {result.returncode})"
+                            )
+                            # Update prompt for next iteration with failure info
+                            prompt = (
+                                f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
+                                f"{result.stdout}\n{result.stderr}\n\n"
+                                f"Original task: {prompt}"
+                            )
 
-            if test_passed:
-                print("[RALPH] ✅ Verification successful!")
-                # Notify subscribers of the change
-                if path:
-                    self.notify_subscribers(
-                        path, f"RALPH Loop successful for: {prompt}", success=True
-                    )
+                    # 5. Git Commit (Optional)
+                    if git_commit and test_passed:
+                        print("[RALPH] Committing changes...")
+                        try:
+                            status = subprocess.run(
+                                ["git", "status", "--porcelain"],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                            )
+                            if status.stdout.strip():
+                                commit_msg = f"RALPH Loop: {prompt[:50]}"
+                                # Try to generate a better commit message using LLM if available
+                                client = self.get_anthropic_client()
+                                if client:
+                                    try:
+                                        diff = subprocess.run(
+                                            ["git", "diff"],
+                                            capture_output=True,
+                                            text=True,
+                                            check=False,
+                                        ).stdout
+                                        msg_prompt = (
+                                            "Generate a concise, one-line git commit message "
+                                            f"for the following task: {prompt[:100]}\n\n"
+                                            f"Git Diff context:\n{diff[:2000]}\n\n"
+                                            "Output ONLY the commit message string."
+                                        )
+                                        message = client.messages.create(
+                                            model="claude-3-5-sonnet-20241022",
+                                            max_tokens=100,
+                                            messages=[{"role": "user", "content": msg_prompt}],
+                                        )
+                                        if isinstance(message.content, list):
+                                            commit_msg = message.content[0].text.strip()
+                                    except Exception:
+                                        pass
 
-                # Update plan.md if it exists
-                if os.path.exists(plan_file):
-                    print(f"[RALPH] Updating {plan_file}...")
-                    update_plan_prompt = (
-                        f"Update '{plan_file}' and 'changelog.md' based on the "
-                        f"successful completion of: {prompt[:100]}"
-                    )
-                    subprocess.run(
-                        f'cursor-agent --print --model {model} --force --trust "{update_plan_prompt}"',
-                        shell=True,
-                        env=env,
-                    )
+                                subprocess.run(["git", "add", "."], check=True)
+                                subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+                                print(f"[RALPH] Committed: {commit_msg}")
+                        except Exception as e:
+                            print(f"[RALPH] Git commit failed: {e}")
 
-                # Update Living Spec if applicable (Phase 10.23)
-                if spec_id:
-                    print(f"[RALPH] Automating Living Spec update for {spec_id}...")
-                    self.automate_spec_update(spec_id, agent_proc.stdout)
+                    if test_passed:
+                        print("[RALPH] ✅ Verification successful!")
+                        # Notify subscribers of the change
+                        if path:
+                            self.notify_subscribers(
+                                path, f"RALPH Loop successful for: {prompt}", success=True
+                            )
 
-                success = True
-                break
+                        # Update plan.md if it exists
+                        if os.path.exists(plan_file):
+                            print(f"[RALPH] Updating {plan_file}...")
+                            update_plan_prompt = (
+                                f"Update '{plan_file}' and 'changelog.md' based on the "
+                                f"successful completion of: {prompt[:100]}"
+                                )
+                            subprocess.run(
+                                f'cursor-agent --print --model {model} --force --trust "{update_plan_prompt}"',
+                                shell=True,
+                            )
+
+                        # Update Living Spec if applicable (Phase 10.23)
+                        if spec_id:
+                            print(f"[RALPH] Automating Living Spec update for {spec_id}...")
+                            self.automate_spec_update(spec_id, result.stdout)
+
+                        success = True
+                        break
+                else:
+                    print(f"[RALPH] [red]Iteration {iteration} agent execution failed. Retrying...[/red]")
+                    prompt = f"Previous attempt agent execution failed. Retrying original task: {prompt}"
+            except Exception as e:
+                print(f"[RALPH] Error during execution: {e}")
+            finally:
+                if os.path.exists(context_file):
+                    os.remove(context_file)
 
             # Stagnation detection
             try:
