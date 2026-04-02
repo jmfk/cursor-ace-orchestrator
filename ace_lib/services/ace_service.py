@@ -6,7 +6,6 @@ import re
 import subprocess
 import hashlib
 import tempfile
-import fcntl
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple, Callable, Any
@@ -30,9 +29,6 @@ from ace_lib.models.schemas import (
     SubscriptionsConfig,
     MACPProposal,
     ConsensusStatus,
-    Plugin,
-    PluginType,
-    MarketplaceConfig,
 )
 
 yaml = YAML()
@@ -52,7 +48,6 @@ class ACEService:
         self.mail_dir = self.ace_dir / "mail"
         self.macp_dir = self.ace_dir / "macp"
         self.specs_dir = self.ace_dir / "specs"
-        self.marketplace_dir = self.ace_dir / "marketplace"
         self.vector_db_dir = self.ace_dir / "vector_db"
         self.cursor_rules_dir = base_path / ".cursor" / "rules"
         self._cache: Dict[str, Any] = {}
@@ -61,19 +56,17 @@ class ACEService:
 
     def _get_chroma_client(self) -> Any:
         if not self._chroma_client:
+            import chromadb
+            from chromadb.config import Settings
+
             self.vector_db_dir.mkdir(parents=True, exist_ok=True)
             # Phase 10.14: Optimize ChromaDB settings for performance and reliability
-            try:
-                import chromadb
-                from chromadb.config import Settings
-                self._chroma_client = chromadb.PersistentClient(
-                    path=str(self.vector_db_dir),
-                    settings=Settings(
-                        allow_reset=True, anonymized_telemetry=False, is_persistent=True
-                    ),
-                )
-            except ImportError:
-                return None
+            self._chroma_client = chromadb.PersistentClient(
+                path=str(self.vector_db_dir),
+                settings=Settings(
+                    allow_reset=True, anonymized_telemetry=False, is_persistent=True
+                ),
+            )
         return self._chroma_client
 
     @profiler.profile
@@ -310,7 +303,6 @@ class ACEService:
         parent_id: Optional[str] = None,
         allowed_paths: Optional[List[str]] = None,
         forbidden_commands: Optional[List[str]] = None,
-        memory_file: Optional[str] = None,
     ) -> Agent:
         config = self.load_agents()
         if any(a.id == id for a in config.agents):
@@ -319,13 +311,7 @@ class ACEService:
         if not email:
             email = f"{id}@ace.local"
 
-        if any(a.email == email for a in config.agents):
-            raise ValueError(f"Agent with email {email} already exists.")
-
-        if not memory_file:
-            # Use rules/ instead of .cursor/rules/ to avoid sandbox issues in tests
-            memory_file = f"rules/{role}.mdc"
-
+        memory_file = f".cursor/rules/{role}.mdc"
         new_agent = Agent(
             id=id,
             name=name,
@@ -350,28 +336,6 @@ class ACEService:
         config.agents.append(new_agent)
         self.save_agents(config)
         return new_agent
-
-    def assign_ownership(self, path: str, agent_id: str):
-        """Assign ownership of a path to an agent."""
-        config = self.load_ownership()
-        config.modules[path] = OwnershipModule(agent_id=agent_id)
-        self.save_ownership(config)
-
-    def identify_reviewers_for_files(self, files: List[str]) -> List[str]:
-        """Identify agents who own the given files."""
-        config = self.load_ownership()
-        reviewers = set()
-        for file_path in files:
-            # Find the longest matching prefix
-            best_match = ""
-            owner = None
-            for module_path, module_info in config.modules.items():
-                if file_path.startswith(module_path) and len(module_path) > len(best_match):
-                    best_match = module_path
-                    owner = module_info.agent_id
-            if owner:
-                reviewers.add(owner)
-        return list(reviewers)
 
     def get_agent_hierarchy(self, agent_id: str) -> Dict:
         """Get the hierarchy for an agent (parent and children)."""
@@ -479,8 +443,6 @@ class ACEService:
 
         # 3. Recent decisions (ADRs)
         if self.decisions_dir.exists():
-            # PRD: Senaste 3 ADRs relaterade till modulen
-            # For now, we just take the latest 3 global ones, but could be filtered by agent/path
             decisions = sorted(
                 list(self.decisions_dir.glob("*.md")),
                 key=lambda x: x.stat().st_mtime,
@@ -496,27 +458,11 @@ class ACEService:
         # 4. Session continuity
         config = self.load_config()
         if self.sessions_dir.exists():
-            # PRD: Senaste sessionen för denna roll (om < 7 dagar)
             session_files = sorted(
                 list(self.sessions_dir.glob("*.md")),
                 key=lambda x: x.stat().st_mtime,
                 reverse=True,
             )
-            
-            # Filter by agent if possible
-            if resolved_agent_id:
-                filtered_sessions = []
-                for s in session_files:
-                    try:
-                        content = s.read_text(encoding="utf-8")
-                        if f"- **Agent ID**: `{resolved_agent_id}`" in content:
-                            # Check age (7 days = 604800 seconds)
-                            if (datetime.now().timestamp() - s.stat().st_mtime) < 604800:
-                                filtered_sessions.append(s)
-                    except Exception:
-                        continue
-                session_files = filtered_sessions
-
             token_map = {
                 TokenMode.LOW: 1,
                 TokenMode.MEDIUM: 3,
@@ -552,12 +498,11 @@ class ACEService:
         context_parts.append(f"### TASK FRAMING\n{framing}")
 
         # 7. RALPH Loop Context (if applicable)
-        # Only inject if caller is `run_loop` (indicated by _ralph_loop_active flag)
         ralph_prompt = os.getenv("ACE_LOOP_PROMPT")
-        if ralph_prompt and getattr(self, "_ralph_loop_active", False):
+        if ralph_prompt:
             context_parts.append(f"### RALPH LOOP PROMPT\n{ralph_prompt}")
 
-        full_context = "[PLAYBOOK START]\n\n" + "\n\n".join(context_parts) + "\n\n[PLAYBOOK END]"
+        full_context = "\n\n".join(context_parts)
         # 8. Adaptive Context Pruning (Phase 10.4)
         # Estimate complexity and prune if necessary
         complexity = 1
@@ -835,18 +780,12 @@ class ACEService:
                         break
         return api_key
 
-    def reflect_on_session(self, session_output: str, task_summary: Optional[str] = None, success: bool = True) -> str:
+    def reflect_on_session(self, session_output: str) -> str:
         config = self.load_config()
-        
-        status_str = "SUCCESS" if success else "FAILURE"
-        task_info = f"Task Summary: {task_summary}\n" if task_summary else ""
-        
         system_prompt = (
             "You are an ACE Reflection Engine. Your task is to analyze the "
             "output of a coding agent session and extract structured "
             "learnings.\n\n"
-            f"Result: {status_str}\n"
-            f"{task_info}"
             "Look for:\n"
             "1. **Strategies [str-XXX]**: Successful patterns, helpful "
             "libraries, or effective approaches.\n"
@@ -856,7 +795,7 @@ class ACEService:
             "during the task.\n\n"
             "Format your output EXACTLY as follows:\n"
             "[str-NEW] helpful=1 harmful=0 :: <description of the strategy>\n"
-            "[mis-NEW] helpful=1 harmful=0 :: <description of the pitfall>\n"
+            "[mis-NEW] helpful=0 harmful=1 :: <description of the pitfall>\n"
             "[dec-NEW] :: <description of the decision>\n\n"
             "Only include items that are clearly supported by the session "
             "output. If no new learnings are found, "
@@ -1381,44 +1320,22 @@ class ACEService:
         print(f"Session logged to: {session_file}")
 
         if exit_code == 0:
-            # PRD: Reflection extraherar: Nya strategier, Nya fallgropar, Beslut som bör bli ADRs, Uppdateringar av helpful/harmful-räknare
-            # We use reflect_on_session which calls the LLM with a specific system prompt
-            reflection_text = self.reflect_on_session(full_output, task_summary=command, success=True)
-            updates = self.parse_reflection_output(reflection_text)
-            if updates:
-                playbook_path = self.cursor_rules_dir / "_global.mdc"
-                if resolved_agent_id:
-                    agents_config = self.load_agents()
-                    agent = next(
-                        (a for a in agents_config.agents if a.id == resolved_agent_id),
-                        None,
-                    )
-                    if agent:
-                        playbook_path = self.base_path / agent.memory_file
-                self.update_playbook(playbook_path, updates)
-            
-            # PRD: Session loggas till .ace/sessions/ (already done above)
-            # PRD: ADR-skapande från decisions (if extracted)
-            for update in updates:
-                if update["type"] == "dec":
-                    # Optionally create a formal ADR if it's a significant decision
-                    # For now, update_playbook already adds it to the .mdc
-                    pass
-        else:
-            # Even on failure, reflect to capture pitfalls
-            reflection_text = self.reflect_on_session(full_output, task_summary=command, success=False)
-            updates = self.parse_reflection_output(reflection_text)
-            if updates:
-                playbook_path = self.cursor_rules_dir / "_global.mdc"
-                if resolved_agent_id:
-                    agents_config = self.load_agents()
-                    agent = next(
-                        (a for a in agents_config.agents if a.id == resolved_agent_id),
-                        None,
-                    )
-                    if agent:
-                        playbook_path = self.base_path / agent.memory_file
-                self.update_playbook(playbook_path, updates)
+            if self.get_anthropic_client():
+                # Note: This is internal, so we don't have _perform_reflection here
+                # but we can call reflect_on_session directly
+                reflection_text = self.reflect_on_session(full_output)
+                updates = self.parse_reflection_output(reflection_text)
+                if updates:
+                    playbook_path = self.cursor_rules_dir / "_global.mdc"
+                    if resolved_agent_id:
+                        agents_config = self.load_agents()
+                        agent = next(
+                            (a for a in agents_config.agents if a.id == resolved_agent_id),
+                            None,
+                        )
+                        if agent:
+                            playbook_path = self.base_path / agent.memory_file
+                    self.update_playbook(playbook_path, updates)
 
         return exit_code == 0
 
@@ -1554,21 +1471,6 @@ class ACEService:
         prd_path = prd_path or "PRD-01 - Cursor-ace-orchestrator-prd.md"
         plan_file = plan_file or "plan.md"
 
-        lock_path = self.ace_dir / "loop.lock"
-        self.ace_dir.mkdir(parents=True, exist_ok=True)
-        self._loop_lock_fd = open(lock_path, "w")
-        try:
-            fcntl.flock(self._loop_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            self._loop_lock_fd.write(
-                f"ace_loop pid={os.getpid()} started={datetime.now().isoformat()}\n"
-            )
-            self._loop_lock_fd.flush()
-        except OSError:
-            self._loop_lock_fd.close()
-            print("[RALPH] Another loop (ralph or ace) is already running. Aborting.")
-            return False, 0
-
-        self._ralph_loop_active = True
         print("🚀 [bold blue]Starting RALPH Loop[/bold blue]")
         print(f"[RALPH] Using PRD: {prd_path}")
         print(f"[RALPH] Using Plan: {plan_file}")
@@ -1633,12 +1535,6 @@ class ACEService:
                 agent_id=agent_id,
                 task_description=prompt,
             )
-
-            # PRD: Task type framing (already handled in build_context)
-            # PRD: Session continuity (already handled in build_context)
-            # PRD: Global rules (already handled in build_context)
-            # PRD: Agent playbook (already handled in build_context)
-            # PRD: Recent decisions (already handled in build_context)
 
             if spec_id:
                 spec = self.get_spec(spec_id)
@@ -1906,15 +1802,6 @@ class ACEService:
             # Cleanup context file
             if os.path.exists(context_file):
                 os.remove(context_file)
-
-        self._ralph_loop_active = False
-        os.environ.pop("ACE_LOOP_PROMPT", None)
-        fcntl.flock(self._loop_lock_fd, fcntl.LOCK_UN)
-        self._loop_lock_fd.close()
-        try:
-            (self.ace_dir / "loop.lock").unlink()
-        except OSError:
-            pass
 
         if success:
             print(f"\n✅ [bold green]RALPH Loop completed in {iteration} iterations![/bold green]")
@@ -2947,7 +2834,7 @@ type: role
         """Read profiler logs from the JSONL file."""
         import json
 
-        log_file = Path(".ralph/profiling.jsonl")
+        log_file = Path(".ace/profiling.jsonl")
         if not log_file.exists():
             return []
 
@@ -2959,78 +2846,6 @@ type: role
                 except json.JSONDecodeError:
                     continue
         return logs
-
-    # --- Marketplace Management ---
-
-    @profiler.profile
-    def load_marketplace(self) -> MarketplaceConfig:
-        return self._get_cached("marketplace", self._load_marketplace_uncached)
-
-    def _load_marketplace_uncached(self) -> MarketplaceConfig:
-        marketplace_file = self.marketplace_dir / "plugins.yaml"
-        if not marketplace_file.exists():
-            return MarketplaceConfig()
-        with open(marketplace_file, "r", encoding="utf-8") as f:
-            data = yaml.load(f)
-            return MarketplaceConfig(**data) if data else MarketplaceConfig()
-
-    def save_marketplace(self, config: MarketplaceConfig):
-        self._cache["marketplace"] = config
-        self.marketplace_dir.mkdir(parents=True, exist_ok=True)
-        marketplace_file = self.marketplace_dir / "plugins.yaml"
-        with open(marketplace_file, "w", encoding="utf-8") as f:
-            yaml.dump(config.model_dump(mode="json"), f)
-
-    def list_plugins(
-        self,
-        plugin_type: Optional[PluginType] = None,
-        query: Optional[str] = None,
-        category: Optional[str] = None,
-    ) -> List[Plugin]:
-        config = self.load_marketplace()
-        plugins = config.plugins
-
-        if plugin_type:
-            plugins = [p for p in plugins if p.type == plugin_type]
-
-        if category:
-            plugins = [p for p in plugins if p.category == category]
-
-        if query:
-            query = query.lower()
-            plugins = [
-                p
-                for p in plugins
-                if query in p.name.lower()
-                or query in p.description.lower()
-                or any(query in tag.lower() for tag in p.tags)
-            ]
-
-        return plugins
-
-    def get_plugin(self, plugin_id: str) -> Optional[Plugin]:
-        config = self.load_marketplace()
-        return next((p for p in config.plugins if p.id == plugin_id), None)
-
-    def publish_plugin(self, plugin: Plugin) -> Plugin:
-        config = self.load_marketplace()
-        # Update if exists, else append
-        existing_index = next((i for i, p in enumerate(config.plugins) if p.id == plugin.id), None)
-        if existing_index is not None:
-            config.plugins[existing_index] = plugin
-        else:
-            config.plugins.append(plugin)
-        self.save_marketplace(config)
-        return plugin
-
-    def download_plugin(self, plugin_id: str) -> Optional[Plugin]:
-        config = self.load_marketplace()
-        plugin = next((p for p in config.plugins if p.id == plugin_id), None)
-        if plugin:
-            plugin.downloads += 1
-            self.save_marketplace(config)
-            return plugin
-        return None
 
     # --- Task Decomposition & Delegation ---
 

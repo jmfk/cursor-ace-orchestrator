@@ -124,38 +124,23 @@ class PlaybookUpdater:
 
         # Check if the entry already exists in the section
         entry_id_marker = f"[{entry.type}-{entry.id}]"
-        match = None
         if entry_id_marker in section_content:
             # Update existing entry
             if entry.type == "dec":
                 new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
                 old_entry_pattern = rf"<!-- \[dec-{entry.id}\] :: .*? -->"
-                match = re.search(old_entry_pattern, section_content)
             else:
-                # Extract existing counters
+                new_entry_line = (
+                    f"<!-- [{entry.type}-{entry.id}] "
+                    f"helpful={entry.helpful} harmful={entry.harmful} :: "
+                    f"{entry.content} -->"
+                )
                 old_entry_pattern = (
                     rf"<!-- \[{entry.type}-{entry.id}\] "
-                    rf"helpful=(\d+) harmful=(\d+) :: (.*?) -->"
+                    rf"helpful=\d+ harmful=\d+ :: .*? -->"
                 )
-                match = re.search(old_entry_pattern, section_content)
-                if match:
-                    old_helpful = int(match.group(1))
-                    old_harmful = int(match.group(2))
-                    # Increment counters
-                    new_helpful = old_helpful + entry.helpful
-                    new_harmful = old_harmful + entry.harmful
-                    new_entry_line = (
-                        f"<!-- [{entry.type}-{entry.id}] "
-                        f"helpful={new_helpful} harmful={new_harmful} :: "
-                        f"{entry.content} -->"
-                    )
-                else:
-                    new_entry_line = (
-                        f"<!-- [{entry.type}-{entry.id}] "
-                        f"helpful={entry.helpful} harmful={entry.harmful} :: "
-                        f"{entry.content} -->"
-                    )
 
+            match = re.search(old_entry_pattern, section_content)
             if match:
                 section_content = (
                     section_content[: match.start()]

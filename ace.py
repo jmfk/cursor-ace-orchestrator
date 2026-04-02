@@ -1,10 +1,6 @@
 """
 ACE CLI entry point.
 """
-import typer
-from rich.console import Console
-from rich.table import Table
-import requests
 from pathlib import Path
 import os
 import subprocess
@@ -12,6 +8,10 @@ import tempfile
 import re
 from datetime import datetime
 from typing import Optional, List, Dict
+import requests
+import typer
+from rich.console import Console
+from rich.table import Table
 
 from ace_lib.services.ace_service import ACEService
 from ace_lib.models.schemas import TokenMode, TaskType, OwnershipConfig
@@ -199,7 +199,7 @@ def api_call(method: str, endpoint: str, **kwargs):
     """Make an API call, fallback to local service if API is unavailable."""
     try:
         url = f"{API_BASE_URL}{endpoint}"
-        response = requests.request(method, url, timeout=0.1, **kwargs)
+        response = requests.request(method, url, timeout=0.5, **kwargs)
         if response.status_code == 200:
             return response.json()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
@@ -336,11 +336,10 @@ app.add_typer(agent_app, name="agent")
 
 @agent_app.command("create")
 def agent_create(
-    id: str = typer.Option(..., "--id", "-i", help="Agent unique ID"),
     name: str = typer.Option(..., "--name", "-n", help="Agent name"),
     role: str = typer.Option(..., "--role", "-r", help="Agent role"),
+    id: str = typer.Option(..., "--id", "-i", help="Agent unique ID"),
     email: Optional[str] = typer.Option(None, "--email", "-e", help="Agent email"),
-    memory: Optional[str] = typer.Option(None, "--memory", "-m", help="Memory file path"),
     responsibilities: Optional[List[str]] = typer.Option(
         None, "--resp", "-p", help="Agent responsibilities"
     ),
@@ -354,7 +353,6 @@ def agent_create(
             "name": name,
             "role": role,
             "email": email,
-            "memory_file": memory,
             "responsibilities": responsibilities or [],
         },
     )
@@ -362,7 +360,7 @@ def agent_create(
         console.print(f"Created agent [green]{res['name']}[/green] (ID: {res['id']})")
     else:
         try:
-            agent = get_service().create_agent(id, name, role, email, responsibilities, memory_file=memory)
+            agent = get_service().create_agent(id, name, role, email, responsibilities)
             console.print(f"Created agent [green]{agent.name}[/green] (ID: {agent.id})")
         except ValueError as e:
             console.print(f"[red]Error: {e}[/red]")
