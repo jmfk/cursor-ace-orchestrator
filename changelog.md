@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 170
+
+### Updated
+- **Phase 11: Advanced Autonomy & Beyond**
+  - Marked task 11.17 (Future Roadmap Task) as completed in `plan.md`.
+  - Added task 11.18 (Next Roadmap Step) as a placeholder for next steps.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 169
 
 ### Updated
