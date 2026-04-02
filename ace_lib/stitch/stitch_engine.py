@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 def generate_mockup(
     description: str, agent_id: str, api_key: Optional[str] = None
-) -> Tuple[str, str]:
+) -> Tuple[str, Optional[str]]:
     """Generate a UI mockup using Google Stitch (PRD-01 / Phase 4.5)."""
     mockup_id = f"stitch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     mockup_url = f"https://stitch.google.com/canvas/{mockup_id}"
@@ -36,7 +36,7 @@ def generate_mockup(
     return mockup_url, ui_code
 
 
-def sync_mockup(url: str, api_key: Optional[str] = None) -> str:
+def sync_mockup(url: str, api_key: Optional[str] = None) -> Optional[str]:
     """Sync UI code from Google Stitch (PRD-01 / Phase 8.3)."""
     mockup_id = url.split("/")[-1]
     ui_code = None
@@ -57,7 +57,7 @@ def sync_mockup(url: str, api_key: Optional[str] = None) -> str:
         except Exception as e:
             print(f"[STITCH] Error calling API: {e}")
 
-    return ui_code or ""
+    return ui_code
 
 
 def extract_components(code: str) -> dict:
