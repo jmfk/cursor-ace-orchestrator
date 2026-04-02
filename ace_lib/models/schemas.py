@@ -235,3 +235,42 @@ class MailMessage(BaseModel):
     status: str = "unread"
 
     model_config = {"populate_by_name": True}
+
+
+class WebhookEvent(str, Enum):
+    """Types of events that can trigger a webhook."""
+
+    LOOP_STARTED = "loop.started"
+    LOOP_COMPLETED = "loop.completed"
+    LOOP_FAILED = "loop.failed"
+    ITERATION_COMPLETED = "iteration.completed"
+    TASK_COMPLETED = "task.completed"
+
+
+class WebhookSubscription(BaseModel):
+    """A subscription to ACE events via webhook."""
+
+    id: str
+    url: str
+    events: List[WebhookEvent] = Field(default_factory=list)
+    secret: Optional[str] = None  # For signing payloads
+    active: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class WebhookConfig(BaseModel):
+    """Configuration for all webhooks."""
+
+    version: str = "1"
+    subscriptions: List[WebhookSubscription] = Field(default_factory=list)
+
+
+class LoopTriggerRequest(BaseModel):
+    """Request to trigger an ACE loop via API."""
+
+    prompt: str
+    test_cmd: str
+    max_iterations: int = 10
+    path: Optional[str] = None
+    agent_id: Optional[str] = None
+    webhook_url: Optional[str] = None  # Optional one-time webhook for this loop

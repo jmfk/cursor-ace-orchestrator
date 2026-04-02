@@ -21,6 +21,10 @@ from ace_lib.models.schemas import (
     SubscriptionsConfig,
     Plugin,
     PluginType,
+    WebhookEvent,
+    WebhookSubscription,
+    WebhookConfig,
+    LoopTriggerRequest,
 )
 
 # Configure logging
@@ -189,17 +193,30 @@ async def debate(
 
 
 @app.post("/loop")
-async def run_loop(
-    prompt: str = Body(...),
-    test_cmd: str = Body(...),
-    max_iterations: int = Body(10),
-    path: Optional[str] = Body(None),
-    agent_id: Optional[str] = Body(None),
-):
+async def run_loop(request: LoopTriggerRequest):
     success, iterations = service.run_loop(
-        prompt, test_cmd, max_iterations, path, agent_id
+        request.prompt, 
+        request.test_cmd, 
+        request.max_iterations, 
+        request.path, 
+        request.agent_id,
+        webhook_url=request.webhook_url
     )
     return {"success": success, "iterations": iterations}
+
+
+@app.get("/webhooks", response_model=WebhookConfig)
+async def get_webhooks():
+    return service.load_webhooks()
+
+
+@app.post("/webhooks", response_model=WebhookSubscription)
+async def subscribe_webhook(
+    url: str = Body(...),
+    events: List[WebhookEvent] = Body(...),
+    secret: Optional[str] = Body(None),
+):
+    return service.subscribe_webhook(url, events, secret)
 
 
 @app.post("/agents/{agent_id}/onboard")

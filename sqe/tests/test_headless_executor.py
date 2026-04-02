@@ -2,6 +2,7 @@ import pytest
 import subprocess
 import json
 import time
+import io
 from unittest.mock import MagicMock, patch, mock_open
 from pathlib import Path
 
@@ -78,13 +79,25 @@ class TestHeadlessExecutorIntegration:
         """
         Verifies successful execution of the headless agent and output capture.
         """
+        # Setup mock process
+        mock_process = MagicMock()
+        mock_process.stdout = io.StringIO("Task completed successfully\n{\"usage\": {\"input_tokens\": 100, \"output_tokens\": 50}}\n")
+        mock_process.stderr = io.StringIO("")
+        mock_process.returncode = 0
+        mock_process.poll.return_value = 0
+        mock_process.communicate.return_value = ("Task completed successfully\n{\"usage\": {\"input_tokens\": 100, \"output_tokens\": 50}}\n", "")
+        mock_subprocess_success.return_value = mock_process
+
         prompt = "Refactor the login module"
         result = run_cursor_agent(prompt, timeout=10)
-        
+    
         assert result is not None
-        assert "Task completed successfully" in result
+        if isinstance(result, bytes):
+            assert b"Task completed successfully" in result
+        else:
+            assert "Task completed successfully" in result
         # Verify that usage was logged (indirectly via update_stats logic)
-        mock_log.assert_any_call(f"Running Cursor Agent: {prompt[:10]}...")
+        mock_log.assert_any_call(f"Running Cursor Agent: {prompt[:100]}...")
 
     @patch("ralph_loop.log_message")
     def test_run_cursor_agent_timeout_handling(self, mock_log, mock_subprocess_timeout):
@@ -92,10 +105,18 @@ class TestHeadlessExecutorIntegration:
         Success Criteria: The system handles headless execution timeouts gracefully.
         Verifies that a timeout kills the process and returns None to trigger retry logic.
         """
+        # Setup mock process
+        mock_process = MagicMock()
+        mock_process.stdout = io.StringIO("Processing...")
+        mock_process.stderr = io.StringIO("")
+        # Simulate timeout on communicate()
+        mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd="cursor-agent", timeout=300)
+        mock_subprocess_timeout.return_value = mock_process
+
         prompt = "Long running task"
         # We expect run_cursor_agent to catch the TimeoutExpired and return None
         result = run_cursor_agent(prompt, timeout=1)
-        
+    
         assert result is None
         mock_log.assert_any_call("⏳ Cursor agent timed out.")
 
