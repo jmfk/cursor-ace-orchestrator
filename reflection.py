@@ -124,11 +124,13 @@ class PlaybookUpdater:
 
         # Check if the entry already exists in the section
         entry_id_marker = f"[{entry.type}-{entry.id}]"
+        match = None
         if entry_id_marker in section_content:
             # Update existing entry
             if entry.type == "dec":
                 new_entry_line = f"<!-- [dec-{entry.id}] :: {entry.content} -->"
                 old_entry_pattern = rf"<!-- \[dec-{entry.id}\] :: .*? -->"
+                match = re.search(old_entry_pattern, section_content)
             else:
                 # Extract existing counters
                 old_entry_pattern = (
