@@ -577,7 +577,7 @@ def run(
             process.wait()
             exit_code = process.returncode
             full_output = "".join(output_lines)
-    except Exception as e:
+    except (subprocess.SubprocessError, Exception) as e:
         console.print(f"[red]Error executing command: {e}[/red]")
         exit_code = 1
         full_output = str(e)
@@ -830,6 +830,54 @@ def memory_synthesize(
     console.print(
         "\n[bold green]Synthesized learnings added to shared-learnings.mdc.[/bold green]"
     )
+
+
+@memory_app.command("dist-sync")
+def memory_dist_sync(
+    agent_id: str = typer.Argument(..., help="Agent ID to sync to distributed memory"),
+):
+    """Sync an agent's playbook to a distributed vector store (Phase 10.1)."""
+    svc = get_service()
+    success = svc.sync_to_distributed_memory(agent_id)
+    if success:
+        console.print(
+            f"Synced memory for agent [green]{agent_id}[/green] to distributed store."
+        )
+    else:
+        console.print(
+            f"[red]Failed to sync memory for agent {agent_id} to distributed store. "
+            "Check 'distributed_memory_url' in config.[/red]"
+        )
+
+
+@memory_app.command("dist-search")
+def memory_dist_search(
+    query: str = typer.Argument(..., help="Search query"),
+    n: int = typer.Option(5, "--results", "-n", help="Number of results"),
+):
+    """Search the distributed vector store for cross-team learning (Phase 10.1)."""
+    svc = get_service()
+    results = svc.search_distributed_memory(query, n)
+    if not results:
+        console.print(
+            f"No relevant distributed memory found for query: [italic]{query}[/italic]"
+        )
+        return
+
+    table = Table(title=f"Distributed Memory Search: {query}")
+    table.add_column("ID", style="cyan")
+    table.add_column("Project", style="blue")
+    table.add_column("Description", style="green")
+    table.add_column("Type", style="yellow")
+
+    for res in results:
+        table.add_row(
+            f"{res.get('type', 'str')}-{res.get('id', 'NEW')}",
+            res.get("project_id", "unknown"),
+            res.get("description", ""),
+            res.get("type", "unknown"),
+        )
+    console.print(table)
 
 
 @app.command()

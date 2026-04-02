@@ -434,6 +434,16 @@ class ACEService:
         if shared_file.exists():
             context_parts.append(f"### SHARED LEARNINGS\n{shared_file.read_text()}")
 
+        # 5.1 Distributed Memory Search (Phase 10.1)
+        distributed_results = self.search_distributed_memory(search_query)
+        if distributed_results:
+            context_parts.append("### DISTRIBUTED MEMORY (Cross-Team)")
+            for res in distributed_results:
+                context_parts.append(
+                    f"- [{res.get('type', 'str')}-{res.get('id', 'NEW')}] "
+                    f"{res.get('description', '')} (Project: {res.get('project_id', 'unknown')})"
+                )
+
         # 6. Task framing
         module_name = path if path else "the project"
         framing = self.get_task_framing(task_type, module_name)
@@ -476,6 +486,7 @@ class ACEService:
         # 6. Recent Sessions (Prune second)
         # 7. Shared Learnings (Prune third)
         # 8. Vector Search Results (Prune fourth)
+        # 9. Distributed Memory Results (Prune fifth)
 
         sections = context.split("### ")
         if not sections:
@@ -493,6 +504,7 @@ class ACEService:
             "RECENT SESSIONS",
             "SHARED LEARNINGS",
             "RELEVANT MEMORY",
+            "DISTRIBUTED MEMORY",
         ]
 
         new_sections = []
@@ -544,6 +556,7 @@ class ACEService:
         # Let's re-order priority for ADDING:
         add_priority = [
             "RELEVANT MEMORY",
+            "DISTRIBUTED MEMORY",
             "SHARED LEARNINGS",
             "RECENT SESSIONS",
             "RECENT DECISIONS",
@@ -783,6 +796,8 @@ class ACEService:
         # Phase 8.1: Re-index playbook after update
         if agent_id:
             self.index_playbook(agent_id)
+            # Phase 10.1: Sync to distributed memory
+            self.sync_to_distributed_memory(agent_id)
 
         return True
 
@@ -1025,12 +1040,13 @@ class ACEService:
             participants.add(proposal.proposer_id)
 
             for aid in participants:
-                self.send_mail(
-                    aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus
-                )
+                if aid:
+                    self.send_mail(
+                        aid, "orchestrator", f"MACP {proposal_id} CONSENSUS", consensus
+                    )
 
             return consensus
-        except Exception as e:
+        except (ImportError, Exception) as e:
             return f"Error: {e}"
 
     def debate(self, proposal_id: str, agent_ids: List[str], turns: int = 3) -> str:
@@ -1093,13 +1109,96 @@ class ACEService:
                     proposal.history.append(
                         f"Turn {turn} - Agent {aid} ({role}): {perspective}"
                     )
-                except Exception as e:
+                except (ImportError, Exception) as e:
                     proposal.history.append(f"Turn {turn} - Agent {aid}: Error: {e}")
 
             proposal.turns_remaining -= 1
             self._save_macp_proposal(proposal)
 
         return self.finalize_macp(proposal_id)
+
+    # --- Distributed Memory (Phase 10.1) ---
+
+    @profiler.profile
+    def sync_to_distributed_memory(self, agent_id: str):
+        """Sync an agent's playbook to a distributed vector store."""
+        config = self.load_config()
+        if not config.distributed_memory_url:
+            return False
+
+        agents_config = self.load_agents()
+        agent = next((a for a in agents_config.agents if a.id == agent_id), None)
+        if not agent:
+            return False
+
+        playbook_path = self.base_path / agent.memory_file
+        if not playbook_path.exists():
+            return False
+
+        content = playbook_path.read_text(encoding="utf-8")
+        # Extract entries
+        pattern = (
+            r"<!-- \[(str|mis|dec)-([^\]]+)\]\s+"
+            r"(?:helpful=(\d+)\s+harmful=(\d+)\s*)?::\s*(.*?) -->"
+        )
+        matches = re.findall(pattern, content)
+
+        if not matches:
+            return False
+
+        payload = {
+            "agent_id": agent_id,
+            "project_id": os.path.basename(os.getcwd()),
+            "entries": [
+                {
+                    "type": m[0],
+                    "id": m[1],
+                    "helpful": int(m[2] or 0),
+                    "harmful": int(m[3] or 0),
+                    "description": m[4],
+                }
+                for m in matches
+            ],
+        }
+
+        try:
+            import requests
+            headers = {}
+            if config.distributed_memory_api_key:
+                headers["X-API-Key"] = config.distributed_memory_api_key
+            response = requests.post(
+                f"{config.distributed_memory_url}/sync",
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
+            return response.status_code == 200
+        except (ImportError, Exception):
+            return False
+
+    @profiler.profile
+    def search_distributed_memory(self, query: str, n_results: int = 5) -> List[Dict]:
+        """Search the distributed vector store for cross-team learning."""
+        config = self.load_config()
+        if not config.distributed_memory_url:
+            return []
+
+        try:
+            import requests
+            headers = {}
+            if config.distributed_memory_api_key:
+                headers["X-API-Key"] = config.distributed_memory_api_key
+            response = requests.get(
+                f"{config.distributed_memory_url}/search",
+                params={"query": query, "n": n_results},
+                headers=headers,
+                timeout=10,
+            )
+            if response.status_code == 200:
+                return response.json().get("results", [])
+        except (ImportError, Exception):
+            pass
+        return []
 
     # --- RALPH Loop Engine ---
 
@@ -2252,7 +2351,6 @@ type: role
                 messages=[{"role": "user", "content": prompt}],
             )
             import json
-
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
             json_match = re.search(r"\{.*\}", content, re.DOTALL)
             if json_match:
@@ -2264,7 +2362,7 @@ type: role
                 if "status" in updates:
                     spec.status = updates["status"]
                 return self.save_spec(spec)
-        except Exception as e:
+        except (ImportError, Exception) as e:
             print(f"Error automating spec update: {e}")
 
         return spec
@@ -2520,7 +2618,6 @@ type: role
                 messages=[{"role": "user", "content": prompt}],
             )
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
-            # Extract JSON from potential markdown blocks
             json_match = re.search(r"\[.*\]", content, re.DOTALL)
             if json_match:
                 subtasks = json.loads(json_match.group(0))
@@ -2534,7 +2631,7 @@ type: role
                     "status": "pending",
                 }
             ]
-        except Exception as e:
+        except (ImportError, Exception) as e:
             print(f"Error decomposing task: {e}")
             return [
                 {
@@ -2657,13 +2754,12 @@ type: role
         )
 
         try:
+            import json
             message = client.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": prompt}],
             )
-            import json
-
             content = "".join([b.text for b in message.content if hasattr(b, "text")])
             json_match = re.search(r"\[.*\]", content, re.DOTALL)
             if json_match:
@@ -2671,7 +2767,7 @@ type: role
                 # Add these to shared learnings
                 self._add_to_shared_learnings(synthesized, agent_id)
                 return synthesized
-        except Exception as e:
+        except (ImportError, Exception) as e:
             print(f"Error synthesizing memories: {e}")
 
         return learnings

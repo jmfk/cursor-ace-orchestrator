@@ -28,6 +28,8 @@ class Config(BaseModel):
     """Global configuration for ACE."""
 
     token_mode: TokenMode = TokenMode.LOW
+    distributed_memory_url: Optional[str] = None
+    distributed_memory_api_key: Optional[str] = None
 
 
 class Decision(BaseModel):

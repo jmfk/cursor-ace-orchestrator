@@ -707,3 +707,66 @@ def test_self_audit(service):
     agent_2_audit = next(a for a in results["agents"] if a["id"] == "dev-2")
     assert agent_2_audit["memory_health"] == "critical"
     assert any("Playbook file missing" in issue for issue in agent_2_audit["issues"])
+
+
+def test_distributed_memory(service, monkeypatch):
+    """Test distributed memory sync and search (Phase 10.1)."""
+    from unittest.mock import MagicMock
+    import requests
+
+    # Setup agent and playbook
+    service.cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    playbook_path = service.cursor_rules_dir / "developer.mdc"
+    playbook_path.write_text(
+        """# Developer Playbook
+## Strategier & patterns
+<!-- [str-001] helpful=1 harmful=0 :: Distributed strategy -->
+"""
+    )
+    service.create_agent(id="dev-1", name="Dev 1", role="developer")
+    # Ensure the agent's memory_file points to the one we just created
+    agents_config = service.load_agents()
+    agent = next(a for a in agents_config.agents if a.id == "dev-1")
+    agent.memory_file = ".cursor/rules/developer.mdc"
+    service.save_agents(agents_config)
+    service.clear_cache()
+
+    # Mock requests
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "results": [
+            {
+                "id": "001",
+                "type": "str",
+                "description": "Remote strategy",
+                "project_id": "other-project",
+            }
+        ]
+    }
+    monkeypatch.setattr(requests, "post", lambda *args, **kwargs: mock_response)
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: mock_response)
+
+    # Set config
+    config = service.load_config()
+    config.distributed_memory_url = "http://ace-memory.local"
+    service.save_config(config)
+
+    # Sync
+    success = service.sync_to_distributed_memory("dev-1")
+    assert success is True
+
+    # Search
+    results = service.search_distributed_memory("remote")
+    assert len(results) == 1
+    assert results[0]["description"] == "Remote strategy"
+    assert len(results) == 1
+    assert results[0]["description"] == "Remote strategy"
+
+    # Context building with distributed memory
+    context, _ = service.build_context(
+        agent_id="dev-1", task_description="remote" * 100
+    )
+    # The complexity will be higher, so max_chars will be higher, avoiding pruning
+    assert "DISTRIBUTED MEMORY" in context
+    assert "Remote strategy" in context
