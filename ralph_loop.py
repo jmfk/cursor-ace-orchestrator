@@ -89,13 +89,13 @@ def update_stats(input_tokens: int, output_tokens: int, elapsed_time: float):
     price_in = float(str(CONFIG.get("price_input_1m", 0.10)))
     price_out = float(str(CONFIG.get("price_output_1m", 0.40)))
 
-    cost = input_tokens / 1_000_000 * price_in + output_tokens / 1_000_000 * price_out
+    cost = float(input_tokens) / 1_000_000 * price_in + float(output_tokens) / 1_000_000 * price_out
 
-    stats["total_input_tokens"] += input_tokens
-    stats["total_output_tokens"] += output_tokens
-    stats["total_cost_usd"] += cost
-    stats["total_time_sec"] += elapsed_time
-    stats["iterations"] += 1
+    stats["total_input_tokens"] = int(stats.get("total_input_tokens", 0)) + int(input_tokens)
+    stats["total_output_tokens"] = int(stats.get("total_output_tokens", 0)) + int(output_tokens)
+    stats["total_cost_usd"] = float(stats.get("total_cost_usd", 0.0)) + float(cost)
+    stats["total_time_sec"] = float(stats.get("total_time_sec", 0.0)) + float(elapsed_time)
+    stats["iterations"] = int(stats.get("iterations", 0)) + 1
 
     with open(str(stats_file), "w") as f:
         json.dump(stats, f, indent=2)
@@ -130,7 +130,7 @@ def parse_usage_from_output(stdout: str) -> tuple[int, int]:
     return input_tokens, output_tokens
 
 
-def run_cursor_agent(prompt: str, timeout: int = 300):
+def run_cursor_agent(prompt: str, model_override: Optional[str] = None, timeout: int = 300):
     """Runs cursor-agent in non-interactive mode and tracks usage."""
     global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
 
@@ -145,6 +145,8 @@ def run_cursor_agent(prompt: str, timeout: int = 300):
     start_time = time.time()
     log_message(f"Running Cursor Agent: {prompt[:100]}...")
 
+    model = model_override if model_override else str(CONFIG["model"])
+
     try:
         cmd_args = [
             "cursor-agent",
@@ -152,7 +154,7 @@ def run_cursor_agent(prompt: str, timeout: int = 300):
             os.getenv("CURSOR_API_KEY", ""),
             "--print",
             "--model",
-            str(CONFIG["model"]),
+            model,
             "--output-format",
             "stream-json",
             "--force",
@@ -492,12 +494,20 @@ def main():
         executor_model=CONFIG.get("executor_model", "gemini-3-flash")
     )
 
+    if LLM_CIRCUIT_BREAKER_TRIPPED:
+        log_message("🚨 CIRCUIT BREAKER IS TRIPPED. Manual intervention required.")
+        sys.exit(1)
+
     iteration = 0
     max_iterations = int(str(CONFIG.get("max_iterations", 50)))
     max_spend = float(str(CONFIG.get("max_spend_usd", 20.0)))
 
     try:
         while iteration < max_iterations:
+            if LLM_CIRCUIT_BREAKER_TRIPPED:
+                log_message("🚨 CIRCUIT BREAKER IS TRIPPED. Manual intervention required.")
+                break
+
             total_cost = get_total_cost()
             if total_cost >= max_spend:
                 log_message(f"Reached maximum spending limit (${max_spend}). Stopping.")

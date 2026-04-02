@@ -245,8 +245,7 @@ class HierarchicalPlanner:
                 self.tree.save_node(node)
                 return None # Return to outer loop to execute in next step
 
-        # Execute actionable node
-        print(f"Executing actionable node {node.id}...")
+            print(f"Executing actionable node {node.id}...")
         context = self.curator.select_context(node, self.tree)
         prompt = (
             f"Implement the following task.\n"
@@ -259,6 +258,10 @@ class HierarchicalPlanner:
         # This is where the actual implementation happens
         output = self.run_cursor_agent(prompt, self.executor_model)
         
+        if output is None:
+            print(f"⚠️ LLM execution failed for node {node.id}. Skipping completion gate.")
+            return node
+
         # Reflection & Write-back
         if output:
             print(f"Reflecting on output for node {node.id}...")
