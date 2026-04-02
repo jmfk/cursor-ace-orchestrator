@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-04-02] - RALPH Loop Iteration 147
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.82 (Future Roadmap Task) as completed in `plan.md`.
+  - Added task 10.83 (Next Roadmap Step) as a placeholder for next steps.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
+## [2026-04-02] - RALPH Loop Iteration 146
+
+### Updated
+- **Phase 10: Post-1.0 Roadmap Execution**
+  - Marked task 10.81 (Future Roadmap Task) as completed in `plan.md`.
+  - Added task 10.82 (Next Roadmap Step) as a placeholder for next steps.
+  - Re-sorted tasks to maintain logical order (completed tasks first, then pending).
+
 ## [2026-04-02] - RALPH Loop Iteration 145
 
 ### Updated
@@ -849,7 +865,7 @@
   - IDE Extension Integration: Built a native Cursor/VSCode extension for ACE.
   - Advanced Multi-Agent Consensus: Supported more complex debate formats and human-in-the-loop escalation UI.
   - Performance Optimization: Profiled and optimized core logic for extremely large codebases.
-  - Security Audit: Conducted a formal security audit of the agent execution environment.
+  - Security Audit: Conducted a formal security audit of the agent environment.
   - Updated `plan.md` to mark Phase 7 as Completed.
 
 ## [2026-04-01] - RALPH Loop Iteration 35
