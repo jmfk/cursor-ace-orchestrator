@@ -148,10 +148,13 @@ class CommitEvaluator:
             # We need to parse this. A simpler way is to use git log --date=short
             try:
                 # Re-fetch date in short format for easier parsing
-                date_str = subprocess.run(
+                res = subprocess.run(
                     ["git", "show", "-s", "--format=%ad", "--date=short", r["commit"]["hash"]],
                     capture_output=True, text=True
-                ).stdout.strip()
+                )
+                date_str = res.stdout.strip()
+                if not date_str:
+                    continue
                 dt = datetime.strptime(date_str, "%Y-%m-%d")
                 daily_value[dt] = daily_value.get(dt, 0.0) + r["score"]
             except Exception:
