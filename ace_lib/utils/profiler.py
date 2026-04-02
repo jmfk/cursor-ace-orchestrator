@@ -13,7 +13,7 @@ class Profiler:
     """
     Profiler class to track function execution time and log it to a JSONL file.
     """
-    def __init__(self, log_file: Path = Path(".ralph/profiling.jsonl")):
+    def __init__(self, log_file: Path = Path(".ace/profiling.jsonl")):
         self.log_file = log_file
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
 

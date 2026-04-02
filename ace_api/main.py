@@ -19,12 +19,6 @@ from ace_lib.models.schemas import (
     OwnershipConfig,
     MailMessage,
     SubscriptionsConfig,
-    Plugin,
-    PluginType,
-    WebhookEvent,
-    WebhookSubscription,
-    WebhookConfig,
-    LoopTriggerRequest,
 )
 
 # Configure logging
@@ -193,30 +187,17 @@ async def debate(
 
 
 @app.post("/loop")
-async def run_loop(request: LoopTriggerRequest):
+async def run_loop(
+    prompt: str = Body(...),
+    test_cmd: str = Body(...),
+    max_iterations: int = Body(10),
+    path: Optional[str] = Body(None),
+    agent_id: Optional[str] = Body(None),
+):
     success, iterations = service.run_loop(
-        request.prompt, 
-        request.test_cmd, 
-        request.max_iterations, 
-        request.path, 
-        request.agent_id,
-        webhook_url=request.webhook_url
+        prompt, test_cmd, max_iterations, path, agent_id
     )
     return {"success": success, "iterations": iterations}
-
-
-@app.get("/webhooks", response_model=WebhookConfig)
-async def get_webhooks():
-    return service.load_webhooks()
-
-
-@app.post("/webhooks", response_model=WebhookSubscription)
-async def subscribe_webhook(
-    url: str = Body(...),
-    events: List[WebhookEvent] = Body(...),
-    secret: Optional[str] = Body(None),
-):
-    return service.subscribe_webhook(url, events, secret)
 
 
 @app.post("/agents/{agent_id}/onboard")
@@ -342,38 +323,6 @@ async def subscribe(
     return service.subscribe(
         agent_id, path, priority, notify_on_success, notify_on_failure
     )
-
-
-# --- Marketplace Endpoints ---
-
-@app.get("/marketplace/plugins", response_model=List[Plugin])
-async def list_plugins(
-    type: Optional[PluginType] = None,
-    query: Optional[str] = None,
-    category: Optional[str] = None,
-):
-    return service.list_plugins(type, query, category)
-
-
-@app.get("/marketplace/plugins/{plugin_id}", response_model=Plugin)
-async def get_plugin(plugin_id: str):
-    plugin = service.get_plugin(plugin_id)
-    if not plugin:
-        raise HTTPException(status_code=404, detail="Plugin not found")
-    return plugin
-
-
-@app.post("/marketplace/plugins", response_model=Plugin)
-async def publish_plugin(plugin: Plugin):
-    return service.publish_plugin(plugin)
-
-
-@app.post("/marketplace/plugins/{plugin_id}/download", response_model=Plugin)
-async def download_plugin(plugin_id: str):
-    plugin = service.download_plugin(plugin_id)
-    if not plugin:
-        raise HTTPException(status_code=404, detail="Plugin not found")
-    return plugin
 
 
 if __name__ == "__main__":

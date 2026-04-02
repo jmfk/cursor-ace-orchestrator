@@ -9,7 +9,4 @@ analysis_data
 ralph_execution.log
 ralph_stats.json
 ralph_state_history.json
-.ace/
-.ralph/
-profiling.jsonl
-cursor_ace.egg-info/
+.ace/loop.lock

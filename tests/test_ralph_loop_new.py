@@ -54,8 +54,10 @@ def test_iteration_cap(mock_config, monkeypatch):
     # Mock all agent calls to return success
     monkeypatch.setattr(ralph_loop, "run_cursor_agent", MagicMock(return_value="success"))
     monkeypatch.setattr(ralph_loop, "get_total_cost", MagicMock(return_value=0.0))
+    monkeypatch.setattr(ralph_loop, "get_current_task", MagicMock(return_value="task"))
     monkeypatch.setattr(ralph_loop, "get_project_state_hash", MagicMock(return_value="hash"))
     monkeypatch.setattr(ralph_loop, "check_stagnation", MagicMock(return_value=False))
+    monkeypatch.setattr(ralph_loop, "get_file_content", MagicMock(return_value="- [ ] task"))
     monkeypatch.setattr(ralph_loop, "generate_commit_message", MagicMock(return_value="msg"))
     
     # Mock git operations
@@ -71,26 +73,20 @@ def test_iteration_cap(mock_config, monkeypatch):
     # Mock PRD check
     monkeypatch.setattr(os.path, "exists", lambda x: True)
     
-    # Mock HierarchicalPlanner to avoid actual LLM calls and complex logic
-    mock_planner = MagicMock()
-    mock_node = MagicMock()
-    mock_node.title = "test task"
-    mock_planner.run_step.return_value = mock_node
-    mock_planner.tree.get_next_incomplete.return_value = mock_node
-    
-    with patch("ralph_loop.HierarchicalPlanner", return_value=mock_planner):
-        with patch("argparse.ArgumentParser.parse_args", return_value=MagicMock(prd="prd.md", config="ralph.yaml", model=None, max_spend=None, plan_file=None)):
-            with patch("ralph_loop.load_config"):
-                with patch("fcntl.flock"):
-                    with patch("builtins.open", MagicMock()):
-                        # Run main but catch SystemExit if any
-                        try:
-                            ralph_loop.main()
-                        except SystemExit:
-                            pass
+    # We need to mock main's dependencies to run it partially
+    with patch("argparse.ArgumentParser.parse_args", return_value=MagicMock(prd="prd.md", config="ralph.yaml", model=None, max_spend=None, plan_file=None)):
+        with patch("ralph_loop.load_config"):
+            with patch("fcntl.flock"):
+                with patch("builtins.open", MagicMock()):
+                    # Run main but catch SystemExit if any
+                    try:
+                        ralph_loop.main()
+                    except SystemExit:
+                        pass
     
     # Check if it stopped at max_iterations (5)
-    assert any("RALPH Loop Iteration 5/5" in str(call) for call in log_mock.call_args_list)
+    # The log message "Reached maximum iterations (5). Stopping." should be present
+    assert any("Reached maximum iterations (5). Stopping." in str(call) for call in log_mock.call_args_list)
 
 def test_stagnation_on_same_task(mock_config, monkeypatch):
     """Test that stagnation is detected when the same task repeats."""

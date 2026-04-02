@@ -162,40 +162,6 @@ class MACPProposal(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
-class PluginType(str, Enum):
-    """Type of plugin in the marketplace."""
-
-    SOP = "sop"
-    AGENT = "agent"
-    MDC = "mdc"
-
-
-class Plugin(BaseModel):
-    """A plugin (SOP, Agent, or MDC template) in the marketplace."""
-
-    id: str
-    name: str
-    type: PluginType
-    description: str
-    author: str
-    version: str = "1.0.0"
-    content: str  # The actual SOP markdown, Agent YAML, or MDC content
-    tags: List[str] = Field(default_factory=list)
-    downloads: int = 0
-    rating: float = 0.0
-    category: str = "General"  # e.g., "Auth", "UI", "Database"
-    compatibility: List[str] = Field(default_factory=list)  # e.g., ["ACE v1", "Cursor v0.40"]
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-
-class MarketplaceConfig(BaseModel):
-    """Configuration for the ACE Plugin Marketplace."""
-
-    version: str = "1"
-    plugins: List[Plugin] = Field(default_factory=list)
-
-
 class NotificationPriority(str, Enum):
     """Priority level for notifications."""
 
@@ -235,42 +201,3 @@ class MailMessage(BaseModel):
     status: str = "unread"
 
     model_config = {"populate_by_name": True}
-
-
-class WebhookEvent(str, Enum):
-    """Types of events that can trigger a webhook."""
-
-    LOOP_STARTED = "loop.started"
-    LOOP_COMPLETED = "loop.completed"
-    LOOP_FAILED = "loop.failed"
-    ITERATION_COMPLETED = "iteration.completed"
-    TASK_COMPLETED = "task.completed"
-
-
-class WebhookSubscription(BaseModel):
-    """A subscription to ACE events via webhook."""
-
-    id: str
-    url: str
-    events: List[WebhookEvent] = Field(default_factory=list)
-    secret: Optional[str] = None  # For signing payloads
-    active: bool = True
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-
-class WebhookConfig(BaseModel):
-    """Configuration for all webhooks."""
-
-    version: str = "1"
-    subscriptions: List[WebhookSubscription] = Field(default_factory=list)
-
-
-class LoopTriggerRequest(BaseModel):
-    """Request to trigger an ACE loop via API."""
-
-    prompt: str
-    test_cmd: str
-    max_iterations: int = 10
-    path: Optional[str] = None
-    agent_id: Optional[str] = None
-    webhook_url: Optional[str] = None  # Optional one-time webhook for this loop
