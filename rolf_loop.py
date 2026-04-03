@@ -146,13 +146,17 @@ def run_cursor_agent(
     """
     Runs cursor-agent in non-interactive mode and tracks usage.
 
+    Retries infrastructure failures (provider connectivity, rate limits, timeouts)
+    with exponential backoff up to MAX_INFRA_RETRIES times before giving up.
+
     Returns:
         str: The output if successful
-        None: If there was an error
-
-    Note: Sets global flags for infrastructure failures (provider errors, rate limits)
+        None: If there was an unrecoverable error
     """
     global LLM_CIRCUIT_BREAKER_TRIPPED, CONSECUTIVE_FAILURES, PAID_ACCOUNT_REQUIRED
+
+    MAX_INFRA_RETRIES = 4
+    INFRA_BACKOFF_BASE = 4  # seconds; doubles each attempt: 4, 8, 16, 32
 
     if LLM_CIRCUIT_BREAKER_TRIPPED:
         log_message("🚫 Circuit breaker is TRIPPED. Skipping LLM call.")
@@ -167,92 +171,140 @@ def run_cursor_agent(
 
     model = model_override if model_override else str(CONFIG["model"])
 
-    try:
-        cmd_args = [
-            "cursor-agent",
-            "--api-key",
-            os.getenv("CURSOR_API_KEY", ""),
-            "--print",
-            "--model",
-            model,
-            "--output-format",
-            "stream-json",
-            "--force",
-            "--trust",
-            prompt,
-        ]
-
-        # Use Popen with process group to ensure cleanup of sub-agents
-        proc = subprocess.Popen(
-            cmd_args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            preexec_fn=os.setsid if hasattr(os, "setsid") else None,
-        )
+    for infra_attempt in range(MAX_INFRA_RETRIES + 1):
+        if infra_attempt > 0:
+            backoff = INFRA_BACKOFF_BASE * (2 ** (infra_attempt - 1))
+            log_message(
+                f"⏳ Retrying after infrastructure failure "
+                f"(attempt {infra_attempt}/{MAX_INFRA_RETRIES}, waiting {backoff}s)..."
+            )
+            time.sleep(backoff)
 
         try:
-            stdout, stderr = proc.communicate(timeout=timeout)
-            elapsed = time.time() - start_time
-        except subprocess.TimeoutExpired:
-            if hasattr(os, "killpg"):
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            else:
-                proc.terminate()
-            stdout, stderr = proc.communicate()
-            log_message(f"❌ Cursor Agent timed out after {timeout}s and was killed.")
-            return None
-        finally:
-            # Ensure cleanup even on unexpected errors
+            cmd_args = [
+                "cursor-agent",
+                "--api-key",
+                os.getenv("CURSOR_API_KEY", ""),
+                "--print",
+                "--model",
+                model,
+                "--output-format",
+                "stream-json",
+                "--force",
+                "--trust",
+                prompt,
+            ]
+
+            proc = subprocess.Popen(
+                cmd_args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                preexec_fn=os.setsid if hasattr(os, "setsid") else None,
+            )
+
             try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+                elapsed = time.time() - start_time
+            except subprocess.TimeoutExpired:
                 if hasattr(os, "killpg"):
                     os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
                 else:
                     proc.terminate()
-            except (ProcessLookupError, OSError):
-                pass
+                proc.communicate()
+                log_message(f"❌ Cursor Agent timed out after {timeout}s and was killed.")
+                if infra_attempt < MAX_INFRA_RETRIES:
+                    continue
+                return None
+            finally:
+                try:
+                    if hasattr(os, "killpg"):
+                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    else:
+                        proc.terminate()
+                except (ProcessLookupError, OSError):
+                    pass
 
-        if proc.returncode != 0:
-            error_output = stdout + stderr
+            if proc.returncode != 0:
+                error_output = stdout + stderr
 
-            # ARCHITECTURAL FIX: Distinguish between infrastructure and logic failures
+                is_rate_limit = (
+                    "429" in error_output
+                    or "RESOURCE_EXHAUSTED" in error_output
+                    or "rate limit" in error_output.lower()
+                )
+                is_infrastructure_failure = (
+                    is_rate_limit
+                    or "Provider Error" in error_output
+                    or "trouble connecting" in error_output.lower()
+                    or "connection" in error_output.lower()
+                    or "timeout" in error_output.lower()
+                )
+
+                if is_infrastructure_failure:
+                    log_message(
+                        f"⚠️ Infrastructure failure detected (Exit Code {proc.returncode}). "
+                        f"This is a transient provider error, not a logic failure."
+                    )
+                    log_message(f"--- STDOUT ---\n{stdout}")
+                    log_message(f"--- STDERR ---\n{stderr}")
+
+                    if is_rate_limit:
+                        PAID_ACCOUNT_REQUIRED = True
+                        log_message(
+                            "🚨 Rate limit detected. Marking paid account as required."
+                        )
+                        return None
+
+                    if infra_attempt < MAX_INFRA_RETRIES:
+                        continue
+                    log_message("❌ Exhausted infrastructure retries. Giving up.")
+                    return None
+                else:
+                    CONSECUTIVE_FAILURES += 1
+                    log_message(
+                        f"❌ Cursor Agent logic failure with Exit Code {proc.returncode} "
+                        f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
+                    )
+
+                    if CONSECUTIVE_FAILURES >= int(
+                        str(CONFIG.get("max_consecutive_failures", 3))
+                    ):
+                        LLM_CIRCUIT_BREAKER_TRIPPED = True
+                        log_message(
+                            "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
+                        )
+
+                    log_message(f"--- STDOUT ---\n{stdout}")
+                    log_message(f"--- STDERR ---\n{stderr}")
+                    return None
+
+            CONSECUTIVE_FAILURES = 0
+            input_tokens, output_tokens = parse_usage_from_output(stdout)
+            update_stats(input_tokens, output_tokens, elapsed)
+            log_message("✅ Cursor Agent completed successfully.")
+            return stdout
+
+        except Exception as e:
+            error_str = str(e).lower()
             is_infrastructure_failure = (
-                "429" in error_output
-                or "RESOURCE_EXHAUSTED" in error_output
-                or "rate limit" in error_output.lower()
-                or "Provider Error" in error_output
-                or "trouble connecting" in error_output.lower()
-                or "connection" in error_output.lower()
-                or "timeout" in error_output.lower()
+                "connection" in error_str
+                or "timeout" in error_str
+                or "network" in error_str
             )
 
             if is_infrastructure_failure:
                 log_message(
-                    f"⚠️ Infrastructure failure detected (Exit Code {proc.returncode}). "
-                    f"This is a transient provider error, not a logic failure."
+                    f"⚠️ Infrastructure exception: {str(e)}. "
+                    f"This is a transient error, not a logic failure."
                 )
-
-                if (
-                    "429" in error_output
-                    or "RESOURCE_EXHAUSTED" in error_output
-                    or "rate limit" in error_output.lower()
-                ):
-                    PAID_ACCOUNT_REQUIRED = True
-                    log_message(
-                        "🚨 Rate limit detected. Marking paid account as required."
-                    )
-
-                # Don't increment consecutive failures for infrastructure issues
-                log_message(f"--- STDOUT ---\n{stdout}")
-                log_message(f"--- STDERR ---\n{stderr}")
-                log_message("Sleeping 30 seconds before retry...")
-                time.sleep(30)
-                return None
+                if infra_attempt < MAX_INFRA_RETRIES:
+                    continue
+                log_message("❌ Exhausted infrastructure retries. Giving up.")
             else:
-                # Logic failure - increment counter
                 CONSECUTIVE_FAILURES += 1
                 log_message(
-                    f"❌ Cursor Agent logic failure with Exit Code {proc.returncode} "
+                    f"🚨 Unexpected error during subprocess execution: {str(e)} "
                     f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
                 )
 
@@ -264,47 +316,9 @@ def run_cursor_agent(
                         "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
                     )
 
-                log_message(f"--- STDOUT ---\n{stdout}")
-                log_message(f"--- STDERR ---\n{stderr}")
-                return None
+            return None
 
-        CONSECUTIVE_FAILURES = 0
-        input_tokens, output_tokens = parse_usage_from_output(stdout)
-        update_stats(input_tokens, output_tokens, elapsed)
-        log_message("✅ Cursor Agent completed successfully.")
-        return stdout
-
-    except Exception as e:
-        error_str = str(e).lower()
-        is_infrastructure_failure = (
-            "connection" in error_str
-            or "timeout" in error_str
-            or "network" in error_str
-        )
-
-        if is_infrastructure_failure:
-            log_message(
-                f"⚠️ Infrastructure exception: {str(e)}. "
-                f"This is a transient error, not a logic failure."
-            )
-            log_message("Sleeping 30 seconds before retry...")
-            time.sleep(30)
-        else:
-            CONSECUTIVE_FAILURES += 1
-            log_message(
-                f"🚨 Unexpected error during subprocess execution: {str(e)} "
-                f"(Consecutive failures: {CONSECUTIVE_FAILURES})"
-            )
-
-            if CONSECUTIVE_FAILURES >= int(
-                str(CONFIG.get("max_consecutive_failures", 3))
-            ):
-                LLM_CIRCUIT_BREAKER_TRIPPED = True
-                log_message(
-                    "🚨 CIRCUIT BREAKER TRIPPED! Too many consecutive failures."
-                )
-
-        return None
+    return None
 
 
 def generate_commit_message(task_name: str):
