@@ -1,11 +1,11 @@
-actionable: true
+actionable: false
 children: []
 created_at: '2026-04-02T18:35:36.293856'
 depth: 0
-description: ''
+description: 'Decompose Phase 11 into specific implementation tasks for advanced autonomy modules including self-correction logic, reward function refinement, and deep LLM integration improvements.'
 id: '0011'
 parent_id: null
-reasoning: ''
-retry_count: 1
+reasoning: 'Phase-level node requires decomposition before execution. Must break down into actionable subtasks.'
+retry_count: 0
 status: pending
-title: 'Phase 11: Phase 11: Advanced Autonomy & Beyond (In Progress)'
+title: 'Phase 11: Advanced Autonomy & Beyond'
