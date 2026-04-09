@@ -676,101 +676,149 @@ class ACEService:
 
     def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """
-        Call the configured LLM provider (Phase 11.1).
+        Call the configured LLM provider.
         Supports Anthropic, Google, OpenAI, and DeepSeek providers.
+
+        Transient network/connection errors are retried with exponential backoff
+        (4s, 8s, 16s, 32s) before raising.
         """
+        import time as _time
+
+        MAX_RETRIES = 4
+        BACKOFF_BASE = 4  # seconds
+
         config = self.load_config()
         provider = config.model_provider
         model = config.model_name
         temp = config.temperature
         max_t = config.max_tokens
 
-        # Phase 11.3: Real-time context injection (mock)
-        # We simulate this by checking for any 'context_updates' in the prompt
         if "### CONTEXT UPDATE" in prompt:
             print(f"[ACE] Injecting real-time context update into {model} call...")
 
-        # Phase 11.1: Support for local models
         if provider == "local":
-            # Mock local model execution via subprocess or local API
             print(f"[ACE] Executing local model: {model}")
-            # In a real implementation, this might call a local Ollama or vLLM instance
-            # For now, we simulate a basic response
             return f"Local model {model} response to: {prompt[:50]}..."
 
-        if provider == "anthropic":
-            client = self.get_anthropic_client()
-            if not client:
-                return "Error: ANTHROPIC_API_KEY not set."
-
-            # Phase 11.1: Support for streaming context (mock)
-            # In a full implementation, this would use a generator or callback
-            message = client.messages.create(
-                model=model,
-                max_tokens=max_t,
-                temperature=temp,
-                system=system_prompt or "",
-                messages=[{"role": "user", "content": prompt}],
+        def _is_transient(exc: Exception) -> bool:
+            """Return True if the exception looks like a recoverable connectivity issue."""
+            import socket
+            transient_types = (
+                ConnectionError,
+                TimeoutError,
+                socket.timeout,
+                OSError,
             )
-            if isinstance(message.content, list):
-                return "".join(
-                    [block.text for block in message.content if hasattr(block, "text")]
+            if isinstance(exc, transient_types):
+                return True
+            msg = str(exc).lower()
+            return any(
+                kw in msg
+                for kw in (
+                    "connection",
+                    "timeout",
+                    "network",
+                    "trouble connecting",
+                    "temporary",
+                    "503",
+                    "502",
+                    "504",
                 )
-            return str(message.content)
-
-        elif provider == "google":
-            import google.generativeai as genai
-
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                # Fallback to ~/.ace/credentials
-                cred_file = Path.home() / ".ace" / "credentials"
-                if cred_file.exists():
-                    for line in cred_file.read_text(encoding="utf-8").splitlines():
-                        if line.startswith("GOOGLE_API_KEY="):
-                            api_key = line.split("=", 1)[1].strip()
-                            break
-            if not api_key:
-                return "Error: GOOGLE_API_KEY not set."
-            genai.configure(api_key=api_key)
-            model_instance = genai.GenerativeModel(model)
-            generation_config = genai.types.GenerationConfig(
-                temperature=temp,
-                max_output_tokens=max_t,
             )
-            response = model_instance.generate_content(
-                prompt if not system_prompt else f"{system_prompt}\n\n{prompt}",
-                generation_config=generation_config
-            )
-            return response.text
 
-        elif provider == "openai" or provider == "deepseek":
-            from openai import OpenAI
+        last_exc: Optional[Exception] = None
 
-            api_key = os.getenv("OPENAI_API_KEY") if provider == "openai" else os.getenv("DEEPSEEK_API_KEY")
-            base_url = None
-            if provider == "deepseek":
-                base_url = "https://api.deepseek.com"
-            
-            if not api_key:
-                return f"Error: {provider.upper()}_API_KEY not set."
-            
-            client = OpenAI(api_key=api_key, base_url=base_url)
-            
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+        for attempt in range(MAX_RETRIES + 1):
+            if attempt > 0:
+                backoff = BACKOFF_BASE * (2 ** (attempt - 1))
+                print(
+                    f"[ACE] Retrying {provider} call after transient error "
+                    f"(attempt {attempt}/{MAX_RETRIES}, waiting {backoff}s)..."
+                )
+                _time.sleep(backoff)
 
-            openai_response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temp,
-                max_tokens=max_t if not model.startswith("o1") else None,
-            )
-            return openai_response.choices[0].message.content or ""
+            try:
+                if provider == "anthropic":
+                    client = self.get_anthropic_client()
+                    if not client:
+                        return "Error: ANTHROPIC_API_KEY not set."
 
-        return f"Error: Unsupported model provider {provider}"
+                    message = client.messages.create(
+                        model=model,
+                        max_tokens=max_t,
+                        temperature=temp,
+                        system=system_prompt or "",
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    if isinstance(message.content, list):
+                        return "".join(
+                            [block.text for block in message.content if hasattr(block, "text")]
+                        )
+                    return str(message.content)
+
+                elif provider == "google":
+                    import google.generativeai as genai
+
+                    api_key = os.getenv("GOOGLE_API_KEY")
+                    if not api_key:
+                        cred_file = Path.home() / ".ace" / "credentials"
+                        if cred_file.exists():
+                            for line in cred_file.read_text(encoding="utf-8").splitlines():
+                                if line.startswith("GOOGLE_API_KEY="):
+                                    api_key = line.split("=", 1)[1].strip()
+                                    break
+                    if not api_key:
+                        return "Error: GOOGLE_API_KEY not set."
+                    genai.configure(api_key=api_key)
+                    model_instance = genai.GenerativeModel(model)
+                    generation_config = genai.types.GenerationConfig(
+                        temperature=temp,
+                        max_output_tokens=max_t,
+                    )
+                    response = model_instance.generate_content(
+                        prompt if not system_prompt else f"{system_prompt}\n\n{prompt}",
+                        generation_config=generation_config,
+                    )
+                    return response.text
+
+                elif provider == "openai" or provider == "deepseek":
+                    from openai import OpenAI
+
+                    api_key = (
+                        os.getenv("OPENAI_API_KEY")
+                        if provider == "openai"
+                        else os.getenv("DEEPSEEK_API_KEY")
+                    )
+                    base_url = "https://api.deepseek.com" if provider == "deepseek" else None
+
+                    if not api_key:
+                        return f"Error: {provider.upper()}_API_KEY not set."
+
+                    client = OpenAI(api_key=api_key, base_url=base_url)
+
+                    messages = []
+                    if system_prompt:
+                        messages.append({"role": "system", "content": system_prompt})
+                    messages.append({"role": "user", "content": prompt})
+
+                    openai_response = client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        temperature=temp,
+                        max_tokens=max_t if not model.startswith("o1") else None,
+                    )
+                    return openai_response.choices[0].message.content or ""
+
+                return f"Error: Unsupported model provider {provider}"
+
+            except Exception as exc:
+                if _is_transient(exc) and attempt < MAX_RETRIES:
+                    last_exc = exc
+                    print(f"[ACE] Transient error on {provider} call: {exc}")
+                    continue
+                raise
+
+        raise last_exc  # type: ignore[misc]
 
     def get_google_client(self) -> str:
         api_key = os.getenv("GOOGLE_API_KEY")
@@ -1685,7 +1733,7 @@ class ACEService:
                     task_type=TaskType.IMPLEMENT,
                     agent_id=agent_id
                 )
-                
+
                 # 3. Verify (Phase 4.1)
                 if task_success:
                     print(f"[ROLF] Verifying with: {test_cmd}")
@@ -1711,7 +1759,8 @@ class ACEService:
                     if webhook_url:
                         try:
                             requests.post(webhook_url, json={"event": WebhookEvent.ITERATION_COMPLETED.value, "payload": iter_payload}, timeout=5)
-                        except Exception: pass
+                        except Exception:
+                            pass
 
                     # --- Automated Security Audit Integration (Phase 10.18) ---
                     if resolved_agent_id:
@@ -1727,7 +1776,6 @@ class ACEService:
                                 print(
                                     f"[ROLF] ⚠️ Security audit failed: {sec_results['summary']['failed']} failures."
                                 )
-                                # We don't necessarily fail the loop, but we log it
                         except Exception as e:
                             print(f"[ROLF] Security audit error: {e}")
 
@@ -1743,7 +1791,6 @@ class ACEService:
                     )
                     self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
-                    # Note: We don't have agent_proc here anymore, but session info is in the run_agent_task logs
                     session_content = (
                         f"# Session Loop {session_id} (Iteration {iteration})\n"
                         f"- **Prompt**: `{prompt}`\n"
@@ -1758,150 +1805,150 @@ class ACEService:
                     )
                     session_file.write_text(session_content, encoding="utf-8")
 
-            # 4. Reflection (Phase 4.1)
-            reflection_text = ""
-            if self.get_anthropic_client():
-                print(f"[ROLF] Performing reflection for iteration {iteration}...")
-                # Reflect on current iteration output, including test success/failure
-                reflection_input = (
-                    f"TASK STATUS: {feedback_status}\n"
-                    f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
-                )
-                reflection_text = self.reflect_on_session(reflection_input)
-                updates = self.parse_reflection_output(reflection_text)
+                # 4. Reflection (Phase 4.1)
+                reflection_text = ""
+                if self.get_anthropic_client():
+                    print(f"[ROLF] Performing reflection for iteration {iteration}...")
+                    # Reflect on current iteration output, including test success/failure
+                    reflection_input = (
+                        f"TASK STATUS: {feedback_status}\n"
+                        f"TEST OUTPUT:\n{result.stdout}\n{result.stderr}"
+                    )
+                    reflection_text = self.reflect_on_session(reflection_input)
+                    updates = self.parse_reflection_output(reflection_text)
 
-                # Phase 11.3: Check for context updates in reflection
-                for update in updates:
-                    if update["type"] == "dec":
-                        context_updates.append(f"Decision: {update['description']}")
-                    elif update["type"] == "str" and update.get("helpful", 0) > 0:
-                        context_updates.append(f"New Strategy: {update['description']}")
+                    # Phase 11.3: Check for context updates in reflection
+                    for update in updates:
+                        if update["type"] == "dec":
+                            context_updates.append(f"Decision: {update['description']}")
+                        elif update["type"] == "str" and update.get("helpful", 0) > 0:
+                            context_updates.append(f"New Strategy: {update['description']}")
 
-                        # If test failed, ensure we increment harmful for the strategy used
-                        # and if it passed, increment helpful (Phase 3.4).
-                        if updates:
-                            for update in updates:
-                                if test_passed:
-                                    update["helpful"] = max(update.get("helpful", 0), 1)
-                                    update["harmful"] = 0
-                                else:
-                                    update["harmful"] = max(update.get("harmful", 0), 1)
-                                    update["helpful"] = 0
+                            # If test failed, ensure we increment harmful for the strategy used
+                            # and if it passed, increment helpful (Phase 3.4).
+                            if updates:
+                                for update in updates:
+                                    if test_passed:
+                                        update["helpful"] = max(update.get("helpful", 0), 1)
+                                        update["harmful"] = 0
+                                    else:
+                                        update["harmful"] = max(update.get("harmful", 0), 1)
+                                        update["helpful"] = 0
 
-                            playbook_path = self.cursor_rules_dir / "_global.mdc"
-                            if resolved_agent_id:
-                                agents_config = self.load_agents()
-                                agent = next(
-                                    (
-                                        a
-                                        for a in agents_config.agents
-                                        if a.id == resolved_agent_id
-                                    ),
-                                    None,
+                                playbook_path = self.cursor_rules_dir / "_global.mdc"
+                                if resolved_agent_id:
+                                    agents_config = self.load_agents()
+                                    agent = next(
+                                        (
+                                            a
+                                            for a in agents_config.agents
+                                            if a.id == resolved_agent_id
+                                        ),
+                                        None,
+                                    )
+                                    if agent:
+                                        playbook_path = self.base_path / agent.memory_file
+                                self.update_playbook(playbook_path, updates)
+                                print(f"[ROLF] Updated playbook: {playbook_path.name}")
+
+                            # Update prompt with reflection insights if it failed
+                            if not test_passed and reflection_text != "No new learnings.":
+                                prompt = (
+                                    f"Previous attempt failed (Status: {feedback_status}). Reflection insights:\n"
+                                    f"{reflection_text}\n\n"
+                                    f"Original task: {prompt}"
                                 )
-                                if agent:
-                                    playbook_path = self.base_path / agent.memory_file
-                            self.update_playbook(playbook_path, updates)
-                            print(f"[ROLF] Updated playbook: {playbook_path.name}")
+                            elif not test_passed:
+                                prompt = (
+                                    f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
+                                    f"{result.stdout}\n{result.stderr}\n\n"
+                                    f"Original task: {prompt}"
+                                )
+                        else:
+                            if not test_passed:
+                                print(
+                                    f"[ROLF] ❌ Verification failed "
+                                    f"(Exit code: {result.returncode})"
+                                )
+                                # Update prompt for next iteration with failure info
+                                prompt = (
+                                    f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
+                                    f"{result.stdout}\n{result.stderr}\n\n"
+                                    f"Original task: {prompt}"
+                                )
 
-                        # Update prompt with reflection insights if it failed
-                        if not test_passed and reflection_text != "No new learnings.":
-                            prompt = (
-                                f"Previous attempt failed (Status: {feedback_status}). Reflection insights:\n"
-                                f"{reflection_text}\n\n"
-                                f"Original task: {prompt}"
-                            )
-                        elif not test_passed:
-                            prompt = (
-                                f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
-                                f"{result.stdout}\n{result.stderr}\n\n"
-                                f"Original task: {prompt}"
-                            )
-                    else:
-                        if not test_passed:
-                            print(
-                                f"[ROLF] ❌ Verification failed "
-                                f"(Exit code: {result.returncode})"
-                            )
-                            # Update prompt for next iteration with failure info
-                            prompt = (
-                                f"Previous attempt failed (Status: {feedback_status}). Test output:\n"
-                                f"{result.stdout}\n{result.stderr}\n\n"
-                                f"Original task: {prompt}"
-                            )
+                        # 5. Git Commit (Optional)
+                        if git_commit and test_passed:
+                            print("[ROLF] Committing changes...")
+                            try:
+                                status = subprocess.run(
+                                    ["git", "status", "--porcelain"],
+                                    capture_output=True,
+                                    text=True,
+                                    check=False,
+                                )
+                                if status.stdout.strip():
+                                    commit_msg = f"ROLF Loop: {prompt[:50]}"
+                                    # Try to generate a better commit message using LLM if available
+                                    client = self.get_anthropic_client()
+                                    if client:
+                                        try:
+                                            diff = subprocess.run(
+                                                ["git", "diff"],
+                                                capture_output=True,
+                                                text=True,
+                                                check=False,
+                                            ).stdout
+                                            msg_prompt = (
+                                                "Generate a concise, one-line git commit message "
+                                                f"for the following task: {prompt[:100]}\n\n"
+                                                f"Git Diff context:\n{diff[:2000]}\n\n"
+                                                "Output ONLY the commit message string."
+                                            )
+                                            message = client.messages.create(
+                                                model="claude-3-5-sonnet-20241022",
+                                                max_tokens=100,
+                                                messages=[{"role": "user", "content": msg_prompt}],
+                                            )
+                                            if isinstance(message.content, list):
+                                                commit_msg = message.content[0].text.strip()
+                                        except Exception:
+                                            pass
 
-                    # 5. Git Commit (Optional)
-                    if git_commit and test_passed:
-                        print("[ROLF] Committing changes...")
-                        try:
-                            status = subprocess.run(
-                                ["git", "status", "--porcelain"],
-                                capture_output=True,
-                                text=True,
-                                check=False,
-                            )
-                            if status.stdout.strip():
-                                commit_msg = f"ROLF Loop: {prompt[:50]}"
-                                # Try to generate a better commit message using LLM if available
-                                client = self.get_anthropic_client()
-                                if client:
-                                    try:
-                                        diff = subprocess.run(
-                                            ["git", "diff"],
-                                            capture_output=True,
-                                            text=True,
-                                            check=False,
-                                        ).stdout
-                                        msg_prompt = (
-                                            "Generate a concise, one-line git commit message "
-                                            f"for the following task: {prompt[:100]}\n\n"
-                                            f"Git Diff context:\n{diff[:2000]}\n\n"
-                                            "Output ONLY the commit message string."
-                                        )
-                                        message = client.messages.create(
-                                            model="claude-3-5-sonnet-20241022",
-                                            max_tokens=100,
-                                            messages=[{"role": "user", "content": msg_prompt}],
-                                        )
-                                        if isinstance(message.content, list):
-                                            commit_msg = message.content[0].text.strip()
-                                    except Exception:
-                                        pass
+                                    subprocess.run(["git", "add", "."], check=True)
+                                    subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+                                    print(f"[ROLF] Committed: {commit_msg}")
+                            except Exception as e:
+                                print(f"[ROLF] Git commit failed: {e}")
 
-                                subprocess.run(["git", "add", "."], check=True)
-                                subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-                                print(f"[ROLF] Committed: {commit_msg}")
-                        except Exception as e:
-                            print(f"[ROLF] Git commit failed: {e}")
+                        if test_passed:
+                            print("[ROLF] ✅ Verification successful!")
+                            # Notify subscribers of the change
+                            if path:
+                                self.notify_subscribers(
+                                    path, f"ROLF Loop successful for: {prompt}", success=True
+                                )
 
-                    if test_passed:
-                        print("[ROLF] ✅ Verification successful!")
-                        # Notify subscribers of the change
-                        if path:
-                            self.notify_subscribers(
-                                path, f"ROLF Loop successful for: {prompt}", success=True
-                            )
+                            # Update plan.md if it exists
+                            if os.path.exists(plan_file):
+                                print(f"[ROLF] Updating {plan_file}...")
+                                update_plan_prompt = (
+                                    f"Update '{plan_file}' and 'changelog.md' based on the "
+                                    f"successful completion of: {prompt[:100]}"
+                                )
+                                subprocess.run(
+                                    f'cursor-agent --print --model {model} --force --trust "{update_plan_prompt}"',
+                                    shell=True,
+                                )
 
-                        # Update plan.md if it exists
-                        if os.path.exists(plan_file):
-                            print(f"[ROLF] Updating {plan_file}...")
-                            update_plan_prompt = (
-                                f"Update '{plan_file}' and 'changelog.md' based on the "
-                                f"successful completion of: {prompt[:100]}"
-                            )
-                            subprocess.run(
-                                f'cursor-agent --print --model {model} --force --trust "{update_plan_prompt}"',
-                                shell=True,
-                            )
+                        # Update Living Spec if applicable (Phase 10.23)
+                        if spec_id:
+                            print(f"[ROLF] Automating Living Spec update for {spec_id}...")
+                            self.automate_spec_update(spec_id, result.stdout)
 
-                    # Update Living Spec if applicable (Phase 10.23)
-                    if spec_id:
-                        print(f"[ROLF] Automating Living Spec update for {spec_id}...")
-                        self.automate_spec_update(spec_id, result.stdout)
-
-                    success = test_passed
-                    if test_passed:
-                        break
+                        success = test_passed
+                        if test_passed:
+                            break
             except Exception as e:
                 print(f"[ROLF] Error during execution: {e}")
             finally:
